@@ -161,13 +161,53 @@ def gorsel_icerik_olustur_ve_gonder(kategori: str = "ayet", tema: Optional[str] 
     return paylasim_id
 
 
-def dinle_ve_bekle(sure_saniye: int = 120):
+def dinle_ve_bekle(sure_saniye: int = 1800, paylasim_id: Optional[int] = None) -> bool:
     """
     Belirtilen süre boyunca Telegram'daki onay butonlarına basılmasını bekler.
+    Eğer paylasim_id belirtilmişse ve onay/ret gelirse döngü erken tamamlanır.
     """
-    log.info(f"Telegram onay butonları dinleniyor ({sure_saniye} saniye)...")
+    dakika = sure_saniye // 60
+    log.info(f"Telegram onay butonları dinleniyor (Maksimum bekleme: {dakika} dakika)...")
     offset = 0
     baslangic = time.time()
     while time.time() - baslangic < sure_saniye:
         offset = telegram_bot.tek_sefer_dinle(offset)
+        if paylasim_id:
+            kayit = db.paylasim_getir(paylasim_id)
+            if kayit and kayit.get("durum") in ("yayinlandi", "iptal_edildi"):
+                durum = kayit.get("durum")
+                log.info(f"Paylaşım #{paylasim_id} '{durum}' durumuna geçti, işlem tamam.")
+                return durum == "yayinlandi"
         time.sleep(2)
+
+    log.warning(f"Zaman aşımı: {sure_saniye} saniye içinde onay/ret gelmedi.")
+    return False
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Ezan Plus Sosyal Medya Otomasyon Motoru")
+    parser.add_argument("--tur", choices=["reels", "gorsel"], default="reels", help="İçerik türü (reels veya gorsel)")
+    parser.add_argument("--tema", type=str, default=None, help="Özel tema veya ayet konusu")
+    parser.add_argument("--otomatik", action="store_true", help="Onay beklemeden doğrudan yayınla")
+    parser.add_argument("--bekleme", type=int, default=1800, help="Onay bekleme süresi (saniye)")
+
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+    if args.tur == "reels":
+        pid = reels_icerigi_olustur_ve_gonder(tema=args.tema)
+    else:
+        pid = gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=args.tema)
+
+    if args.otomatik:
+        log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")
+        telegram_bot.yayinla_hepsi(pid)
+    else:
+        dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid)
+

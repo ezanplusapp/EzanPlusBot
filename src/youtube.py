@@ -63,7 +63,7 @@ def yetki_al() -> Optional[Credentials]:
                 str(CLIENT_SECRET_DOSYASI), SCOPES
             )
             # Yerel sunucu başlatıp tarayıcıda izin ekranını aç
-            creds = flow.run_local_server(port=8088, prompt="consent")
+            creds = flow.run_local_server(port=0, prompt="consent")
 
         # Yeni token'ı kaydet
         TOKEN_DOSYASI.parent.mkdir(parents=True, exist_ok=True)

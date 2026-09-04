@@ -36,17 +36,34 @@ def get_meta_bilgileri() -> tuple[str, str, str]:
     return ig_id, page_id, token
 
 
-def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:
+def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
     """
-    Yerel görsel dosyasını Meta'nın erişebileceği geçici/kalıcı bir genel URL'ye yükler.
-    Önce .env'deki IMGBB_API_KEY kontrol edilir, yoksa tmpfiles.org kullanılır.
+    Yerel görsel veya video dosyasını Meta'nın doğrudan erişebileceği genel bir CDN URL'sine yükler.
+    Önce Catbox.moe (hızlı, direkt, sınırsız), yedek olarak tmpfiles/ImgBB kullanılır.
     """
     p = Path(dosya_yolu)
     if not p.exists():
-        raise FileNotFoundError(f"Görsel bulunamadı: {dosya_yolu}")
+        raise FileNotFoundError(f"Medya bulunamadı: {dosya_yolu}")
 
+    # 1. Öncelik: Catbox.moe (Meta tarafından sorunsuz kabul edilen doğrudan dosya linki)
+    try:
+        with open(p, "rb") as f:
+            res = requests.post(
+                "https://catbox.moe/user/api.php",
+                data={"reqtype": "fileupload"},
+                files={"fileToUpload": f},
+                timeout=60,
+            )
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            log.info(f"Medya Catbox'a yüklendi: {url}")
+            return url
+    except Exception as e:
+        log.warning(f"Catbox yükleme hatası: {e}, ImgBB/tmpfiles deneniyor...")
+
+    # 2. Öncelik: ImgBB
     imgbb_key = get_env("IMGBB_API_KEY")
-    if imgbb_key:
+    if imgbb_key and p.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
         try:
             with open(p, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -59,9 +76,9 @@ def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:
             if data.get("success"):
                 return data["data"]["url"]
         except Exception as e:
-            log.warning(f"ImgBB yüklemesi başarısız oldu, tmpfiles deneniyor: {e}")
+            log.warning(f"ImgBB yüklemesi başarısız oldu: {e}")
 
-    # Alternatif: tmpfiles.org üzerinden direkt indirme URL'si
+    # 3. Öncelik: tmpfiles.org
     with open(p, "rb") as f:
         res = requests.post(
             "https://tmpfiles.org/api/v1/upload",
@@ -71,11 +88,14 @@ def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:
     data = res.json()
     if data.get("status") == "success":
         url = data["data"]["url"]
-        # tmpfiles.org/123/resim.png -> tmpfiles.org/dl/123/resim.png
-        direct_url = url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-        return direct_url
+        return url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
 
-    raise RuntimeError(f"Görsel genel URL'ye yüklenemedi: {data}")
+    raise RuntimeError("Medya hiçbir servise yüklenemedi!")
+
+
+def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:
+    """Geriye dönük uyumluluk için takma ad."""
+    return gecici_medya_yukle(dosya_yolu)
 
 
 def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> Dict[str, Any]:
@@ -216,6 +236,7 @@ def facebook_post_paylas(metin: str, gorsel_yolu: Optional[str | Path] = None) -
     Facebook 'Ezan Plus App' Sayfasına metin veya görsel paylaşır.
     """
     _, page_id, token = get_meta_bilgileri()
+    page_token = get_env("FACEBOOK_PAGE_ACCESS_TOKEN") or token
     if not page_id:
         raise ValueError("FACEBOOK_PAGE_ID bulunamadı!")
 
@@ -224,7 +245,7 @@ def facebook_post_paylas(metin: str, gorsel_yolu: Optional[str | Path] = None) -
         with open(gorsel_yolu, "rb") as f:
             res = requests.post(
                 f"{GRAPH_API_URL}/{page_id}/photos",
-                data={"message": metin, "access_token": token},
+                data={"message": metin, "access_token": page_token},
                 files={"source": f},
                 timeout=45
             )
@@ -232,7 +253,7 @@ def facebook_post_paylas(metin: str, gorsel_yolu: Optional[str | Path] = None) -
         log.info("Facebook sayfasına metin postu atılıyor...")
         res = requests.post(
             f"{GRAPH_API_URL}/{page_id}/feed",
-            data={"message": metin, "access_token": token},
+            data={"message": metin, "access_token": page_token},
             timeout=30
         )
 

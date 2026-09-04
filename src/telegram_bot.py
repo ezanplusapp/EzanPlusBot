@@ -238,16 +238,17 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
         log.error(f"Instagram Story yayınlama hatası: {e}")
         sonuclar["instagram_story_hata"] = str(e)
 
-    # 2. Threads Yayınla
+    # 2. Threads Yayınla (Akıllı Parçalanmış Video/Görsel Zincir Gönderi)
     try:
-        if gorsel_yolu:
-            log.info("Threads'e görselli gönderi yükleniyor...")
-            th_res = threads.threads_gorsel_paylas(gorsel_yolu, caption)
-            sonuclar["threads"] = th_res.get("id")
+        log.info("Threads'e zincir gönderi yükleniyor...")
+        if format_tipi == "reels_9_16" and video_yolu:
+            th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=video_yolu)
+        elif gorsel_yolu:
+            th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=gorsel_yolu)
         else:
-            log.info("Threads'e metin gönderisi yükleniyor...")
-            th_res = threads.threads_metin_paylas(caption)
-            sonuclar["threads"] = th_res.get("id")
+            th_res = threads.threads_zincir_paylas(caption)
+        sonuclar["threads"] = th_res.get("id")
+        sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
     except Exception as e:
         log.error(f"Threads yayınlama hatası: {e}")
         sonuclar["threads_hata"] = str(e)
@@ -284,7 +285,7 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
         try:
             from . import tiktok
             key = os.getenv("TIKTOK_CLIENT_KEY")
-            if key and (tiktok.TOKEN_DOSYASI.exists() or key.strip()):
+            if key and tiktok.TOKEN_DOSYASI.exists():
                 log.info(f"TikTok'a yükleniyor: {video_yolu}")
                 baslik = kayit.get("baslik") or "Ezan Plus • Günün Ayeti"
                 tt_res = tiktok.tiktok_video_yukle(
@@ -316,7 +317,12 @@ def tek_sefer_dinle(offset: int = 0) -> int:
     token, _ = get_token_ve_chat_id()
     url = TABAN_URL.format(token=token, metot="getUpdates")
     try:
-        res = requests.get(url, params={"offset": offset, "timeout": 2}, timeout=5)
+        params = {
+            "offset": offset,
+            "timeout": 2,
+            "allowed_updates": json.dumps(["message", "callback_query", "channel_post", "my_chat_member"]),
+        }
+        res = requests.get(url, params=params, timeout=5)
         res_json = res.json()
         if not res_json.get("ok"):
             return offset
@@ -335,6 +341,7 @@ def tek_sefer_dinle(offset: int = 0) -> int:
             msg = cq.get("message", {})
             chat_id = msg.get("chat", {}).get("id")
             msg_id = msg.get("message_id")
+            log.info(f"Telegram buton tıklaması alındı: data='{data}', msg_id={msg_id}")
 
             if data.startswith("onay_"):
                 paylasim_id = int(data.split("_")[1])

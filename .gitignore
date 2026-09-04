@@ -10,8 +10,8 @@ venv/
 .env
 *.env
 client_secret*.json
-token.json
-credentials.json
+*token*.json
+credentials*.json
 
 # Veri & Çıktı Dosyaları (Büyük video, ses ve SQLite)
 data/*.db

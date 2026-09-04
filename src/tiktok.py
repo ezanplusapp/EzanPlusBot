@@ -26,7 +26,7 @@ INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
 STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
 
 SCOPES = "user.info.basic,video.upload,video.publish"
-REDIRECT_URI = "http://localhost:8088/"
+REDIRECT_URI = "https://ezanplus.ozbornstudio.com/callback"
 
 TOKEN_DOSYASI = KOK_DIZIN / "data" / "tiktok_token.json"
 
@@ -42,33 +42,11 @@ def get_tiktok_api_anahtarlari() -> tuple[str, str]:
     return key, secret
 
 
-class _OAuthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        parsed = urllib.parse.urlparse(self.path)
-        qs = urllib.parse.parse_qs(parsed.query)
-        if "code" in qs:
-            self.server.auth_code = qs["code"][0]
-            self.send_response(200)
-            self.send_header("Content-type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(
-                b"<h2>\xe2\x9c\x85 TikTok Yetkilendirmesi Basarili!</h2><p>Bu pencereyi kapatip terminale donebilirsiniz.</p>"
-            )
-        else:
-            self.server.auth_code = None
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Giris basarisiz oldu.")
-
-    def log_message(self, format, *args):
-        pass
-
-
-def yetki_al() -> Dict[str, Any]:
+def yetki_al(manuel_kod: Optional[str] = None) -> Dict[str, Any]:
     """
     TikTok OAuth 2.0 erişim belirtecini yönetir.
     Token dosyası varsa okur, gerekirse yeniler.
-    Yoksa tarayıcı açarak kullanıcıdan izin alır.
+    Yoksa kullanıcıdan yetkilendirme alır.
     """
     key, secret = get_tiktok_api_anahtarlari()
 
@@ -105,7 +83,7 @@ def yetki_al() -> Dict[str, Any]:
         except Exception as e:
             log.warning(f"TikTok token yenileme hatası: {e}, yeniden giriş yapılıyor...")
 
-    # 2. Yeni giriş akışı başlat
+    # 2. Yeni giriş akışı
     params = {
         "client_key": key,
         "scope": SCOPES,
@@ -114,20 +92,25 @@ def yetki_al() -> Dict[str, Any]:
         "state": "ezanplus_tiktok_auth",
     }
     giris_url = f"{AUTH_URL}?{urllib.parse.urlencode(params)}"
-    log.info(f"TikTok giriş URL'si oluşturuldu:\n{giris_url}")
 
-    server = HTTPServer(("localhost", 8088), _OAuthHandler)
-    server.auth_code = None
-
-    import webbrowser
-    webbrowser.open(giris_url)
-    log.info("Tarayıcıda TikTok izin penceresi açıldı. Onay bekleniyor...")
-
-    while server.auth_code is None:
-        server.handle_request()
-
-    code = server.auth_code
-    server.server_close()
+    code = manuel_kod
+    if not code:
+        log.info(f"TikTok Giriş Bağlantısı:\n{giris_url}\n")
+        import webbrowser
+        webbrowser.open(giris_url)
+        print("\n" + "=" * 60)
+        print("🔗 TIKTOK YETKİLENDİRME ADIMI:")
+        print(f"Tarayıcınız açılmadıysa şu adrese gidin:\n{giris_url}\n")
+        print("Giriş yapıp izin verdikten sonra yönlendirildiğiniz sayfanın adres çubuğundaki")
+        print("tüm URL'yi (veya 'code=' sonrasındaki metni) kopyalayıp buraya yapıştırın:")
+        print("=" * 60)
+        raw_input = input("Yönlendirme URL'si veya Kod: ").strip()
+        if "code=" in raw_input:
+            parsed = urllib.parse.urlparse(raw_input)
+            qs = urllib.parse.parse_qs(parsed.query)
+            code = qs.get("code", [raw_input])[0]
+        else:
+            code = raw_input
 
     # Kodu Access Token ile takas et
     token_res = requests.post(

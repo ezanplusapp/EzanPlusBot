@@ -1,0 +1,103 @@
+name: Günlük Reels Otomasyonu
+
+on:
+  # 1. Yerel GitHub Zamanlayıcı (Yedek: Her gün 19:45 TSİ / 16:45 UTC)
+  schedule:
+    - cron: '45 16 * * *'
+
+  # 2. cron-job.org veya GitHub web arayüzünden manuel tetikleme
+  workflow_dispatch:
+    inputs:
+      auto_publish:
+        description: 'Telegram onayı beklemeden doğrudan yayınla'
+        type: boolean
+        default: false
+      tema:
+        description: 'Özel ayet teması (Boş bırakılırsa yapay zeka seçer)'
+        type: string
+        default: ''
+
+  # 3. Harici Webhook (cron-job.org / curl / repository_dispatch)
+  repository_dispatch:
+    types: [gunluk_reels]
+
+concurrency:
+  group: reels-otomasyon
+  cancel-in-progress: false
+
+jobs:
+  reels_uret_ve_yayinla:
+    name: Reels Üret ve Dağıt
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Kodu Çek
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: FFmpeg ve Sistem Fontlarını Kur
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto fonts-noto-color-emoji
+
+      - name: Python Paketlerini Yükle
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ortam Değişkenlerini ve Token Dosyalarını Hazırla
+        env:
+          ENV_CONTENT: |
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
+            INSTAGRAM_ACCOUNT_ID=${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+            INSTAGRAM_ACCESS_TOKEN=${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+            FACEBOOK_PAGE_ID=${{ secrets.FACEBOOK_PAGE_ID }}
+            FACEBOOK_PAGE_ACCESS_TOKEN=${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+            META_APP_ID=${{ secrets.META_APP_ID }}
+            META_APP_SECRET=${{ secrets.META_APP_SECRET }}
+            THREADS_APP_ID=${{ secrets.THREADS_APP_ID }}
+            THREADS_APP_SECRET=${{ secrets.THREADS_APP_SECRET }}
+            THREADS_USER_ID=${{ secrets.THREADS_USER_ID }}
+            THREADS_ACCESS_TOKEN=${{ secrets.THREADS_ACCESS_TOKEN }}
+            TIKTOK_CLIENT_KEY=${{ secrets.TIKTOK_CLIENT_KEY }}
+            TIKTOK_CLIENT_SECRET=${{ secrets.TIKTOK_CLIENT_SECRET }}
+            TIKTOK_REFRESH_TOKEN=${{ secrets.TIKTOK_REFRESH_TOKEN }}
+            IMGBB_API_KEY=${{ secrets.IMGBB_API_KEY }}
+          YT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
+          YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          TT_TOKEN: ${{ secrets.TIKTOK_TOKEN_JSON }}
+        run: |
+          mkdir -p data
+          printf "%s\n" "$ENV_CONTENT" > .env
+          if [ -n "$YT_SECRET" ]; then
+            printf "%s\n" "$YT_SECRET" > client_secret.json
+          fi
+          if [ -n "$YT_TOKEN" ]; then
+            printf "%s\n" "$YT_TOKEN" > data/youtube_token.json
+          fi
+          if [ -n "$TT_TOKEN" ]; then
+            printf "%s\n" "$TT_TOKEN" > data/tiktok_token.json
+          fi
+
+      - name: Reels Üretim ve Yayın Motorunu Çalıştır
+        run: |
+          ARGS="--tur reels --bekleme 2700"
+          
+          if [ "${{ github.event.inputs.auto_publish }}" = "true" ]; then
+            ARGS="$ARGS --otomatik"
+          fi
+          
+          if [ -n "${{ github.event.inputs.tema }}" ]; then
+            ARGS="$ARGS --tema '${{ github.event.inputs.tema }}'"
+          fi
+
+          echo "Çalıştırılıyor: python -m src.otomasyon $ARGS"
+          PYTHONPATH=. python -m src.otomasyon $ARGS
