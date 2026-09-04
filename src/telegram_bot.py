@@ -224,6 +224,20 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
         log.error(f"Instagram yayınlama hatası: {e}")
         sonuclar["instagram_hata"] = str(e)
 
+    # 1b. Instagram Story Yayınla
+    try:
+        if format_tipi == "reels_9_16" and video_yolu:
+            log.info(f"Instagram Story (Video) yükleniyor: {video_yolu}")
+            story_res = instagram.instagram_story_paylas(video_yolu, is_video=True)
+            sonuclar["instagram_story"] = story_res.get("id")
+        elif gorsel_yolu:
+            log.info(f"Instagram Story (Görsel) yükleniyor: {gorsel_yolu}")
+            story_res = instagram.instagram_story_paylas(gorsel_yolu, is_video=False)
+            sonuclar["instagram_story"] = story_res.get("id")
+    except Exception as e:
+        log.error(f"Instagram Story yayınlama hatası: {e}")
+        sonuclar["instagram_story_hata"] = str(e)
+
     # 2. Threads Yayınla
     try:
         if gorsel_yolu:
@@ -318,7 +332,8 @@ def tek_sefer_dinle(offset: int = 0) -> int:
 
                 basari_metni = (
                     f"🎉 <b>İÇERİK BAŞARIYLA YAYINLANDI!</b>\n\n"
-                    f"• <b>Instagram (@ezanplusapp):</b> {'✅ Yayınlandı' if 'instagram' in sonuclar else '❌ Hata'}\n"
+                    f"• <b>Instagram Reels/Gönderi:</b> {'✅ Yayınlandı' if 'instagram' in sonuclar else '❌ Hata'}\n"
+                    f"• <b>Instagram Story:</b> {'✅ Yayınlandı' if 'instagram_story' in sonuclar else '❌ Hata'}\n"
                     f"• <b>Threads (@ezanplusapp):</b> {'✅ Yayınlandı' if 'threads' in sonuclar else '❌ Hata'}\n"
                     f"• <b>Facebook Sayfası:</b> {'✅ Yayınlandı' if 'facebook' in sonuclar else '❌ Hata'}\n"
                     f"• <b>YouTube Shorts:</b> {yt_durum}\n\n"

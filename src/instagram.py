@@ -242,3 +242,114 @@ def facebook_post_paylas(metin: str, gorsel_yolu: Optional[str | Path] = None) -
 
     log.info(f"Facebook gönderisi başarıyla yayınlandı! ID: {data['id']}")
     return data
+
+
+def instagram_story_paylas(
+    medya_yolu_veya_url: str | Path,
+    is_video: bool = False,
+) -> Dict[str, Any]:
+    """
+    Instagram'da Story (Hikaye) paylaşır.
+    is_video=True: 9:16 dikey video story olarak yayınlanır (Resumable upload).
+    is_video=False: Görsel story olarak yayınlanır.
+    """
+    ig_id, _, token = get_meta_bilgileri()
+    medya_p = Path(medya_yolu_veya_url)
+
+    if is_video:
+        if not medya_p.exists():
+            raise FileNotFoundError(f"Story video dosyası bulunamadı: {medya_yolu_veya_url}")
+
+        dosya_boyutu = medya_p.stat().st_size
+
+        # 1. Adım: Resumable Story Container Başlat
+        log.info("Instagram Story Video Container başlatılıyor...")
+        init_res = requests.post(
+            f"{GRAPH_API_URL}/{ig_id}/media",
+            data={
+                "media_type": "STORIES",
+                "upload_type": "resumable",
+                "access_token": token,
+            },
+            timeout=30,
+        )
+        init_data = init_res.json()
+        if "id" not in init_data:
+            raise RuntimeError(f"Story başlatma hatası: {init_data}")
+
+        container_id = init_data["id"]
+        upload_url = init_data.get("uri", f"{RUPLOAD_URL}/{container_id}")
+
+        # 2. Adım: Video Baytlarını Yükle
+        log.info(f"Story videosu yükleniyor ({dosya_boyutu / (1024*1024):.2f} MB)...")
+        with open(medya_p, "rb") as f:
+            video_bytes = f.read()
+
+        headers = {
+            "Authorization": f"OAuth {token}",
+            "offset": "0",
+            "file_size": str(dosya_boyutu),
+            "Content-Type": "application/octet-stream",
+        }
+        upload_res = requests.post(upload_url, headers=headers, data=video_bytes, timeout=120)
+        log.info(f"Story video yükleme HTTP yanıtı: {upload_res.status_code}")
+
+        # 3. Adım: İşlenme Durumunu Bekle
+        log.info("Story videosunun Meta tarafında işlenmesi bekleniyor...")
+        for _ in range(30):
+            time.sleep(5)
+            status_res = requests.get(
+                f"{GRAPH_API_URL}/{container_id}",
+                params={"fields": "status_code,status", "access_token": token},
+                timeout=15,
+            )
+            s_data = status_res.json()
+            status_code = s_data.get("status_code")
+            log.info(f"Story video işlenme durumu: {status_code}")
+            if status_code == "FINISHED":
+                break
+            elif status_code in ("ERROR", "EXPIRED"):
+                raise RuntimeError(f"Story video işleme hatası: {s_data}")
+        else:
+            raise TimeoutError("Story videosu işleme zaman aşımına uğradı!")
+
+    else:
+        # Görsel Story
+        if str(medya_yolu_veya_url).startswith("http://") or str(medya_yolu_veya_url).startswith("https://"):
+            image_url = str(medya_yolu_veya_url)
+        else:
+            log.info("Story görseli genel URL'ye aktarılıyor...")
+            image_url = gecici_gorsel_yukle(medya_yolu_veya_url)
+
+        log.info("Instagram Story Image Container oluşturuluyor...")
+        c_res = requests.post(
+            f"{GRAPH_API_URL}/{ig_id}/media",
+            data={
+                "media_type": "STORIES",
+                "image_url": image_url,
+                "access_token": token,
+            },
+            timeout=30,
+        )
+        c_data = c_res.json()
+        if "id" not in c_data:
+            raise RuntimeError(f"Story Image Container hatası: {c_data}")
+        container_id = c_data["id"]
+
+    # Son Adım: Story Yayınla
+    log.info(f"Instagram Story {container_id} yayınlanıyor...")
+    publish_res = requests.post(
+        f"{GRAPH_API_URL}/{ig_id}/media_publish",
+        data={
+            "creation_id": container_id,
+            "access_token": token,
+        },
+        timeout=30,
+    )
+    p_data = publish_res.json()
+    if "id" not in p_data:
+        raise RuntimeError(f"Instagram Story Yayınlama hatası: {p_data}")
+
+    log.info(f"Instagram Story başarıyla yayınlandı! Medya ID: {p_data['id']}")
+    return p_data
+
