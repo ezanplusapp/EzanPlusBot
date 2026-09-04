@@ -8,3 +8,6 @@ fonttools>=4.50.0
 brotli>=1.1.0
 arabic-reshaper>=3.0.0
 python-bidi>=0.6.0
+google-api-python-client>=2.150.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0

@@ -51,11 +51,17 @@ def tabloları_hazirla():
                 instagram_post_id TEXT,
                 threads_post_id TEXT,
                 tiktok_post_id TEXT,
+                youtube_post_id TEXT,
                 olusturma_zamani TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 yayin_zamani TIMESTAMP,
                 hata_mesaji TEXT
             )
         """)
+        # Migration: youtube_post_id yoksa ekle
+        try:
+            con.execute("ALTER TABLE paylasimlar ADD COLUMN youtube_post_id TEXT")
+        except sqlite3.OperationalError:
+            pass
         # Hızlı mükerrer arama için index
         con.execute("CREATE INDEX IF NOT EXISTS idx_kaynak ON paylasimlar(kaynak)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_durum ON paylasimlar(durum)")
@@ -124,6 +130,7 @@ def durum_guncelle(
     hata_mesaji: Optional[str] = None,
     instagram_post_id: Optional[str] = None,
     telegram_mesaj_id: Optional[int] = None,
+    youtube_post_id: Optional[str] = None,
 ):
     """Paylaşımın durumunu günceller."""
     with baglanti_al() as con:
@@ -139,6 +146,9 @@ def durum_guncelle(
         if telegram_mesaj_id is not None:
             updates.append("telegram_mesaj_id = ?")
             params.append(telegram_mesaj_id)
+        if youtube_post_id is not None:
+            updates.append("youtube_post_id = ?")
+            params.append(youtube_post_id)
         if yeni_durum == "yayinlandi":
             updates.append("yayin_zamani = CURRENT_TIMESTAMP")
 
