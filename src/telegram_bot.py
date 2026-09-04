@@ -279,12 +279,31 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
             log.error(f"YouTube Shorts yayınlama hatası: {e}")
             sonuclar["youtube_hata"] = str(e)
 
+    # 5. TikTok Yayınla (Video varsa ve TikTok anahtarları tanımlıysa)
+    if format_tipi == "reels_9_16" and video_yolu:
+        try:
+            from . import tiktok
+            key = os.getenv("TIKTOK_CLIENT_KEY")
+            if key and (tiktok.TOKEN_DOSYASI.exists() or key.strip()):
+                log.info(f"TikTok'a yükleniyor: {video_yolu}")
+                baslik = kayit.get("baslik") or "Ezan Plus • Günün Ayeti"
+                tt_res = tiktok.tiktok_video_yukle(
+                    video_yolu=video_yolu,
+                    baslik=baslik,
+                    aciklama=caption,
+                )
+                sonuclar["tiktok"] = tt_res.get("publish_id")
+        except Exception as e:
+            log.error(f"TikTok yayınlama hatası: {e}")
+            sonuclar["tiktok_hata"] = str(e)
+
     # Veritabanı güncelle
     db.durum_guncelle(
         paylasim_id,
         yeni_durum="yayinlandi",
         instagram_post_id=sonuclar.get("instagram"),
         youtube_post_id=sonuclar.get("youtube"),
+        tiktok_post_id=sonuclar.get("tiktok"),
     )
     return sonuclar
 
@@ -330,13 +349,20 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                 elif "youtube_hata" in sonuclar:
                     yt_durum = "❌ Hata"
 
+                tt_durum = "—"
+                if "tiktok" in sonuclar:
+                    tt_durum = "✅ Yayınlandı"
+                elif "tiktok_hata" in sonuclar:
+                    tt_durum = "❌ Hata"
+
                 basari_metni = (
                     f"🎉 <b>İÇERİK BAŞARIYLA YAYINLANDI!</b>\n\n"
                     f"• <b>Instagram Reels/Gönderi:</b> {'✅ Yayınlandı' if 'instagram' in sonuclar else '❌ Hata'}\n"
                     f"• <b>Instagram Story:</b> {'✅ Yayınlandı' if 'instagram_story' in sonuclar else '❌ Hata'}\n"
                     f"• <b>Threads (@ezanplusapp):</b> {'✅ Yayınlandı' if 'threads' in sonuclar else '❌ Hata'}\n"
                     f"• <b>Facebook Sayfası:</b> {'✅ Yayınlandı' if 'facebook' in sonuclar else '❌ Hata'}\n"
-                    f"• <b>YouTube Shorts:</b> {yt_durum}\n\n"
+                    f"• <b>YouTube Shorts:</b> {yt_durum}\n"
+                    f"• <b>TikTok (@ezanplusapp):</b> {tt_durum}\n\n"
                     f"⏰ <i>Zaman: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
                 )
                 caption_guncelle(chat_id, msg_id, basari_metni)

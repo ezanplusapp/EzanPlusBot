@@ -131,6 +131,7 @@ def durum_guncelle(
     instagram_post_id: Optional[str] = None,
     telegram_mesaj_id: Optional[int] = None,
     youtube_post_id: Optional[str] = None,
+    tiktok_post_id: Optional[str] = None,
 ):
     """Paylaşımın durumunu günceller."""
     with baglanti_al() as con:
@@ -149,6 +150,9 @@ def durum_guncelle(
         if youtube_post_id is not None:
             updates.append("youtube_post_id = ?")
             params.append(youtube_post_id)
+        if tiktok_post_id is not None:
+            updates.append("tiktok_post_id = ?")
+            params.append(tiktok_post_id)
         if yeni_durum == "yayinlandi":
             updates.append("yayin_zamani = CURRENT_TIMESTAMP")
 
