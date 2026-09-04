@@ -46,12 +46,15 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
   - Okunan kelime anında kırmızıya (`#9B1B1B`) boyanır; başından sonuna doğru akan dinamik loading dolum çizgisi akar.
   - Okunan kelimeye odaklanılırken meal ve tefekkür bölümü kartın alt kısmında huzurlu bir şekilde eşlik eder.
 
-### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru (1. Yol — Multi-Page Crossfade Engine)
+### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru & Dinamik Flex Mizanpaj
 * **Otomatik Tetikleme:** Ayet 20 kelimeyi aştığında metni sıkıştırmak veya fontu küçültmek yerine otomatik olarak 2 veya 3 sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 18)`).
-* **Asil Tipografi:** Her sayfada en fazla 16-20 kelime yer aldığı için Arapça font 68-76pt, Türkçe okunuş 28-32pt ve meal 38-44pt boyutunda ferah ve asil kalır.
+* **Dinamik Flex Mizanpaj:**
+  - *Üste Dayalı Tilavet (`Y = 484`):* Arapça satır yüksekliği `96px` (66pt ferah font), Türkçe okunuş ile arasında `24px` nefes payı bırakılır. 4 satırlık metinlerde dahi çakışma ve taşma imkansızdır.
+  - *Alta Dayalı Günün Hikmeti & Tefekkür (`Y = 1566 - tef_h - 16`):* `_tefekkur_yukseklik_hesapla` formülü ile hesaplanan tefekkür bloğu kartın alt sınırına dayalıdır. Çok sayfalı geçişlerde Sayfa 1 ve Sayfa 2'de milimetrik olarak aynı pikselde sabitlenir; geçişte sıfır ghosting (çift görüntü) ve sıfır titreme sağlanır.
+  - *Orta Flex Alan (Meal & Ayraç):* Tilavet bitişi ile tefekkür başlangıcı arasındaki kalan serbest dikey boşluk hesaplanarak Türkçe meal ve altın ayraç dikeyde ortalanır (`pad_ust = int(serbest_bosluk * 0.42)`).
 * **Akıllı Cümle / Meal Bölücü (`_meal_parcala`):** Türkçe meal rastgele kesilmez; nokta, soru işareti veya virgül gibi doğal durak yerlerinden bölünerek her sayfaya anlam bütünlüğü tam olan kısım yerleştirilir.
 * **Sinematik Erime (Crossfade):** Sayfa sonlarında hafızın nefes aralığında 0.45 saniyelik pürüzsüz `Image.blend` erimesi gerçekleşir.
-* **Sabit Tefekkür & Kesintisiz Animasyon:** "Günün Hikmeti & Tefekkür" alanı alt kısımda sabitlenir, geçiş esnasında ghosting (çift görüntü) oluşmaz. Ekolayzır ses dalgaları ve alt ilerleme çubuğu 30 FPS hızında kesintisiz akmaya devam eder.
+* **Kesintisiz Animasyon:** Ekolayzır ses dalgaları ve alt ilerleme çubuğu 30 FPS hızında kesintisiz akmaya devam eder.
 
 ---
 
