@@ -1,0 +1,76 @@
+# =========================================================
+#  Ezan Plus Sosyal Medya & İçerik Botu Yapılandırması
+# =========================================================
+
+genel:
+  bot_adi: "Ezan Plus Bot"
+  zaman_dilimi: "Europe/Istanbul"
+  cikti_klasoru: "data/cikti"
+  db_yolu: "data/bot.db"
+  varsayilan_dil: "tr"
+
+renkler:
+  # Ezan Plus Kurumsal Renk Paleti
+  bg_krem: "#F4F1EA"           # Klasik kağıt arka plan
+  bg_kagit: "#FFFDF5"          # İç kart beyazı / parşömen
+  kirmizi: "#C0392B"           # Ezan Plus ana marka kırmızısı
+  koyu_kirmizi: "#962D22"      # Derin bordo vurgu
+  yesil: "#0D5C3A"             # Manevi İslam yeşili / zümrüt
+  acik_yesil: "#059669"        # Canlı yeşil rozetler
+  altin: "#D97706"             # Sıcak amber / altın detaylar
+  koyu_slate: "#1E293B"        # Kart gölgeleri ve koyu alanlar
+  metin_ana: "#0F172A"         # Yüksek kontrastlı okunur metin
+  metin_soluk: "#64748B"       # Kaynak, dipnot ve künye metinleri
+  kenarlik: "#E5E0D0"          # Narin ayraç ve kart kenarlıkları
+
+boyutlar:
+  feed_genislik: 1080
+  feed_yukseklik: 1350         # 4:5 dikey post boyutu
+  reels_genislik: 1080
+  reels_yukseklik: 1920        # 9:16 dikey Reels / TikTok / Story boyutu
+  guvenli_pay_ust: 120
+  guvenli_pay_alt: 120
+  kenar_payi: 64
+
+yayin:
+  # Günde kaç post ve reels hedefleniyor
+  gunluk_post_sayisi: 2
+  gunluk_reels_sayisi: 1
+  # Saatler (Türkiye saati)
+  saatler:
+    sabah: "08:30"             # Günün Ayeti / Hadisi
+    oglen: "13:00"             # Dini Bilgi / Takvim Yaprağı
+    aksam: "19:30"             # Dua / Reels / Carousel
+  # Otomatik onay yerine Telegram'dan onay zorunlu mu?
+  telegram_onay_zorunlu: true
+
+kategoriler:
+  ayet:
+    ad: "Günün Ayeti"
+    etiket: "AYET-İ KERİME"
+    format: "post_4_5"
+    renk_temasi: "yesil"
+  hadis:
+    ad: "Günün Hadis-i Şerifi"
+    etiket: "HADİS-İ ŞERİF"
+    format: "post_4_5"
+    renk_temasi: "kirmizi"
+  dua:
+    ad: "Hâline Uygun Dua"
+    etiket: "GÜNÜN DUASI"
+    format: "carousel_4_5"
+    renk_temasi: "altin"
+  takvim:
+    ad: "Ezan Plus Takvim Yaprağı"
+    etiket: "TAKVİM YAPRAĞI"
+    format: "post_4_5"
+    renk_temasi: "krem"
+  reels:
+    ad: "Sesli Tilavet & Tefekkür"
+    etiket: "KUR'AN TİLAVETİ"
+    format: "reels_9_16"
+    hafiz: "Mishary Rashid Alafasy"
+
+yapay_zeka:
+  model: "gemini-3.6-flash"
+  sicaklik: 0.7

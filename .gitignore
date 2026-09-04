@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Environment / Secrets (Hassas Bilgiler)
+.env
+*.env
+client_secret*.json
+token.json
+credentials.json
+
+# Veri & Çıktı Dosyaları (Büyük video, ses ve SQLite)
+data/*.db
+data/*.sqlite
+data/cikti/*
+!data/cikti/.gitkeep
+data/onbellek/*
+!data/onbellek/.gitkeep
+
+# Sistem & Editör
+.DS_Store
+.idea/
+.vscode/
