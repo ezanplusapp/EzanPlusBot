@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from . import db
-from . import icerik_uret
-from . import sablon_ciz
-from . import ses_getir
-from . import video_motoru
-from . import telegram_bot
+from .uretim import ai as icerik_uret
+from .uretim import kart as sablon_ciz
+from .uretim import ses as ses_getir
+from .uretim import video as video_motoru
+from .telegram import bot as telegram_bot
 
 log = logging.getLogger(__name__)
 
