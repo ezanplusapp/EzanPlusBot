@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import imageio
@@ -229,22 +230,23 @@ def arapca_kelimeleri_ayristir(metin: str) -> List[str]:
 def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
     """
     Türkçe Latin okunuşu ile Arapça kelimeleri 1:1 hizalar.
-    Arapça'da bitişik yazılan 've' (و), 'fe' (ف), 'bi' (ب), 'li' (ل)
-    bağlaçlarını Türkçe'deki sonraki kelimeyle birleştirerek
+    Arapça'da bitişik yazılan 've' (و), 'fe' (ف), 'bi' (ب), 'li' (ل), 'ke' (ك)
+    bağlaçlarını ve harf-i tariflerini Türkçe'deki sonraki kelimeyle birleştirerek
     Arapça kelime sayısına tam eşitler.
     """
+    baglaclar = ["ve", "fe", "bi", "li", "vel", "fel", "bil", "lil", "ke", "kel"]
     yeni_tr: List[str] = []
     i = 0
     while i < len(tr_list):
         w = tr_list[i]
         if (
-            w.lower() in ["ve", "fe", "bi", "li"]
+            w.lower() in baglaclar
             and i + 1 < len(tr_list)
             and len(yeni_tr) < len(ar_list)
             and len(tr_list) - i > len(ar_list) - len(yeni_tr)
         ):
             ar_karsi = ar_list[len(yeni_tr)]
-            if ar_karsi.startswith(("و", "ف", "ب", "ل")):
+            if ar_karsi.startswith(("و", "ف", "ب", "ل", "ك")):
                 yeni_tr.append(f"{w} {tr_list[i+1]}")
                 i += 2
                 continue
@@ -324,6 +326,298 @@ def zengin_metin_ciz_baseline(
     return int(cur_baseline_y)
 
 
+def _meal_parcala(meal_metin: str, parca_sayisi: int) -> List[str]:
+    """
+    Türkçe meali anlam ve cümle bütünlüğünü bozmadan parça sayısına böler.
+    Öncelikle nokta, ünlem, soru işareti, noktalı virgül gibi cümle sonlarına bakar;
+    cümle sayısı yetersizse virgüllere veya kelime bloklarına böler.
+    """
+    if parca_sayisi <= 1:
+        return [meal_metin.strip()]
+    cumleler = [c.strip() for c in re.split(r"(?<=[.!?;\n])\s+", meal_metin.strip()) if c.strip()]
+    if len(cumleler) >= parca_sayisi:
+        parcalar = []
+        hedef_len = len(meal_metin) / parca_sayisi
+        cur = []
+        cur_len = 0
+        for c in cumleler:
+            cur.append(c)
+            cur_len += len(c)
+            if cur_len >= hedef_len and len(parcalar) < parca_sayisi - 1:
+                parcalar.append(" ".join(cur).strip())
+                cur = []
+                cur_len = 0
+        if cur:
+            parcalar.append(" ".join(cur).strip())
+        return parcalar
+    else:
+        # Virgüllere göre bölmeyi dene
+        yan_cumleler = [c.strip() for c in re.split(r"(?<=[,])\s+", meal_metin.strip()) if c.strip()]
+        if len(yan_cumleler) >= parca_sayisi:
+            parcalar = []
+            hedef_len = len(meal_metin) / parca_sayisi
+            cur = []
+            cur_len = 0
+            for c in yan_cumleler:
+                cur.append(c)
+                cur_len += len(c)
+                if cur_len >= hedef_len and len(parcalar) < parca_sayisi - 1:
+                    parcalar.append(" ".join(cur).strip())
+                    cur = []
+                    cur_len = 0
+            if cur:
+                parcalar.append(" ".join(cur).strip())
+            return parcalar
+        else:
+            kelimeler = meal_metin.split()
+            adim = math.ceil(len(kelimeler) / parca_sayisi)
+            return [" ".join(kelimeler[i:i + adim]) for i in range(0, len(kelimeler), adim)]
+
+
+class _SayfaVerisi:
+    """
+    Reels videosundaki tek bir sayfanın mizanpaj, font, slot ve taban görselini yönetir.
+    """
+    def __init__(
+        self,
+        p_idx: int,
+        sayfa_sayisi: int,
+        start_w: int,
+        end_w: int,
+        page_ar: List[str],
+        page_tr: List[str],
+        page_meal: str,
+        sure_ayet: str,
+        s1: str,
+        s2: str,
+        tef: str,
+        hafiz_adi: str,
+    ):
+        self.p_idx = p_idx
+        self.start_w = start_w
+        self.end_w = end_w
+        self.page_ar = page_ar
+        self.page_tr = page_tr
+        self.page_meal = page_meal
+
+        # Sayfa başlığı: Tek sayfada yalın, çoklu sayfada (1/2) vb. rozet
+        if sayfa_sayisi > 1:
+            page_title = f"{sure_ayet} ({p_idx + 1}/{sayfa_sayisi})"
+        else:
+            page_title = sure_ayet
+
+        # Tipografi parametreleri
+        if len(page_ar) > 16:
+            self.pt_ar = 68
+            self.pt_okunus = 28
+            self.pt_meal = 38
+            self.ar_h = 76
+            self.tr_h = 34
+            self.meal_h = 46
+            self.satir_s = 4
+            self.hedef_kart_w = 820
+        else:
+            self.pt_ar = 76
+            self.pt_okunus = 32
+            self.pt_meal = 44
+            self.ar_h = 92
+            self.tr_h = 40
+            self.meal_h = 56
+            self.satir_s = 3
+            self.hedef_kart_w = 840
+
+        self.font_ar_norm = font_al(FONT_ARAPCA_NORMAL, self.pt_ar)
+        self.font_ar_bold = font_al(FONT_ARAPCA_BOLD, self.pt_ar)
+        self.font_okunus_norm = font_al(FONT_UI, self.pt_okunus, agirlik=500)
+        self.font_okunus_bold = font_al(FONT_UI, self.pt_okunus, agirlik=800)
+        self.font_meal = font_al(FONT_BASLIK, self.pt_meal, agirlik=600)
+
+        # 1. Taban görseli oluştur
+        self.taban_img, self.ar_y_start, _, self.kart_ic_w = _statik_taban_ciz(
+            sure_ayet=page_title,
+            video_baslik_satir1=s1,
+            video_baslik_satir2=s2,
+            tefekkur_notu=tef,
+            hafiz_adi=hafiz_adi,
+        )
+        draw_t = ImageDraw.Draw(self.taban_img)
+
+        # 2. Satır grupları oluştur
+        eleman_basi = math.ceil(len(page_ar) / self.satir_s)
+        ar_gruplar = []
+        tr_gruplar = []
+        cur_i = 0
+        while cur_i < len(page_ar):
+            end_i = min(cur_i + eleman_basi, len(page_ar))
+            global_s = start_w + cur_i
+            ar_gruplar.append((page_ar[cur_i:end_i], global_s))
+            tr_gruplar.append((page_tr[cur_i:end_i], global_s))
+            cur_i = end_i
+
+        # Arapça kelime slotları (merkez X koordinatları)
+        self.ar_satir_bilgileri = []
+        for words, g_start in ar_gruplar:
+            harf_w_list = [
+                draw_t.textbbox((0, 0), arapca_hazirla(w), font=self.font_ar_norm)[2]
+                - draw_t.textbbox((0, 0), arapca_hazirla(w), font=self.font_ar_norm)[0]
+                for w in words
+            ]
+            toplam_harf_w = sum(harf_w_list)
+            gap = max(16, (self.hedef_kart_w - toplam_harf_w) // (len(words) - 1)) if len(words) > 1 else 28
+            gap = min(gap, 48)
+            toplam_w = toplam_harf_w + (len(words) - 1) * gap
+
+            kelime_yuvalari = []
+            cur_x = (GENISLIK_9_16 + toplam_w) // 2
+            for j, w in enumerate(words):
+                width = harf_w_list[j]
+                cur_x -= width
+                slot_mid_x = cur_x + width // 2
+                kelime_yuvalari.append((words[j], g_start + j, slot_mid_x))
+                cur_x -= gap
+            self.ar_satir_bilgileri.append(kelime_yuvalari)
+
+        # Türkçe Latin okunuş slotları
+        self.tr_satir_bilgileri = []
+        for words, g_start in tr_gruplar:
+            kelime_w_list = [
+                draw_t.textbbox((0, 0), w, font=self.font_okunus_norm)[2]
+                - draw_t.textbbox((0, 0), w, font=self.font_okunus_norm)[0]
+                for w in words
+            ]
+            toplam_w_kelime = sum(kelime_w_list)
+            gap = max(10, (self.hedef_kart_w - toplam_w_kelime) // (len(words) - 1)) if len(words) > 1 else 14
+            gap = min(gap, 28)
+            toplam_w = toplam_w_kelime + (len(words) - 1) * gap
+
+            kelime_yuvalari = []
+            cur_x = (GENISLIK_9_16 - toplam_w) // 2
+            for j, w_str in enumerate(words):
+                width = kelime_w_list[j]
+                slot_mid_x = cur_x + width // 2
+                kelime_yuvalari.append((w_str, g_start + j, slot_mid_x))
+                cur_x += width + gap
+            self.tr_satir_bilgileri.append(kelime_yuvalari)
+
+        # Kırmızı dolum önbellekleri
+        self.latin_red_cache = {}
+        for satir in self.tr_satir_bilgileri:
+            for w_str, idx, mid_x in satir:
+                bbox = draw_t.textbbox((0, 0), w_str, font=self.font_okunus_bold)
+                wt = bbox[2] - bbox[0]
+                ht = bbox[3] - bbox[1]
+                im_w = Image.new("RGBA", (wt + 4, ht + 10), (0, 0, 0, 0))
+                d_w = ImageDraw.Draw(im_w)
+                d_w.text((0, 0), w_str, font=self.font_okunus_bold, fill=KIRMIZI)
+                self.latin_red_cache[idx] = (im_w, wt, ht)
+
+        self.ar_red_cache = {}
+        for satir in self.ar_satir_bilgileri:
+            for w, idx, mid_x in satir:
+                gw = arapca_hazirla(w)
+                bbox = draw_t.textbbox((0, 0), gw, font=self.font_ar_bold)
+                wt = bbox[2] - bbox[0]
+                ht = bbox[3] - bbox[1]
+                im_w = Image.new("RGBA", (wt + 4, ht + 24), (0, 0, 0, 0))
+                d_w = ImageDraw.Draw(im_w)
+                d_w.text((0, 0), gw, font=self.font_ar_bold, fill=KIRMIZI)
+                self.ar_red_cache[idx] = (im_w, wt, ht, gw)
+
+        # 3. Ayraç & Meal Çizimi (Taban görseline kalıcı)
+        cur_y = self.ar_y_start + len(self.ar_satir_bilgileri) * self.ar_h + 18 + len(self.tr_satir_bilgileri) * self.tr_h
+        ayrac_y = cur_y + 24
+        font_giant_quote = font_al(FONT_BASLIK, 140, agirlik=700)
+        draw_t.text((54 + 40, ayrac_y + 10), "“", font=font_giant_quote, fill="#F6ECDA")
+
+        draw_t.line([(GENISLIK_9_16 // 2 - 110, ayrac_y), (GENISLIK_9_16 // 2 + 110, ayrac_y)], fill=ALTIN, width=2)
+        draw_t.ellipse([GENISLIK_9_16 // 2 - 6, ayrac_y - 5, GENISLIK_9_16 // 2 + 6, ayrac_y + 7], fill=ALTIN)
+
+        meal_satirlar = metin_satirla(f"“{page_meal}”", self.font_meal, self.kart_ic_w - 40, draw_t)
+        my = ayrac_y + 32
+        for s in meal_satirlar:
+            bbox = draw_t.textbbox((0, 0), s, font=self.font_meal)
+            sw = bbox[2] - bbox[0]
+            draw_t.text(((GENISLIK_9_16 - sw) // 2, my), s, font=self.font_meal, fill=METIN_ANA)
+            my += self.meal_h
+
+        # 4. Günün Hikmeti & Tefekkür (Çoklu sayfada sabit Y=1390 ile sıfır ghosting, tek sayfada my+24)
+        if sayfa_sayisi > 1:
+            ay_y = 1390
+        else:
+            ay_y = my + 24
+
+        draw_t.line([(GENISLIK_9_16 // 2 - 90, ay_y), (GENISLIK_9_16 // 2 + 90, ay_y)], fill="#E5DAC3", width=2)
+        draw_t.ellipse([GENISLIK_9_16 // 2 - 5, ay_y - 4, GENISLIK_9_16 // 2 + 5, ay_y + 6], fill=ALTIN)
+
+        font_tef_baslik = font_al(FONT_UI, 24, agirlik=800)
+        txt_b = "GÜNÜN HİKMETİ & TEFEKKÜRÜ"
+        bw = draw_t.textlength(txt_b, font=font_tef_baslik)
+        bx = (GENISLIK_9_16 - bw) // 2
+        draw_t.ellipse([bx - 18, ay_y + 28, bx - 10, ay_y + 36], fill=ALTIN)
+        draw_t.text((bx, ay_y + 20), txt_b, font=font_tef_baslik, fill="#B45309")
+
+        font_tef_norm = font_al(FONT_GOVDE, 24, agirlik=400)
+        font_tef_bold = font_al(FONT_GOVDE, 24, agirlik=700)
+        zengin_metin_ciz_baseline(
+            draw_t,
+            tef,
+            GENISLIK_9_16 // 2,
+            ay_y + 56,
+            self.kart_ic_w - 40,
+            font_tef_norm,
+            font_tef_bold,
+            fill_norm="#475569",
+            fill_bold="#182230",
+            line_height=34,
+        )
+
+    def kare_ciz(self, t_sec: float, aktif_idx: int, aktif_progress: float) -> Image.Image:
+        """Sayfanın belirtilen andaki karesini döndürür."""
+        kare = self.taban_img.copy()
+        draw_k = ImageDraw.Draw(kare)
+
+        # Arapça Kelimeler (Sağdan sola loading akışı)
+        cur_y = self.ar_y_start
+        for satir in self.ar_satir_bilgileri:
+            for w, w_idx, mid_x in satir:
+                im_w, wt, ht, gw = self.ar_red_cache[w_idx]
+                x_start = mid_x - wt // 2
+
+                if w_idx == aktif_idx and aktif_progress < 1.0:
+                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_bold, fill=YESIL_INACTIVE)
+                    dolum_w = int(wt * aktif_progress)
+                    if dolum_w > 0:
+                        crop_x1 = max(0, wt - dolum_w)
+                        cropped = im_w.crop((crop_x1, 0, im_w.width, im_w.height))
+                        kare.paste(cropped, (x_start + crop_x1, cur_y), cropped)
+                elif w_idx < aktif_idx or (w_idx == aktif_idx and aktif_progress >= 1.0):
+                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=ISLAM_YESILI)
+                else:
+                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=YESIL_INACTIVE)
+            cur_y += self.ar_h
+
+        cur_y += 18
+        # Türkçe Okunuş Kelimeler (Soldan sağa loading akışı)
+        for satir in self.tr_satir_bilgileri:
+            for w_str, w_idx, mid_x in satir:
+                im_w, wt, ht = self.latin_red_cache[w_idx]
+                x_start = mid_x - wt // 2
+
+                if w_idx == aktif_idx and aktif_progress < 1.0:
+                    draw_k.text((x_start, cur_y), w_str, font=self.font_okunus_bold, fill=METIN_LIGHT)
+                    dolum_w = int(wt * aktif_progress)
+                    if dolum_w > 0:
+                        cropped = im_w.crop((0, 0, dolum_w, im_w.height))
+                        kare.paste(cropped, (x_start, cur_y), cropped)
+                elif w_idx < aktif_idx or (w_idx == aktif_idx and aktif_progress >= 1.0):
+                    draw_k.text((x_start, cur_y), w_str, font=self.font_okunus_norm, fill=METIN_ANA)
+                else:
+                    draw_k.text((x_start, cur_y), w_str, font=self.font_okunus_norm, fill=METIN_LIGHT)
+            cur_y += self.tr_h
+
+        return kare
+
+
 def reels_videosu_uret(
     sure_ayet: str,
     turkce_meal: str,
@@ -347,6 +641,8 @@ def reels_videosu_uret(
     - Kelime merkez koordinatlarıyla sıfır titreme (zero-jitter) stabilite garantisi.
     - Tilavet ile Meal arasında zarif altın ayraç.
     - Tırnaklı lüks Türkçe meal ve tabana dayalı Günün Hikmeti kutusu.
+    - UZUN AYET DESTEĞİ (1. YOL): 20 kelimeyi aşan uzun ayetlerde metni küçültüp sıkıştırmak yerine,
+      sayfalar arası sinematik yumuşak crossfade (erime) geçişi ile 2-3 slayt halinde sunar.
     """
     CIKTI_DIZINI.mkdir(parents=True, exist_ok=True)
     toplam_sure = ses_sure_hesapla(ses_yolu)
@@ -357,16 +653,7 @@ def reels_videosu_uret(
     s2 = video_baslik_satir2 or "kalbin ilahi sığınağı."
     tef = tefekkur_notu or "Namaz sadece bir ibadet değil; günün karmaşasında ruhu arındıran, insanı kötülükten ve günahtan koruyan ilahi bir sığınaktır. Her secde kalbi yeniler."
 
-    # 1. Taban Görseli Çiz
-    taban_img, ar_y_start, tef_y1, kart_ic_w = _statik_taban_ciz(
-        sure_ayet=sure_ayet,
-        video_baslik_satir1=s1,
-        video_baslik_satir2=s2,
-        tefekkur_notu=tef,
-        hafiz_adi=hafiz_adi,
-    )
-
-    # 2. Kelimeleri Ayrıştır ve Secavendleri Birleştir
+    # 1. Kelimeleri Ayrıştır ve Hizala
     ar_str = (arapca_metin or "اتْلُ مَا أُوحِيَ إِلَيْكَ مِنَ الْكِتَابِ وَأَقِمِ الصَّلَاةَ").strip()
     tr_str = (arapca_okunus or "Utlu mâ ûhıye ileyke minel kitâbi ve ekımis-salâte").strip()
 
@@ -375,168 +662,64 @@ def reels_videosu_uret(
     tr_kelimeler = turkce_okunus_hizala(tr_ham, ar_kelimeler)
 
     toplam_kelime = len(ar_kelimeler)
-    meal_karakter = len(turkce_meal)
 
-    # AUTO-FIT: Ferah, asil tipografi (Arapça 1 punto küçültüldü: 86 -> 78/82)
-    if toplam_kelime > 22 or meal_karakter > 180:
-        pt_ar_norm = 62
-        pt_ar_bold = 62
-        pt_okunus_norm = 28
-        pt_okunus_bold = 28
-        pt_meal = 44
-        ar_satir_h = 88
-        tr_satir_h = 42
-        meal_satir_h = 58
-        satir_sayisi = 4
-        hedef_kart_w = 860
+    # 2. Sayfa Sayısını ve Aralıkları Belirle (1. Yol — Çoklu Sayfa Motoru)
+    if toplam_kelime <= 20:
+        sayfa_sayisi = 1
+    elif toplam_kelime <= 40:
+        sayfa_sayisi = 2
     else:
-        pt_ar_norm = 78
-        pt_ar_bold = 78
-        pt_okunus_norm = 34
-        pt_okunus_bold = 34
-        pt_meal = 48
-        ar_satir_h = 100
-        tr_satir_h = 46
-        meal_satir_h = 62
-        satir_sayisi = 3
-        hedef_kart_w = 840
+        sayfa_sayisi = math.ceil(toplam_kelime / 18)
 
-    font_ar_norm = font_al(FONT_ARAPCA_NORMAL, pt_ar_norm)
-    font_ar_bold = font_al(FONT_ARAPCA_BOLD, pt_ar_bold)
-    font_okunus_norm = font_al(FONT_UI, pt_okunus_norm, agirlik=500)
-    font_okunus_bold = font_al(FONT_UI, pt_okunus_bold, agirlik=800)
-    font_meal = font_al(FONT_BASLIK, pt_meal, agirlik=600)
+    meal_parcalari = _meal_parcala(turkce_meal, sayfa_sayisi)
 
-    # Satır grupları oluştur
-    eleman_basi = math.ceil(toplam_kelime / satir_sayisi)
-    ar_gruplar = []
-    tr_gruplar = []
-    cur_idx = 0
-    while cur_idx < toplam_kelime:
-        end_idx = min(cur_idx + eleman_basi, toplam_kelime)
-        ar_gruplar.append((ar_kelimeler[cur_idx:end_idx], cur_idx))
-        tr_gruplar.append((tr_kelimeler[cur_idx:end_idx], cur_idx))
-        cur_idx = end_idx
+    kelimeler_per_sayfa = math.ceil(toplam_kelime / sayfa_sayisi)
+    sayfa_araliklari = []
+    cur_w = 0
+    for s_idx in range(sayfa_sayisi):
+        end_w = min(cur_w + kelimeler_per_sayfa, toplam_kelime)
+        sayfa_araliklari.append((cur_w, end_w))
+        cur_w = end_w
 
-    dummy_draw = ImageDraw.Draw(taban_img)
+    # 3. Sayfa Verilerini Hazırla
+    sayfalar: List[_SayfaVerisi] = []
+    for p_idx, (w_s, w_e) in enumerate(sayfa_araliklari):
+        s = _SayfaVerisi(
+            p_idx=p_idx,
+            sayfa_sayisi=sayfa_sayisi,
+            start_w=w_s,
+            end_w=w_e,
+            page_ar=ar_kelimeler[w_s:w_e],
+            page_tr=tr_kelimeler[w_s:w_e],
+            page_meal=meal_parcalari[p_idx],
+            sure_ayet=sure_ayet,
+            s1=s1,
+            s2=s2,
+            tef=tef,
+            hafiz_adi=hafiz_adi,
+        )
+        sayfalar.append(s)
 
-    # Ön Hesaplama: Arapça kelimelerin merkez X koordinatları (sıfır titreme / zero-jitter)
-    ar_satir_bilgileri = []
-    for words, start_idx in ar_gruplar:
-        harf_w_list = [
-            dummy_draw.textbbox((0, 0), arapca_hazirla(w), font=font_ar_norm)[2]
-            - dummy_draw.textbbox((0, 0), arapca_hazirla(w), font=font_ar_norm)[0]
-            for w in words
-        ]
-        toplam_harf_w = sum(harf_w_list)
-        gap = max(24, (hedef_kart_w - toplam_harf_w) // (len(words) - 1)) if len(words) > 1 else 32
-        gap = min(gap, 68)
-        toplam_w = toplam_harf_w + (len(words) - 1) * gap
+    # 4. Çoklu Sayfa Geçiş Pencerelerini Hesapla
+    # Her geçiş: (t_trans_start, t_trans_end, sayfa_left_idx, sayfa_right_idx)
+    gecisler = []
+    TRANS_DURATION = 0.45  # 0.45 saniye sinematik erime geçişi
 
-        kelime_yuvalari = []
-        cur_x = (GENISLIK_9_16 + toplam_w) // 2
-        for j, w in enumerate(words):
-            width = harf_w_list[j]
-            cur_x -= width
-            slot_mid_x = cur_x + width // 2
-            kelime_yuvalari.append((words[j], start_idx + j, slot_mid_x))
-            cur_x -= gap
-        ar_satir_bilgileri.append(kelime_yuvalari)
+    if sayfa_sayisi > 1:
+        for p in range(sayfa_sayisi - 1):
+            w_last = sayfa_araliklari[p][1] - 1
+            w_first = sayfa_araliklari[p + 1][0]
+            if kelime_zamanlari and w_last < len(kelime_zamanlari) and w_first < len(kelime_zamanlari):
+                t_p_end = kelime_zamanlari[w_last][1]
+                t_next_start = kelime_zamanlari[w_first][0]
+            else:
+                t_p_end = (p + 1) * (toplam_sure / sayfa_sayisi)
+                t_next_start = t_p_end
 
-    # Ön Hesaplama: Türkçe Okunuş kelimelerinin merkez X koordinatları (sıfır titreme)
-    tr_satir_bilgileri = []
-    for words, start_idx in tr_gruplar:
-        kelime_w_list = [
-            dummy_draw.textbbox((0, 0), w, font=font_okunus_norm)[2]
-            - dummy_draw.textbbox((0, 0), w, font=font_okunus_norm)[0]
-            for w in words
-        ]
-        toplam_w_kelime = sum(kelime_w_list)
-        gap = max(14, (hedef_kart_w - toplam_w_kelime) // (len(words) - 1)) if len(words) > 1 else 20
-        gap = min(gap, 40)
-        toplam_w = toplam_w_kelime + (len(words) - 1) * gap
-
-        kelime_yuvalari = []
-        cur_x = (GENISLIK_9_16 - toplam_w) // 2
-        for j, w_str in enumerate(words):
-            width = kelime_w_list[j]
-            slot_mid_x = cur_x + width // 2
-            kelime_yuvalari.append((w_str, start_idx + j, slot_mid_x))
-            cur_x += width + gap
-        tr_satir_bilgileri.append(kelime_yuvalari)
-
-    # Loading efekti için yüksek kaliteli şeffaf kırmızı kelime bitmap önbelleği
-    latin_red_cache = {}
-    for satir in tr_satir_bilgileri:
-        for w_str, idx, mid_x in satir:
-            bbox = dummy_draw.textbbox((0, 0), w_str, font=font_okunus_bold)
-            wt = bbox[2] - bbox[0]
-            ht = bbox[3] - bbox[1]
-            im_w = Image.new("RGBA", (wt + 4, ht + 10), (0, 0, 0, 0))
-            d_w = ImageDraw.Draw(im_w)
-            d_w.text((0, 0), w_str, font=font_okunus_bold, fill=KIRMIZI)
-            latin_red_cache[idx] = (im_w, wt, ht)
-
-    ar_red_cache = {}
-    for satir in ar_satir_bilgileri:
-        for w, idx, mid_x in satir:
-            gw = arapca_hazirla(w)
-            bbox = dummy_draw.textbbox((0, 0), gw, font=font_ar_bold)
-            wt = bbox[2] - bbox[0]
-            ht = bbox[3] - bbox[1]
-            im_w = Image.new("RGBA", (wt + 4, ht + 24), (0, 0, 0, 0))
-            d_w = ImageDraw.Draw(im_w)
-            d_w.text((0, 0), gw, font=font_ar_bold, fill=KIRMIZI)
-            ar_red_cache[idx] = (im_w, wt, ht, gw)
-
-    # Meal satırlarını hesapla
-    meal_fmt = f"“{turkce_meal.strip()}”"
-    meal_satirlar = metin_satirla(meal_fmt, font_meal, kart_ic_w - 40, dummy_draw)
-
-    # Ayraç ve Meali taban görseline kalıcı olarak çiz
-    ayrac_y = ar_y_start + len(ar_gruplar) * ar_satir_h + 28 + len(tr_gruplar) * tr_satir_h + 36
-    draw_taban = ImageDraw.Draw(taban_img)
-
-    # 1. Dev Tırnak Filigranı (Mealin sol üst arkasında zarif altın)
-    font_giant_quote = font_al(FONT_BASLIK, 160, agirlik=700)
-    draw_taban.text((54 + 40, ayrac_y + 14), "“", font=font_giant_quote, fill="#F6ECDA")
-
-    draw_taban.line([(GENISLIK_9_16 // 2 - 110, ayrac_y), (GENISLIK_9_16 // 2 + 110, ayrac_y)], fill=ALTIN, width=2)
-    draw_taban.ellipse([GENISLIK_9_16 // 2 - 6, ayrac_y - 5, GENISLIK_9_16 // 2 + 6, ayrac_y + 7], fill=ALTIN)
-
-    my = ayrac_y + 44
-    for s in meal_satirlar:
-        bbox = draw_taban.textbbox((0, 0), s, font=font_meal)
-        sw = bbox[2] - bbox[0]
-        draw_taban.text(((GENISLIK_9_16 - sw) // 2, my), s, font=font_meal, fill=METIN_ANA)
-        my += meal_satir_h
-
-    # 2. Günün Hikmeti & Tefekkür Bölümü (Kutusuz, Zarif Ayraçlı, Tok Başlıklı ve Vurgulu)
-    ay_y = my + 24
-    draw_taban.line([(GENISLIK_9_16 // 2 - 90, ay_y), (GENISLIK_9_16 // 2 + 90, ay_y)], fill="#E5DAC3", width=2)
-    draw_taban.ellipse([GENISLIK_9_16 // 2 - 5, ay_y - 4, GENISLIK_9_16 // 2 + 5, ay_y + 6], fill=ALTIN)
-
-    font_tef_baslik = font_al(FONT_UI, 26, agirlik=800)
-    txt_b = "GÜNÜN HİKMETİ & TEFEKKÜRÜ"
-    bw = draw_taban.textlength(txt_b, font=font_tef_baslik)
-    bx = (GENISLIK_9_16 - bw) // 2
-    draw_taban.ellipse([bx - 20, ay_y + 32, bx - 10, ay_y + 42], fill=ALTIN)
-    draw_taban.text((bx, ay_y + 24), txt_b, font=font_tef_baslik, fill="#B45309")
-
-    font_tef_norm = font_al(FONT_GOVDE, 26, agirlik=400)
-    font_tef_bold = font_al(FONT_GOVDE, 26, agirlik=700)
-    zengin_metin_ciz_baseline(
-        draw_taban,
-        tef,
-        GENISLIK_9_16 // 2,
-        ay_y + 72,
-        kart_ic_w - 40,
-        font_tef_norm,
-        font_tef_bold,
-        fill_norm="#475569",
-        fill_bold="#182230",
-        line_height=40,
-    )
+            t_switch = (t_p_end + t_next_start) / 2.0
+            t_trans_s = max(0.0, t_switch - TRANS_DURATION / 2.0)
+            t_trans_e = min(toplam_sure, t_switch + TRANS_DURATION / 2.0)
+            gecisler.append((t_trans_s, t_trans_e, p, p + 1))
 
     if not cikti_adi:
         sure_kod = sure_ayet.replace(" ", "_").replace("•", "_").replace(".", "_").lower()
@@ -567,10 +750,9 @@ def reels_videosu_uret(
         for i in range(toplam_kare):
             ilerleme = (i + 1) / toplam_kare
             t_sec = i / FPS
-            # Doğal telaffuz ve akustik artikülasyon mikro-avansı (240ms)
             t_eval = t_sec + 0.24
 
-            # O an okunan aktif kelime indeksi ve kelime içi ilerleme (loading progress)
+            # O an okunan kelime indeksi ve dolum yüzdesi
             aktif_idx = -1
             aktif_progress = 0.0
 
@@ -591,7 +773,33 @@ def reels_videosu_uret(
                 aktif_idx = min(int(p_toplam), toplam_kelime - 1)
                 aktif_progress = p_toplam - aktif_idx
 
-            kare = taban_img.copy()
+            # Sayfa Seçimi & Yumuşak Erime (Crossfade)
+            kare: Optional[Image.Image] = None
+            if sayfa_sayisi == 1:
+                kare = sayfalar[0].kare_ciz(t_sec, aktif_idx, aktif_progress)
+            else:
+                # Geçiş aralığında mıyız?
+                in_transition = False
+                for t_s, t_e, p_from, p_to in gecisler:
+                    if t_s <= t_sec <= t_e:
+                        alpha = (t_sec - t_s) / max(0.001, (t_e - t_s))
+                        kare_from = sayfalar[p_from].kare_ciz(t_sec, sayfa_araliklari[p_from][1], 1.0)
+                        kare_to = sayfalar[p_to].kare_ciz(t_sec, sayfa_araliklari[p_to][0] - 1, 0.0)
+                        kare = Image.blend(kare_from, kare_to, alpha)
+                        in_transition = True
+                        break
+
+                if not in_transition:
+                    # Hangi sayfa aktif?
+                    active_p = 0
+                    for p_idx, (w_s, w_e) in enumerate(sayfa_araliklari):
+                        if w_s <= aktif_idx < w_e:
+                            active_p = p_idx
+                            break
+                        elif aktif_idx >= w_e:
+                            active_p = min(p_idx + 1, sayfa_sayisi - 1)
+                    kare = sayfalar[active_p].kare_ciz(t_sec, aktif_idx, aktif_progress)
+
             draw_k = ImageDraw.Draw(kare)
 
             # A. CANLI SES DALGALARI
@@ -602,56 +810,7 @@ def reels_videosu_uret(
                 renk = CANLI_YESIL if bar_idx % 2 == 0 else ALTIN
                 draw_k.rounded_rectangle([bx, by1, bx + 3, eq_base_y], radius=2, fill=renk)
 
-            # B. DİNAMİK ARAPÇA ÇİZİMİ (Sağdan Sola Loading Akışı)
-            cur_y = ar_y_start
-            for satir in ar_satir_bilgileri:
-                for w, w_idx, mid_x in satir:
-                    im_w, wt, ht, gw = ar_red_cache[w_idx]
-                    x_start = mid_x - wt // 2
-
-                    if w_idx == aktif_idx and aktif_progress < 1.0:
-                        # 1. Taban: Açık yeşil
-                        draw_k.text((x_start, cur_y), gw, font=font_ar_bold, fill=YESIL_INACTIVE)
-                        # 2. Sağdan sola loading dolumu
-                        dolum_w = int(wt * aktif_progress)
-                        if dolum_w > 0:
-                            crop_x1 = max(0, wt - dolum_w)
-                            cropped = im_w.crop((crop_x1, 0, im_w.width, im_w.height))
-                            kare.paste(cropped, (x_start + crop_x1, cur_y), cropped)
-                    elif w_idx < aktif_idx or (w_idx == aktif_idx and aktif_progress >= 1.0):
-                        # Tamamen okunmuş kelime
-                        draw_k.text((x_start, cur_y), gw, font=font_ar_norm, fill=ISLAM_YESILI)
-                    else:
-                        # Henüz okunmamış kelime
-                        draw_k.text((x_start, cur_y), gw, font=font_ar_norm, fill=YESIL_INACTIVE)
-                cur_y += ar_satir_h
-
-            # Arapça ile Türkçe okunuş arasına ferah nefes boşluğu (28px)
-            cur_y += 28
-
-            # C. DİNAMİK TÜRKÇE OKUNUŞ ÇİZİMİ (Soldan Sağa Loading Akışı)
-            for satir in tr_satir_bilgileri:
-                for w_str, w_idx, mid_x in satir:
-                    im_w, wt, ht = latin_red_cache[w_idx]
-                    x_start = mid_x - wt // 2
-
-                    if w_idx == aktif_idx and aktif_progress < 1.0:
-                        # 1. Taban: Açık gri
-                        draw_k.text((x_start, cur_y), w_str, font=font_okunus_bold, fill=METIN_LIGHT)
-                        # 2. Soldan sağa loading dolumu
-                        dolum_w = int(wt * aktif_progress)
-                        if dolum_w > 0:
-                            cropped = im_w.crop((0, 0, dolum_w, im_w.height))
-                            kare.paste(cropped, (x_start, cur_y), cropped)
-                    elif w_idx < aktif_idx or (w_idx == aktif_idx and aktif_progress >= 1.0):
-                        # Tamamen okunmuş kelime
-                        draw_k.text((x_start, cur_y), w_str, font=font_okunus_norm, fill=METIN_ANA)
-                    else:
-                        # Henüz okunmamış kelime
-                        draw_k.text((x_start, cur_y), w_str, font=font_okunus_norm, fill=METIN_LIGHT)
-                cur_y += tr_satir_h
-
-            # D. İLERLEME ÇUBUĞU
+            # B. İLERLEME ÇUBUĞU
             yuvarlak_kose_ciz(draw_k, (bar_x1, bar_y, bar_x2, bar_y + 10), radius=5, dolgu="#E2E8F0")
             dolu_w = int(bar_w * ilerleme)
             if dolu_w > 6:
@@ -669,7 +828,7 @@ def reels_videosu_uret(
     finally:
         writer.close()
 
-    # 3. FFmpeg ile MP3 Sesi Sessiz Videoya Birleştir
+    # 5. FFmpeg ile MP3 Sesi Sessiz Videoya Birleştir
     exe = imageio_ffmpeg.get_ffmpeg_exe()
     cmd = [
         exe, "-y",

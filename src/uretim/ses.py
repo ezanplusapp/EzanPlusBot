@@ -141,11 +141,18 @@ def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[float,
     for vt in af.get("verse_timings", []):
         if vt.get("verse_key") == verse_key:
             ayah_start = vt.get("timestamp_from", 0)
+            ayah_end = vt.get("timestamp_to", ayah_start)
             segments = vt.get("segments", [])
             zamanlar = []
             for seg in segments:
-                s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
-                e_sec = max(0.0, (seg[2] - ayah_start) / 1000.0)
+                if len(seg) >= 3:
+                    s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
+                    e_sec = max(0.0, (seg[2] - ayah_start) / 1000.0)
+                elif len(seg) == 2:
+                    s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
+                    e_sec = max(s_sec, (ayah_end - ayah_start) / 1000.0)
+                else:
+                    continue
                 zamanlar.append((s_sec, e_sec))
             return zamanlar
 
