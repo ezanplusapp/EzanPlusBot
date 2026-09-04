@@ -167,7 +167,7 @@ def _statik_taban_ciz(
 
     c_y += 48
     draw.line([(kx1 + 40, c_y), (kx2 - 40, c_y)], fill="#F1ECE1", width=2)
-    c_y += 34
+    c_y += 26
 
     kart_ic_genislik = (kx2 - kx1) - 80
     arapca_y_baslangic = c_y
@@ -374,6 +374,46 @@ def _meal_parcala(meal_metin: str, parca_sayisi: int) -> List[str]:
             return [" ".join(kelimeler[i:i + adim]) for i in range(0, len(kelimeler), adim)]
 
 
+def _tefekkur_yukseklik_hesapla(
+    draw: ImageDraw.ImageDraw,
+    tef_text: str,
+    max_w: int,
+    font_norm: ImageFont.FreeTypeFont,
+    font_bold: ImageFont.FreeTypeFont,
+    line_height: int = 34,
+) -> int:
+    """Tefekkür bloğunun toplam piksel yüksekliğini (ayraç çizgisinden en alta) hesaplar."""
+    formatted = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", tef_text)
+    tokens = re.split(r"(<b>.*?</b>)", formatted)
+    words_data = []
+    space_w = draw.textlength(" ", font=font_norm)
+
+    for tok in tokens:
+        if not tok:
+            continue
+        is_b = tok.startswith("<b>") and tok.endswith("</b>")
+        content = tok[3:-4] if is_b else tok
+        for w in content.split():
+            f = font_bold if is_b else font_norm
+            w_px = draw.textlength(w, font=f)
+            words_data.append((w, f, w_px))
+
+    lines_count = 0
+    curr_w = 0
+    for w_str, f, w_px in words_data:
+        needed = w_px if curr_w == 0 else curr_w + space_w + w_px
+        if needed <= max_w:
+            curr_w = needed
+        else:
+            lines_count += 1
+            curr_w = w_px
+    if curr_w > 0:
+        lines_count += 1
+
+    lines_count = max(1, lines_count)
+    return 56 + lines_count * line_height
+
+
 class _SayfaVerisi:
     """
     Reels videosundaki tek bir sayfanın mizanpaj, font, slot ve taban görselini yönetir.
@@ -408,21 +448,23 @@ class _SayfaVerisi:
 
         # Tipografi parametreleri
         if len(page_ar) > 16:
-            self.pt_ar = 68
-            self.pt_okunus = 28
-            self.pt_meal = 38
-            self.ar_h = 76
+            self.pt_ar = 66
+            self.pt_okunus = 26
+            self.pt_meal = 36
+            self.ar_h = 96
             self.tr_h = 34
-            self.meal_h = 46
+            self.meal_h = 44
+            self.gap_ar_tr = 24
             self.satir_s = 4
             self.hedef_kart_w = 820
         else:
-            self.pt_ar = 76
-            self.pt_okunus = 32
-            self.pt_meal = 44
-            self.ar_h = 92
-            self.tr_h = 40
-            self.meal_h = 56
+            self.pt_ar = 74
+            self.pt_okunus = 30
+            self.pt_meal = 40
+            self.ar_h = 104
+            self.tr_h = 38
+            self.meal_h = 50
+            self.gap_ar_tr = 24
             self.satir_s = 3
             self.hedef_kart_w = 840
 
@@ -523,41 +565,62 @@ class _SayfaVerisi:
                 d_w.text((0, 0), gw, font=self.font_ar_bold, fill=KIRMIZI)
                 self.ar_red_cache[idx] = (im_w, wt, ht, gw)
 
-        # 3. Ayraç & Meal Çizimi (Taban görseline kalıcı)
-        cur_y = self.ar_y_start + len(self.ar_satir_bilgileri) * self.ar_h + 18 + len(self.tr_satir_bilgileri) * self.tr_h
-        ayrac_y = cur_y + 24
+        # 3. Dinamik Flex Mizanpaj (Üste dayalı tilavet, alta dayalı tefekkür, kalan alanı esnek paylaşan meal)
+        # A) ALTA DAYALI GÜNÜN HİKMETİ & TEFEKKÜRÜ
+        font_tef_baslik = font_al(FONT_UI, 24, agirlik=800)
+        font_tef_norm = font_al(FONT_GOVDE, 24, agirlik=400)
+        font_tef_bold = font_al(FONT_GOVDE, 24, agirlik=700)
+
+        tef_h = _tefekkur_yukseklik_hesapla(
+            draw_t, tef, self.kart_ic_w - 40, font_tef_norm, font_tef_bold, line_height=34
+        )
+        y_bottom_safe = 1566
+        ay_y = y_bottom_safe - tef_h - 16
+
+        # B) ÜSTE DAYALI TİLAVET BİTİŞ KOORDİNATI
+        y_recitation_bottom = (
+            self.ar_y_start
+            + len(self.ar_satir_bilgileri) * self.ar_h
+            + self.gap_ar_tr
+            + len(self.tr_satir_bilgileri) * self.tr_h
+        )
+
+        # C) ORTADA KALAN ALANI ESNEK PAYLAŞAN MEAL & AYRAÇ
+        temiz_meal = page_meal.strip("“”\"' ")
+        meal_metin = f"“{temiz_meal}”"
+        meal_satirlar = metin_satirla(meal_metin, self.font_meal, self.kart_ic_w - 40, draw_t)
+        meal_blok_h = 30 + len(meal_satirlar) * self.meal_h
+
+        kalan_yukseklik = ay_y - y_recitation_bottom
+        serbest_bosluk = max(16, kalan_yukseklik - meal_blok_h)
+        pad_ust = int(serbest_bosluk * 0.42)
+        ayrac_y = y_recitation_bottom + pad_ust
+
+        # Tırnak filigranı & Altın ayraç
         font_giant_quote = font_al(FONT_BASLIK, 140, agirlik=700)
         draw_t.text((54 + 40, ayrac_y + 10), "“", font=font_giant_quote, fill="#F6ECDA")
 
         draw_t.line([(GENISLIK_9_16 // 2 - 110, ayrac_y), (GENISLIK_9_16 // 2 + 110, ayrac_y)], fill=ALTIN, width=2)
         draw_t.ellipse([GENISLIK_9_16 // 2 - 6, ayrac_y - 5, GENISLIK_9_16 // 2 + 6, ayrac_y + 7], fill=ALTIN)
 
-        meal_satirlar = metin_satirla(f"“{page_meal}”", self.font_meal, self.kart_ic_w - 40, draw_t)
-        my = ayrac_y + 32
+        # Meal Metni Çizimi
+        my = ayrac_y + 30
         for s in meal_satirlar:
             bbox = draw_t.textbbox((0, 0), s, font=self.font_meal)
             sw = bbox[2] - bbox[0]
             draw_t.text(((GENISLIK_9_16 - sw) // 2, my), s, font=self.font_meal, fill=METIN_ANA)
             my += self.meal_h
 
-        # 4. Günün Hikmeti & Tefekkür (Çoklu sayfada sabit Y=1390 ile sıfır ghosting, tek sayfada my+24)
-        if sayfa_sayisi > 1:
-            ay_y = 1390
-        else:
-            ay_y = my + 24
-
+        # D) Günün Hikmeti & Tefekkür Çizimi (Alta dayalı sabit)
         draw_t.line([(GENISLIK_9_16 // 2 - 90, ay_y), (GENISLIK_9_16 // 2 + 90, ay_y)], fill="#E5DAC3", width=2)
         draw_t.ellipse([GENISLIK_9_16 // 2 - 5, ay_y - 4, GENISLIK_9_16 // 2 + 5, ay_y + 6], fill=ALTIN)
 
-        font_tef_baslik = font_al(FONT_UI, 24, agirlik=800)
         txt_b = "GÜNÜN HİKMETİ & TEFEKKÜRÜ"
         bw = draw_t.textlength(txt_b, font=font_tef_baslik)
         bx = (GENISLIK_9_16 - bw) // 2
         draw_t.ellipse([bx - 18, ay_y + 28, bx - 10, ay_y + 36], fill=ALTIN)
         draw_t.text((bx, ay_y + 20), txt_b, font=font_tef_baslik, fill="#B45309")
 
-        font_tef_norm = font_al(FONT_GOVDE, 24, agirlik=400)
-        font_tef_bold = font_al(FONT_GOVDE, 24, agirlik=700)
         zengin_metin_ciz_baseline(
             draw_t,
             tef,
@@ -596,7 +659,7 @@ class _SayfaVerisi:
                     draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=YESIL_INACTIVE)
             cur_y += self.ar_h
 
-        cur_y += 18
+        cur_y += self.gap_ar_tr
         # Türkçe Okunuş Kelimeler (Soldan sağa loading akışı)
         for satir in self.tr_satir_bilgileri:
             for w_str, w_idx, mid_x in satir:
