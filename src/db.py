@@ -68,12 +68,84 @@ def tabloları_hazirla():
         con.commit()
 
 
+YAYIN_GECMISI_DOSYASI = KOK_DIZIN / "data" / "yayin_gecmisi.json"
+
+
+def yayin_gecmisi_yukle() -> List[Dict[str, Any]]:
+    """Git dostu JSON dosyasından yayın geçmişini yükler."""
+    if not YAYIN_GECMISI_DOSYASI.exists():
+        return []
+    try:
+        with open(YAYIN_GECMISI_DOSYASI, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        log.warning(f"Yayın geçmişi JSON okunamadı: {e}")
+        return []
+
+
+def yayin_gecmisi_kaydet(kayit: Dict[str, Any]):
+    """Yeni yayınlanan içeriği Git dostu JSON geçmişine ekler."""
+    gecmis = yayin_gecmisi_yukle()
+    kaynak = (kayit.get("kaynak") or kayit.get("baslik") or "").strip()
+    if not kaynak:
+        return
+
+    # Mükerrer eklemeyi engelle
+    if not any(item.get("kaynak") == kaynak for item in gecmis):
+        gecmis.append({
+            "id": kayit.get("id"),
+            "kategori": kayit.get("kategori", "ayet"),
+            "kaynak": kaynak,
+            "baslik": kayit.get("baslik"),
+            "yayin_zamani": kayit.get("yayin_zamani") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        })
+        YAYIN_GECMISI_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
+        with open(YAYIN_GECMISI_DOSYASI, "w", encoding="utf-8") as f:
+            json.dump(gecmis, f, ensure_ascii=False, indent=2)
+        log.info(f"Yayın geçmişi JSON güncellendi: {kaynak}")
+
+
+def son_paylasilan_kaynaklar(limit: int = 60) -> List[str]:
+    """Son paylaşılan ayet/hadis kaynaklarını döner (hem SQLite hem JSON geçmişinden)."""
+    kaynaklar = set()
+    # 1. JSON geçmişinden al
+    for item in yayin_gecmisi_yukle():
+        k = item.get("kaynak") or item.get("baslik")
+        if k:
+            kaynaklar.add(k.strip())
+
+    # 2. SQLite'tan al
+    try:
+        with baglanti_al() as con:
+            cur = con.execute(
+                "SELECT DISTINCT kaynak FROM paylasimlar WHERE durum = 'yayinlandi' ORDER BY id DESC LIMIT ?",
+                (limit,),
+            )
+            for row in cur.fetchall():
+                if row[0]:
+                    kaynaklar.add(row[0].strip())
+    except Exception:
+        pass
+
+    return sorted(list(kaynaklar))
+
+
 def kaynak_daha_once_paylasildi_mi(kaynak: str) -> bool:
     """Belirtilen ayet veya hadis kaynağının daha önce paylaşılıp paylaşılmadığını denetler."""
     if not kaynak:
         return False
+    
+    k_temiz = kaynak.strip().lower()
+
+    # 1. JSON geçmişinde ara
+    for item in yayin_gecmisi_yukle():
+        k = (item.get("kaynak") or item.get("baslik") or "").strip().lower()
+        if k and (k in k_temiz or k_temiz in k):
+            return True
+
+    # 2. SQLite'ta ara
     with baglanti_al() as con:
-        cur = con.execute("SELECT COUNT(*) FROM paylasimlar WHERE kaynak = ?", (kaynak.strip(),))
+        cur = con.execute("SELECT COUNT(*) FROM paylasimlar WHERE durum = 'yayinlandi' AND kaynak LIKE ?", (f"%{kaynak.strip()}%",))
         sayi = cur.fetchone()[0]
         return sayi > 0
 
@@ -159,6 +231,14 @@ def durum_guncelle(
         params.append(paylasim_id)
         con.execute(f"UPDATE paylasimlar SET {', '.join(updates)} WHERE id = ?", params)
         con.commit()
+
+    if yeni_durum == "yayinlandi":
+        try:
+            k = paylasim_getir(paylasim_id)
+            if k:
+                yayin_gecmisi_kaydet(k)
+        except Exception as e:
+            log.warning(f"JSON yayın geçmişi kaydedilemedi: {e}")
 
 
 def paylasim_getir(paylasim_id: int) -> Optional[Dict[str, Any]]:
