@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gizlilik Politikası — Ezan Plus</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-krem: #F7F5EF;
+            --kart-bg: #FFFFFF;
+            --kirmizi: #C0392B;
+            --metin-ana: #182230;
+            --metin-soluk: #64748B;
+            --kenarlik: #EAE5D8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Manrope', -apple-system, sans-serif;
+            background: var(--bg-krem);
+            color: var(--metin-ana);
+            line-height: 1.7;
+            padding: 40px 20px 60px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 720px;
+            width: 100%;
+        }
+        .kart {
+            background: var(--kart-bg);
+            border: 1px solid var(--kenarlik);
+            border-radius: 24px;
+            padding: 44px 36px;
+            box-shadow: 0 16px 40px rgba(24, 34, 48, 0.04);
+        }
+        header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--kenarlik);
+        }
+        .logo { width: 48px; height: 48px; border-radius: 12px; }
+        .marka-adi { font-family: 'Lora', serif; font-size: 24px; font-weight: 700; }
+        h1 { font-family: 'Lora', serif; font-size: 28px; margin-bottom: 8px; color: var(--metin-ana); }
+        .tarih { color: var(--metin-soluk); font-size: 13px; margin-bottom: 24px; }
+        h2 { font-size: 18px; margin: 28px 0 12px; color: var(--metin-ana); }
+        p { color: #334155; margin-bottom: 16px; font-size: 15px; }
+        ul { margin-left: 20px; margin-bottom: 16px; color: #334155; font-size: 15px; }
+        li { margin-bottom: 6px; }
+        a.geri {
+            display: inline-block;
+            margin-top: 30px;
+            color: var(--kirmizi);
+            font-weight: 700;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="kart">
+            <header>
+                <img src="/logo.png" alt="Ezan Plus Logo" class="logo">
+                <span class="marka-adi">Ezan Plus</span>
+            </header>
+
+            <h1>Gizlilik Politikası (Privacy Policy)</h1>
+            <div class="tarih">Son Güncelleme: 4 Eylül 2026</div>
+
+            <p>
+                Ozborn Studio ("biz", "bizim") olarak geliştirdiğimiz <strong>Ezan Plus</strong> mobil uygulaması ve <strong>Ezan Plus Bot</strong> otomasyon servisleri, kullanıcı gizliliğine ve veri güvenliğine en üst düzeyde önem verir.
+            </p>
+
+            <h2>1. Toplanan Veriler ve Kullanım Amacı</h2>
+            <p>
+                Ezan Plus ve otomasyon araçları kullanıcıların kişisel gizlilik haklarını ihlal edecek hiçbir hassas veriyi toplamaz, satmaz veya üçüncü şahıslarla paylaşmaz.
+            </p>
+            <ul>
+                <li><strong>Konum Bilgisi:</strong> Mobil uygulamada namaz vakitlerinin ve kıble yönünün hatasız hesaplanabilmesi amacıyla yalnızca cihaz üzerinde yerel olarak kullanılır; sunucularımızda saklanmaz.</li>
+                <li><strong>Sosyal Medya ve API Entegrasyonları:</strong> Ezan Plus Bot; Meta (Instagram, Threads, Facebook), Google (YouTube) ve TikTok resmi geliştirici API'lerini yalnızca @ezanplusapp kurumsal sayfalarına manevi içerik, ayet mealleri ve tefekkür paylaşımlarını otomatikleştirmek amacıyla kullanır.</li>
+            </ul>
+
+            <h2>2. Üçüncü Taraf Servisler</h2>
+            <p>
+                Uygulamamız ve içerik botumuz, güvenilir resmi platform sağlayıcılarının altyapılarını kullanır:
+            </p>
+            <ul>
+                <li>Meta Platforms Graph API (Instagram & Threads & Facebook)</li>
+                <li>Google LLC (YouTube Data API v3 & Gemini AI)</li>
+                <li>TikTok Pte. Ltd. (Content Posting API)</li>
+            </ul>
+
+            <h2>3. İletişim</h2>
+            <p>
+                Gizlilik politikamız veya haklarınız ile ilgili sorularınız için bizimle <a href="mailto:contact@ozbornstudio.com" style="color: var(--kirmizi);">contact@ozbornstudio.com</a> adresinden veya <a href="https://ozbornstudio.com" style="color: var(--kirmizi);">ozbornstudio.com</a> üzerinden iletişime geçebilirsiniz.
+            </p>
+
+            <a href="/" class="geri">← Ana Sayfaya Dön</a>
+        </div>
+    </div>
+</body>
+</html>
