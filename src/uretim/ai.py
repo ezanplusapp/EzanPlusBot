@@ -212,6 +212,7 @@ Tema: {tema}
 Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında yanıt ver:
 {{
   "arapca_okunus": "Arapça kelimelerle birebir eşleşen Latin harfleriyle Türkçe okunuşu",
+  "meal_vurgulu": "Yukarıdaki Türkçe mealin hiçbir kelimesini değiştirmeden veya eksiltmeden, âyetin en can alıcı ve vurucu 2-5 kelimelik kısmını markdown **bold** içine alarak aynen yaz (Örn: 'Elbette güçlükle beraber şüphesiz **bir kolaylık vardır.**')",
   "video_baslik_satir1": "Çağrı/anons cümlesi (sonunda : olsun, maks 30 karakter)",
   "video_baslik_satir2": "Vurucu hakikat cümlesi (maks 32 karakter)",
   "tefekkur_notu": "2-3 cümlelik samimi hayat dersi ve tefekkür",
@@ -229,7 +230,15 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
     veri["cuz_no"] = cuz_no
     veri["sure_ayet_etiket"] = sure_ayet_etiket
     veri["arapca_metin"] = arapca_metin
-    veri["turkce_meal"] = turkce_meal
+
+    # Vurgulu meal kontrolü: Gemini tek bir harf dahi değiştirdiyse orijinal tescilli meale dön
+    vurgulu = str(veri.get("meal_vurgulu") or "").strip()
+    if vurgulu and re.sub(r'[\*\s\.,;!?:“"\'”]', '', vurgulu.lower()) == re.sub(r'[\*\s\.,;!?:“"\'”]', '', turkce_meal.lower()):
+        veri["turkce_meal"] = vurgulu
+    else:
+        veri["turkce_meal"] = turkce_meal
+    veri["turkce_meal_orijinal"] = turkce_meal
+
     veri["meal_kaynagi"] = meal_kaynagi
     veri["kategori"] = "ayet"
     veri["format"] = "reels_9_16"

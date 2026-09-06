@@ -23,6 +23,8 @@ from .kart import (
     font_al,
     arapca_hazirla,
     metin_satirla,
+    parse_markdown_bold,
+    wrap_mixed_tokens,
     yuvarlak_kose_ciz,
     rozet_ciz,
     FONT_BASLIK,
@@ -688,7 +690,9 @@ class _SayfaVerisi:
         self.tr_h = int(self.pt_okunus * 1.32)
 
         # 2. Türkçe Meal Ölçeği (Hero Element: Okunaklı, tok ve asil editoryal punto)
-        meal_len = len(page_meal)
+        temiz_meal = page_meal.strip("“”\"' ")
+        meal_metinsiz = temiz_meal.replace("**", "")
+        meal_len = len(meal_metinsiz)
         if meal_len < 45:
             self.pt_meal = 66
         elif meal_len < 80:
@@ -710,7 +714,9 @@ class _SayfaVerisi:
         self.font_ar_bold = font_al(FONT_ARAPCA_BOLD, self.pt_ar)
         self.font_okunus_norm = font_al(FONT_UI, self.pt_okunus, agirlik=500)
         self.font_okunus_bold = font_al(FONT_UI, self.pt_okunus, agirlik=800)
-        self.font_meal = font_al(FONT_BASLIK, self.pt_meal, agirlik=600)
+        self.font_meal_reg = font_al(FONT_BASLIK, self.pt_meal, agirlik=400)
+        self.font_meal_bold = font_al(FONT_BASLIK, self.pt_meal, agirlik=700)
+        self.font_meal = self.font_meal_reg
         self.font_tef_norm = font_al(FONT_GOVDE, self.pt_tef, agirlik=400)
         self.font_tef_bold = font_al(FONT_GOVDE, self.pt_tef, agirlik=700)
         self.font_tef_baslik = font_al(FONT_UI, max(22, int(self.pt_tef * 0.9)), agirlik=800)
@@ -845,10 +851,13 @@ class _SayfaVerisi:
         # C) ORTA ALAN: OKUNUŞ BİTİŞİ İLE TEFEKKÜR ARASINDA ALTIN AYRAÇ VE MEAL DENGELİ ORTALANIR
         temiz_meal = page_meal.strip("“”\"' ")
         meal_metin = f"“{temiz_meal}”"
-        meal_satirlar = metin_satirla(meal_metin, self.font_meal, self.kart_ic_w - 60, draw_t)
+        meal_tokens = parse_markdown_bold(meal_metin)
+        meal_wrapped_lines, space_w = wrap_mixed_tokens(
+            meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
+        )
 
         gap_ayrac_meal = max(32, int(self.pt_meal * 0.55))
-        meal_blok_h = len(meal_satirlar) * self.meal_h
+        meal_blok_h = len(meal_wrapped_lines) * self.meal_h
 
         kalan_orta = ay_y - tr_bottom
         serbest_meal = max(16, kalan_orta - (meal_blok_h + gap_ayrac_meal))
@@ -862,12 +871,15 @@ class _SayfaVerisi:
         draw_t.line([(GENISLIK_9_16 // 2 - ayrac_w // 2, ayrac_y), (GENISLIK_9_16 // 2 + ayrac_w // 2, ayrac_y)], fill=ALTIN, width=2)
         draw_t.ellipse([GENISLIK_9_16 // 2 - 6, ayrac_y - 5, GENISLIK_9_16 // 2 + 6, ayrac_y + 7], fill=ALTIN)
 
-        # Meal Metni Çizimi (Ayracın hemen altından başlar)
+        # Meal Metni Çizimi (Ayracın hemen altından başlar - Mixed Bold)
         my = ayrac_y + gap_ayrac_meal
-        for s in meal_satirlar:
-            bbox = draw_t.textbbox((0, 0), s, font=self.font_meal)
-            sw = bbox[2] - bbox[0]
-            draw_t.text(((GENISLIK_9_16 - sw) // 2, my), s, font=self.font_meal, fill=METIN_ANA)
+        for satir_tokens, line_w in meal_wrapped_lines:
+            cur_x = (GENISLIK_9_16 - line_w) // 2
+            for tok_text, is_bold, word_w in satir_tokens:
+                f_tok = self.font_meal_bold if is_bold else self.font_meal_reg
+                f_color = "#111827" if is_bold else METIN_ANA
+                draw_t.text((cur_x, my), tok_text, font=f_tok, fill=f_color)
+                cur_x += word_w + space_w
             my += self.meal_h
 
         # D) Günün Hikmeti & Tefekkür Çizimi (Alta dayalı sabit)

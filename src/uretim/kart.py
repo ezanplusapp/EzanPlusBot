@@ -198,7 +198,7 @@ def parse_markdown_bold(metin: str) -> List[Tuple[str, bool]]:
     Noktalama işaretlerini önceki kelimeye yapıştırarak 'kelime ,' boşluk hatasını önler."""
     parcalar = re.split(r'(\*\*.*?\*\*)', metin)
     tokenlar = []
-    noktalama_regex = re.compile(r'^([,\.;:!?\)]+)(.*)$')
+    noktalama_regex = re.compile(r'^([,\.;:!?\)’”"]+)(.*)$')
     for parca in parcalar:
         if not parca:
             continue
@@ -233,7 +233,7 @@ def wrap_mixed_tokens(tokens: List[Tuple[str, bool]], font_reg: ImageFont.FreeTy
         kelime_w = bb[2] - bb[0]
 
         # Noktalama ile başlıyorsa önceki kelimeye yapışık kabul et
-        is_noktalama = bool(re.match(r'^[,\.;:!?\)]', kelime))
+        is_noktalama = bool(re.match(r'^[,\.;:!?\)’”"]', kelime))
         eklenecek_space = 0 if is_noktalama else space_w
 
         gereken_w = kelime_w if not mevcut_satir else (mevcut_w + eklenecek_space + kelime_w)
