@@ -570,6 +570,11 @@ class _SayfaVerisi:
         if n <= 1:
             return [[0]]
 
+        # 1. Tek bir satıra rahatça sığıyorsa doğrudan 1 satır yap (Kısa âyetler için heybetli tek satır)
+        toplam_tek_w = sum(w_sizes) + (n - 1) * 18
+        if toplam_tek_w <= max_text_w:
+            return [list(range(n))]
+
         for n_lines in [2, 3]:
             best_diff = 999999
             best_part = None
@@ -709,7 +714,7 @@ class _SayfaVerisi:
 
         for line_indices in chosen_lines:
             sub_ar = [page_ar[i] for i in line_indices]
-            sub_tr = [page_tr[i] for i in line_indices]
+            sub_tr = [page_tr[i] if i < len(page_tr) else "" for i in line_indices]
             g_start = start_w + line_indices[0]
 
             # Arapça kelime genişlikleri
