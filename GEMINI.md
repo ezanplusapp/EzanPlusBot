@@ -97,7 +97,8 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
    - Kısa hadislerde meal **60pt - 66pt (9:16)** / **56pt - 62pt (4:5)** asil puntoya çıkar; orta hadislerde **48pt - 54pt**, uzun hadislerde **41pt - 42pt**.
    - **Mixed Bold Tipografi (`wrap_mixed_tokens`):** `**bold**` kelimeler Ibarra Real Nova Bold (700 weight, `#111827`) ile, diğer kısımlar Regular (400 weight, `#1C1917`) ile çizilir.
    - **Sıfır Halüsinasyon:** Gemini AI mealin tek bir harfini dahi değiştiremez; `re.sub` metin kontrolüyle sadece vurucu 2-5 kelimelik öğüt bold yapılır.
-3. **Dikey Flex Dengeleme:** Kalan serbest boşluk kutu üstü (`%16`), kutu-meal arası (`%48`) ve meal-öğüt arası (`%52`) olarak paylaştırılarak alt tarafta ölü kanyon oluşması önlenir.
+   - **Asil Parşömen Tırnak Filigranı:** Kırmızı/yeşil leke hissi veren eski filigranlar terk edilmiş; `#EFE8DA` sıcak krem/fildişi tonunda, metin üzerine binmeyen ferah ve narin bir tırnak alıntısı uygulanmıştır.
+3. **Altın Oran Dikey Flex Dağılımı:** Kısa hadislerde alt kısımda ölü kanyon oluşmaması için serbest boşluk 3 yönlü altın oranla (`gap_ust ~23%`, `gap_kutu_tr ~44%`, `gap_alt_toplam ~33%`, `gap_tr_kaynak ~36%`) dağıtılır; içerik optik ağırlık merkezine kusursuz oturur.
 4. **Muteber Kaynak Rozeti ve Günün Nebevî Öğüdü:** Taban kutusunda kompakt tefekkür notu ve CTA barı yer alır.
 
 ### C. V16 Günün Duası Kartı (`dua_karti_ciz`)
@@ -105,18 +106,19 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
 - Arapça dua metninde kısa metinlerde **88pt - 114pt (9:16)** / **70pt - 98pt (4:5)** dinamik autofit.
 - Türkçe anlamda kısa dualarda **60pt - 66pt (9:16)** / **54pt - 60pt (4:5)** heybetli punto.
 - Mixed bold vurgusu ve fazilet/öğüt kutusu (`#111827` koyu kontrast).
+- `#EFE8DA` sıcak parşömen tırnak filigranı ve altın oran dikey flex dengelemesi.
 
 ### D. V17 Kur'an Sözlüğü & İslamî Kavram Kartı (`kelime_karti_ciz`)
 - **Yalınlık & Editoryal Duruş:** Ağır kutular ve çerçeveler terk edilmiş; nefes alan ferah, asil bir editoryal sayfa hissi benimsenmiştir.
 - **Renk Standartları:** Ezan Plus Soft Kırmızı zemin (`#AA2228` merkez ➔ `#7E1016` dış vignette), Saf Beyaz (`#FFFFFF`) hero başlık, İpeksi Beyaz (`#FFF8EE`) hat, Şampanya Altın (`#FDE6BA`) rozet, ayraç ve alıntı detayları.
-- **Tipografi Hiyerarşisi:** 
-  * 172pt (9:16) / 130pt (4:5) Saf Beyaz Lora Bold Türkçe kavram.
-  * **Çoklu Satır Desteği & Minimum Taban:** Uzun veya birleşik kavramlarda (*Sıla-i Rahim*, *Emr-i bi'l-Ma'rûf*) fontu küçültmek yerine doğal alt satıra iner (`kelime_basligi_satirla`). Boyut hiçbir durumda **154pt (9:16) / 118pt (4:5)** Sekînet standardının altına düşürülemez.
-  * 180pt (9:16) / 142pt (4:5) Amiri Bold Arapça hat.
+- **Tipografi Hiyerarşisi & Akıllı Çoklu Satır Desteği:** 
+  * Tek satırlı kavramlarda 172pt (9:16) / 130pt (4:5) Saf Beyaz Lora Bold Türkçe kavram.
+  * 2 satırlı kavramlarda (*Sıla-i Rahim*, *Emr-i bi'l-Ma'rûf*) dikey sıkışmayı önlemek için otomatik **138pt (9:16) / 104pt (4:5)** puntoya ve **148pt (9:16) / 116pt (4:5)** Arapça hatta geçiş yapılır. 3 satırlı kavramlarda **118pt (9:16) / 88pt (4:5)** kullanılır.
   * Lügat anlamı arkasında zarif saten altın filigran tırnak işareti (`“`).
-- **Safe Area Standardı:** 
-  * Türkçe kelime alt tabanından Arapça hattın en üst noktasına: `68px` (9:16) / `46px` (4:5) net görsel mesafe.
-  * Arapça kasralardan okunuş/kök satırına: `58px` (9:16) / `42px` (4:5) net emniyet mesafesi (sıfır çakışma).
+- **Kesin Safe Area & CTA Çarpışma Kilidi:** 
+  * Türkçe kelime alt tabanından Arapça hattın en üst noktasına: `68px` (9:16) / `42-46px` (4:5) net görsel mesafe.
+  * Arapça kasralardan okunuş/kök satırına: `56px` (9:16) / `38-42px` (4:5) net emniyet mesafesi.
+  * **Ayet Referansı Güvenlik Kilidi:** Âyet referansı metni, CTA indirme butonu üzerinden en az `34px - 44px` güvenli pay bırakılarak akış içinde kilitlenir; alıntı metni ile referans arasında en az `22px - 30px` nefes payı garanti edilir. Uzun metinlerde otomatik auto-fit döngüsü devreye girerek font ve satır aralıklarını milimetrik ölçekler, butona çarpma imkansızdır.
 - **Taban CTA:** Alt kısımda logo, "Ezan Plus • Ücretsiz İndirin" ve vektörel App Store & Google Play Store indirme barı.
 
 ### E. V16 Ayet-i Kerime Görsel Kartı (`ayet_karti_ciz`)

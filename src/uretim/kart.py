@@ -1028,14 +1028,20 @@ def hadis_karti_ciz(
 
     # 5. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANLARI)
     toplam_icerik_h = box_s_h + tr_toplam_h + kaynak_h
-    kalan_bosluk = max(35, free_vertical - toplam_icerik_h)
+    kalan_bosluk = max(40, free_vertical - toplam_icerik_h)
 
-    gap_ust = max(24, min(70 if format_tipi == "4:5" else 105, int(kalan_bosluk * 0.22)))
-    gap_tr_kaynak = 26 if format_tipi == "4:5" else 32
-
-    kalan_orta_alt = kalan_bosluk - gap_ust - gap_tr_kaynak
-    gap_kutu_tr = max(32, min(56 if format_tipi == "4:5" else 82, int(kalan_orta_alt * 0.38)))
-    gap_kaynak_alt = kalan_orta_alt - gap_kutu_tr
+    if format_tipi == "9:16":
+        gap_ust = max(24, min(170, int(kalan_bosluk * 0.23)))
+        kalan_orta_alt = kalan_bosluk - gap_ust
+        gap_kutu_tr = max(36, min(260, int(kalan_orta_alt * 0.44)))
+        gap_alt_toplam = max(40, kalan_orta_alt - gap_kutu_tr)
+        gap_tr_kaynak = max(26, min(80, int(gap_alt_toplam * 0.36)))
+    else:  # 4:5
+        gap_ust = max(20, min(65, int(kalan_bosluk * 0.20)))
+        kalan_orta_alt = kalan_bosluk - gap_ust
+        gap_kutu_tr = max(28, min(65, int(kalan_orta_alt * 0.44)))
+        gap_alt_toplam = max(30, kalan_orta_alt - gap_kutu_tr)
+        gap_tr_kaynak = max(20, min(38, int(gap_alt_toplam * 0.40)))
 
     box_s_y1 = ayrac_y + gap_ust
     box_s_y2 = box_s_y1 + box_s_h
@@ -1121,22 +1127,15 @@ def hadis_karti_ciz(
             draw.text(((w - o_w) // 2, ok_y), osat, font=font_okunus, fill="#5A4B42")
             ok_y += ok_line_h
 
-    # 6. TÜRKÇE HADİS & KESİNLİKLE TAŞMAYAN TIRNAK FİLİGRANI
+    # 6. TÜRKÇE HADİS & ZARİF PARŞÖMEN TIRNAK FİLİGRANI
     tr_y = box_s_y2 + gap_kutu_tr
-    first_tw = tr_wrapped_lines[0][1]
-    first_tx = (w - first_tw) // 2
 
-    fili_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    fili_draw = ImageDraw.Draw(fili_layer)
+    # Asil ve narin parşömen tırnak filigranı (Metinle çakışmayan, huzurlu krem tonu)
     font_fili_pt = int(font_hadis_boyut * 2.3)
     font_fili = font_al(FONT_BASLIK, font_fili_pt, agirlik=700)
-    fx = max(kx1 + 48, first_tx - 24)
-    fy = max(box_s_y2 + 8, tr_y - int(font_hadis_boyut * 0.65))
-    fili_draw.text((fx, fy), "“", font=font_fili, fill=(192, 33, 40, 24))
-    im.paste(fili_layer, (0, 0), fili_layer)
+    draw.text((w // 2 - 120, tr_y - int(font_fili_pt * 0.45)), "“", font=font_fili, fill="#EFE8DA")
 
     # TÜRKÇE MEAL ÇİZİMİ (BOLD VE REGULAR KELİMELER KUSURSUZ YANYANA)
-    draw = ImageDraw.Draw(im)
     for line_tokens, line_w in tr_wrapped_lines:
         cur_x = (w - line_w) // 2
         for word, is_bold, word_w in line_tokens:
@@ -1449,14 +1448,20 @@ def dua_karti_ciz(
 
     # 5. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANLARI)
     toplam_icerik_h = box_s_h + tr_toplam_h + kaynak_h
-    kalan_bosluk = max(35, free_vertical - toplam_icerik_h)
+    kalan_bosluk = max(40, free_vertical - toplam_icerik_h)
 
-    gap_ust = max(24, min(70 if format_tipi == "4:5" else 105, int(kalan_bosluk * 0.22)))
-    gap_tr_kaynak = 26 if format_tipi == "4:5" else 32
-
-    kalan_orta_alt = kalan_bosluk - gap_ust - gap_tr_kaynak
-    gap_kutu_tr = max(32, min(56 if format_tipi == "4:5" else 82, int(kalan_orta_alt * 0.38)))
-    gap_kaynak_alt = kalan_orta_alt - gap_kutu_tr
+    if format_tipi == "9:16":
+        gap_ust = max(24, min(170, int(kalan_bosluk * 0.23)))
+        kalan_orta_alt = kalan_bosluk - gap_ust
+        gap_kutu_tr = max(36, min(260, int(kalan_orta_alt * 0.44)))
+        gap_alt_toplam = max(40, kalan_orta_alt - gap_kutu_tr)
+        gap_tr_kaynak = max(26, min(80, int(gap_alt_toplam * 0.36)))
+    else:  # 4:5
+        gap_ust = max(20, min(65, int(kalan_bosluk * 0.20)))
+        kalan_orta_alt = kalan_bosluk - gap_ust
+        gap_kutu_tr = max(28, min(65, int(kalan_orta_alt * 0.44)))
+        gap_alt_toplam = max(30, kalan_orta_alt - gap_kutu_tr)
+        gap_tr_kaynak = max(20, min(38, int(gap_alt_toplam * 0.40)))
 
     box_s_y1 = ayrac_y + gap_ust
     box_s_y2 = box_s_y1 + box_s_h
@@ -1508,22 +1513,15 @@ def dua_karti_ciz(
             draw.text(((w - o_w) // 2, ok_y), osat, font=font_okunus, fill="#5A4B42")
             ok_y += ok_line_h
 
-    # 6. TÜRKÇE DUA ANLAMI & KESİNLİKLE TAŞMAYAN ZÜMRÜT FİLİGRAN
+    # 6. TÜRKÇE DUA ANLAMI & ZARİF PARŞÖMEN TIRNAK FİLİGRANI
     tr_y = box_s_y2 + gap_kutu_tr
-    first_tw = tr_wrapped_lines[0][1]
-    first_tx = (w - first_tw) // 2
 
-    fili_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    fili_draw = ImageDraw.Draw(fili_layer)
+    # Asil ve narin parşömen tırnak filigranı (Metinle çakışmayan, huzurlu krem tonu)
     font_fili_pt = int(font_anlam_boyut * 2.3)
     font_fili = font_al(FONT_BASLIK, font_fili_pt, agirlik=700)
-    fx = max(kx1 + 48, first_tx - 24)
-    fy = max(box_s_y2 + 8, tr_y - int(font_anlam_boyut * 0.65))
-    fili_draw.text((fx, fy), "“", font=font_fili, fill=(27, 67, 50, 24))
-    im.paste(fili_layer, (0, 0), fili_layer)
+    draw.text((w // 2 - 120, tr_y - int(font_fili_pt * 0.45)), "“", font=font_fili, fill="#EFE8DA")
 
     # TÜRKÇE ANLAM ÇİZİMİ (BOLD VE REGULAR KELİMELER KUSURSUZ YANYANA)
-    draw = ImageDraw.Draw(im)
     for line_tokens, line_w in tr_wrapped_lines:
         cur_x = (w - line_w) // 2
         for word, is_bold, word_w in line_tokens:
@@ -1785,10 +1783,16 @@ def kelime_karti_ciz(
     f_latin = font_al(FONT_GOVDE, pt_latin, agirlik=700)
     lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw)
 
-    # 3+ satırlı uzun kavramlarda dikey sıkışmayı önlemek için esnet
+    # Çoklu satırlı kavramlarda dikey sıkışmayı önlemek için akıllı ölçeklendirme
     if len(lines_tr) >= 3:
-        target_pt = 138 if is_916 else 105
-        min_pt_floor = 120 if is_916 else 92
+        target_pt = 118 if is_916 else 88
+        min_pt_floor = 96 if is_916 else 72
+        pt_latin = target_pt
+        f_latin = font_al(FONT_GOVDE, pt_latin, agirlik=700)
+        lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw)
+    elif len(lines_tr) == 2:
+        target_pt = 138 if is_916 else 104
+        min_pt_floor = 114 if is_916 else 86
         pt_latin = target_pt
         f_latin = font_al(FONT_GOVDE, pt_latin, agirlik=700)
         lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw)
@@ -1812,7 +1816,13 @@ def kelime_karti_ciz(
     latin_block_h = (len(lines_tr) - 1) * lh_latin + (last_l_bb[3] - first_l_bb[1])
 
     # Arapça Hat
-    pt_arabic = 180 if is_916 else 142
+    if len(lines_tr) >= 3:
+        pt_arabic = 130 if is_916 else 102
+    elif len(lines_tr) == 2:
+        pt_arabic = 148 if is_916 else 116
+    else:
+        pt_arabic = 180 if is_916 else 142
+
     f_arabic = font_al(FONT_ARAPCA, pt_arabic)
     ar_prep_txt = arapca_hazirla(kelime_ar)
     ar_bb = draw.textbbox((0, 0), ar_prep_txt, font=f_arabic)
@@ -1897,23 +1907,47 @@ def kelime_karti_ciz(
     rh = r_bb[3] - r_bb[1]
 
     # 3. Dinamik Dikey Flex Mizanpaj & KESİN GÖRSEL SAFE AREA
-    gap_tr_ar = 68 if is_916 else 46
-    gap_ar_origin = 58 if is_916 else 42
+    gap_tr_ar = 68 if is_916 else (42 if len(lines_tr) >= 2 else 46)
+    gap_ar_origin = 56 if is_916 else (38 if len(lines_tr) >= 2 else 42)
 
     top_y = 150 if is_916 else 95
-    bottom_y = cta_ust_y - (45 if is_916 else 35)
-    usable_h = bottom_y - top_y
+    # CTA butonu üst sınırından kesin nefes payı ile referans satırının azami tavanı
+    ref_y_max = cta_ust_y - (44 if is_916 else 34) - rh
+    usable_h = ref_y_max - top_y
 
     hero_visual_h = latin_block_h + gap_tr_ar + (ar_bb[3] - ar_bb[1]) + gap_ar_origin + origin_total_h
     fixed_content_h = 28 + hero_visual_h + body_block_h + italic_block_h + rh
 
-    free_space = max(40, usable_h - fixed_content_h)
+    # Taşma önleyici otomatik sığdırma döngüsü (Auto-fit safe area guarantee)
+    while (fixed_content_h > usable_h - 20) and (pt_body > (32 if is_916 else 25)):
+        pt_body -= 2
+        lh_body = int(pt_body * (1.50 if is_916 else 1.48))
+        f_body_reg = font_al(FONT_GOVDE, pt_body, agirlik=400)
+        f_body_bold = font_al(FONT_GOVDE, pt_body, agirlik=700)
+        body_wrapped, body_space_w = wrap_mixed_tokens(body_tokens, f_body_reg, f_body_bold, max_text_w, draw)
+        body_block_h = len(body_wrapped) * lh_body
 
-    pad_tag_hero = int(free_space * 0.16)
-    pad_origin_div = int(free_space * 0.18)
-    pad_div_body = int(free_space * 0.24)
-    pad_body_quote = int(free_space * 0.26)
-    pad_quote_ref = int(free_space * 0.16)
+        pt_italic -= 1
+        lh_italic = int(pt_italic * (1.50 if is_916 else 1.48))
+        f_italic = font_al(FONT_GOVDE, pt_italic, agirlik=400)
+        italic_lines = metin_satirla(f"“{clean_alinti}”", f_italic, max_text_w - 40, draw)
+        italic_block_h = len(italic_lines) * lh_italic
+
+        if gap_tr_ar > (44 if is_916 else 30):
+            gap_tr_ar -= 2
+        if gap_ar_origin > (38 if is_916 else 26):
+            gap_ar_origin -= 2
+
+        hero_visual_h = latin_block_h + gap_tr_ar + (ar_bb[3] - ar_bb[1]) + gap_ar_origin + origin_total_h
+        fixed_content_h = 28 + hero_visual_h + body_block_h + italic_block_h + rh
+
+    free_space = max(30, usable_h - fixed_content_h)
+
+    pad_tag_hero = int(free_space * 0.12)
+    pad_origin_div = int(free_space * 0.14)
+    pad_div_body = int(free_space * 0.22)
+    pad_body_quote = int(free_space * 0.22)
+    pad_quote_ref = max(30 if is_916 else 22, int(free_space * 0.14))
 
     cur_y = top_y
 
@@ -1992,10 +2026,9 @@ def kelime_karti_ciz(
         draw.text(((w - (bb[2] - bb[0])) / 2, cur_y), line, font=f_italic, fill=secili_palet["c_italic"])
         cur_y += lh_italic
 
-    cur_y += pad_quote_ref
-
-    # I) Ayet Referansı
-    draw.text(((w - rw) / 2, cur_y), ref_txt, font=f_ref, fill=secili_palet["c_ref"])
+    # I) Ayet Referansı (Akış içinde, garantili güvenli koordinatta çizilir)
+    ref_y = min(cur_y + pad_quote_ref, ref_y_max)
+    draw.text(((w - rw) / 2, ref_y), ref_txt, font=f_ref, fill=secili_palet["c_ref"])
 
     # 4. Kaydet
     if not cikti_dosya_adi:
