@@ -25,3 +25,6 @@ data/onbellek/*
 .DS_Store
 .idea/
 .vscode/
+*.log
+data/logs/
+

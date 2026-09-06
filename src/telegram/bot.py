@@ -203,7 +203,8 @@ def caption_ve_buton_guncelle(
     yeni_caption: str,
     butonlar: Optional[List[List[Dict[str, str]]]] = None,
 ):
-    """Medya mesajının başlığını ve inline butonlarını günceller."""
+    """Medya veya metin mesajının içeriğini ve inline butonlarını günceller."""
+    # 1. Medya mesajı başlığını güncellemeyi dene (editMessageCaption)
     try:
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
@@ -214,8 +215,23 @@ def caption_ve_buton_guncelle(
         if butonlar is not None:
             payload["reply_markup"] = json.dumps({"inline_keyboard": butonlar})
         _istek("editMessageCaption", data=payload)
+        return
     except Exception as e:
-        log.warning(f"editMessageCaption hatası: {e}")
+        log.debug(f"editMessageCaption denenemedi ({e}), editMessageText deneniyor...")
+
+    # 2. Eğer medya değilse metin mesajı olarak güncelle (editMessageText)
+    try:
+        payload_txt: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": yeni_caption,
+            "parse_mode": "HTML",
+        }
+        if butonlar is not None:
+            payload_txt["reply_markup"] = json.dumps({"inline_keyboard": butonlar})
+        _istek("editMessageText", data=payload_txt)
+    except Exception as e2:
+        log.warning(f"Mesaj güncelleme hatası: {e2}")
 
 
 def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
@@ -393,6 +409,29 @@ def yardim_metni_olustur() -> str:
     )
 
 
+import threading
+
+SON_KOMUTLAR: Dict[str, float] = {}
+
+
+def _coklu_komut_engeli(ana_komut: str, chat_id: str | int, limit_saniye: float = 15.0) -> bool:
+    """Aynı komutun arka arkaya flood edilmesini engeller."""
+    anahtar = f"{chat_id}:{ana_komut}"
+    simdi = time.time()
+    son_zaman = SON_KOMUTLAR.get(anahtar, 0)
+    if simdi - son_zaman < limit_saniye:
+        return False
+    SON_KOMUTLAR[anahtar] = simdi
+    return True
+
+
+def _arkaplanda_calistir(hedef, *args, **kwargs):
+    """Uzun süren komutları ve yayın işlemlerini bot dinleme döngüsünü tıkamadan arka planda çalıştırır."""
+    t = threading.Thread(target=hedef, args=args, kwargs=kwargs, daemon=True)
+    t.start()
+    return t
+
+
 def komut_isle(chat_id: str | int, msg_id: int, metin: str):
     """Kullanıcının gönderdiği metin komutunu ayrıştırır ve çalıştırır."""
     parcalar = metin.split(maxsplit=1)
@@ -408,40 +447,60 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         mesaj_gonder(durum_raporu_olustur(), chat_id=str(chat_id))
 
     elif ana_komut == "/ayet":
+        if not _coklu_komut_engeli("/ayet", chat_id):
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Kur'an tilaveti hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            return
         mesaj_gonder("⏳ <b>Kur'an Tilaveti Reels Videosu Hazırlanıyor...</b>\n\nMişari Râşid el-Afâsî tilaveti render edilip otomatik yayınlanacak, lütfen bekleyin...", chat_id=str(chat_id))
-        try:
-            from .. import otomasyon
-            otomasyon.reels_icerigi_olustur_ve_gonder(tema=parametre)
-        except Exception as e:
-            log.error(f"/ayet komutu hatası: {e}")
-            mesaj_gonder(f"❌ <b>Tilavet videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        def _gorev_ayet():
+            try:
+                from .. import otomasyon
+                otomasyon.reels_icerigi_olustur_ve_gonder(tema=parametre)
+            except Exception as e:
+                log.error(f"/ayet komutu hatası: {e}")
+                mesaj_gonder(f"❌ <b>Tilavet videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_ayet)
 
     elif ana_komut == "/hadis":
+        if not _coklu_komut_engeli("/hadis", chat_id):
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Hadis kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            return
         mesaj_gonder("⏳ <b>Sahih Hadis-i Şerif Kartı Hazırlanıyor...</b>\n\nRiyâzü's-Sâlihîn külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çiziliyor...", chat_id=str(chat_id))
-        try:
-            from .. import otomasyon
-            otomasyon.hadis_postu_olustur_ve_gonder(tema=parametre)
-        except Exception as e:
-            log.error(f"/hadis komutu hatası: {e}")
-            mesaj_gonder(f"❌ <b>Hadis kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        def _gorev_hadis():
+            try:
+                from .. import otomasyon
+                otomasyon.hadis_postu_olustur_ve_gonder(tema=parametre)
+            except Exception as e:
+                log.error(f"/hadis komutu hatası: {e}")
+                mesaj_gonder(f"❌ <b>Hadis kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_hadis)
 
     elif ana_komut == "/dua":
+        if not _coklu_komut_engeli("/dua", chat_id):
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Dua kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            return
         mesaj_gonder("⏳ <b>Günün Duası Kartı Hazırlanıyor...</b>\n\nTescilli dualar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çiziliyor...", chat_id=str(chat_id))
-        try:
-            from .. import otomasyon
-            otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=parametre)
-        except Exception as e:
-            log.error(f"/dua komutu hatası: {e}")
-            mesaj_gonder(f"❌ <b>Dua kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        def _gorev_dua():
+            try:
+                from .. import otomasyon
+                otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=parametre)
+            except Exception as e:
+                log.error(f"/dua komutu hatası: {e}")
+                mesaj_gonder(f"❌ <b>Dua kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_dua)
 
     elif ana_komut == "/kelime":
+        if not _coklu_komut_engeli("/kelime", chat_id):
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Kelime kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            return
         mesaj_gonder("⏳ <b>Kur'an Sözlüğü Kartı Hazırlanıyor...</b>\n\nİslami kavramlar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çiziliyor...", chat_id=str(chat_id))
-        try:
-            from .. import otomasyon
-            otomasyon.kelime_postu_olustur_ve_gonder(kavram=parametre)
-        except Exception as e:
-            log.error(f"/kelime komutu hatası: {e}")
-            mesaj_gonder(f"❌ <b>Kelime kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        def _gorev_kelime():
+            try:
+                from .. import otomasyon
+                otomasyon.kelime_postu_olustur_ve_gonder(kavram=parametre)
+            except Exception as e:
+                log.error(f"/kelime komutu hatası: {e}")
+                mesaj_gonder(f"❌ <b>Kelime kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_kelime)
 
     elif ana_komut == "/yayinla":
         if not parametre or not parametre.isdigit():
@@ -449,12 +508,14 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
             return
         pid = int(parametre)
         mesaj_gonder(f"⏳ <b>Paylaşım #{pid} yayınlanıyor...</b>\nInstagram, Threads ve Facebook'a aktarılıyor...", chat_id=str(chat_id))
-        try:
-            sonuclar = yayinla_hepsi(pid)
-            yayin_detay_karti_gonder(pid, sonuclar)
-        except Exception as e:
-            log.error(f"/yayinla hatası: {e}")
-            mesaj_gonder(f"❌ <b>Yayınlama hatası:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        def _gorev_yayinla():
+            try:
+                sonuclar = yayinla_hepsi(pid)
+                yayin_detay_karti_gonder(pid, sonuclar)
+            except Exception as e:
+                log.error(f"/yayinla hatası: {e}")
+                mesaj_gonder(f"❌ <b>Yayınlama hatası:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_yayinla)
 
     elif ana_komut in ("/kaldir", "/sil"):
         if not parametre or not parametre.isdigit():
@@ -462,20 +523,22 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
             return
         pid = int(parametre)
         mesaj_gonder(f"⏳ <b>Paylaşım #{pid} tüm platformlardan yayından kaldırılıyor...</b>", chat_id=str(chat_id))
-        try:
-            silme_sonuclar = yayindan_kaldir(pid)
-            mesaj_gonder(
-                f"🗑️ <b>PAYLAŞIM #{pid} YAYINDAN KALDIRILDI!</b>\n\n"
-                f"• Instagram: {'✅ Silindi' if silme_sonuclar.get('instagram') else '—'}\n"
-                f"• Facebook: {'✅ Silindi' if silme_sonuclar.get('facebook') else '—'}\n"
-                f"• YouTube: {'✅ Silindi' if silme_sonuclar.get('youtube') else '—'}\n"
-                f"• Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else '—'}\n\n"
-                f"Sistem yayın geçmişinden ve veritabanından temizlendi.",
-                chat_id=str(chat_id),
-            )
-        except Exception as e:
-            log.error(f"/kaldir hatası: {e}")
-            mesaj_gonder(f"❌ <b>Yayından kaldırma hatası:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        def _gorev_kaldir():
+            try:
+                silme_sonuclar = yayindan_kaldir(pid)
+                mesaj_gonder(
+                    f"🗑️ <b>PAYLAŞIM #{pid} YAYINDAN KALDIRILDI!</b>\n\n"
+                    f"• Instagram: {'✅ Silindi' if silme_sonuclar.get('instagram') else '—'}\n"
+                    f"• Facebook: {'✅ Silindi' if silme_sonuclar.get('facebook') else '—'}\n"
+                    f"• YouTube: {'✅ Silindi' if silme_sonuclar.get('youtube') else '—'}\n"
+                    f"• Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else '—'}\n\n"
+                    f"Sistem yayın geçmişinden ve veritabanından temizlendi.",
+                    chat_id=str(chat_id),
+                )
+            except Exception as e:
+                log.error(f"/kaldir hatası: {e}")
+                mesaj_gonder(f"❌ <b>Yayından kaldırma hatası:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_kaldir)
 
     elif ana_komut == "/iptal":
         if not parametre or not parametre.isdigit():
@@ -484,6 +547,13 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         pid = int(parametre)
         db.durum_guncelle(pid, yeni_durum="iptal_edildi")
         mesaj_gonder(f"❌ <b>Paylaşım #{pid} iptal edildi.</b>", chat_id=str(chat_id))
+
+    else:
+        mesaj_gonder(
+            f"❓ <b>Bilinmeyen Komut:</b> <code>{html.escape(ana_komut)}</code>\n\n"
+            f"Kullanılabilir tüm komutlar için <b>/yardim</b> yazabilirsiniz.",
+            chat_id=str(chat_id),
+        )
 
 
 def tek_sefer_dinle(offset: int = 0) -> int:
@@ -524,37 +594,39 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                     callback_cevapla(cq_id, "✅ İçerik onaylandı, yayınlanıyor! Lütfen bekleyin...", alert=True)
                     caption_guncelle(chat_id, msg_id, "⏳ <b>YAYINLANIYOR...</b>\n\nİçerik Instagram, Threads ve Facebook'a aktarılıyor...")
 
-                    sonuclar = yayinla_hepsi(paylasim_id)
+                    def _gorev_onay(p_id=paylasim_id, c_id=chat_id, m_id=msg_id):
+                        sonuclar = yayinla_hepsi(p_id)
+                        yt_durum = "—"
+                        if "youtube" in sonuclar:
+                            yt_durum = f"✅ Yayınlandı (<a href='{sonuclar.get('youtube_url', '')}'>İzle</a>)"
+                        elif "youtube_hata" in sonuclar:
+                            yt_durum = "❌ Hata"
 
-                    yt_durum = "—"
-                    if "youtube" in sonuclar:
-                        yt_durum = f"✅ Yayınlandı (<a href='{sonuclar.get('youtube_url', '')}'>İzle</a>)"
-                    elif "youtube_hata" in sonuclar:
-                        yt_durum = "❌ Hata"
+                        tt_durum = "—"
+                        if "tiktok" in sonuclar:
+                            tt_durum = "✅ Yayınlandı"
+                        elif "tiktok_hata" in sonuclar:
+                            tt_durum = "❌ Hata"
 
-                    tt_durum = "—"
-                    if "tiktok" in sonuclar:
-                        tt_durum = "✅ Yayınlandı"
-                    elif "tiktok_hata" in sonuclar:
-                        tt_durum = "❌ Hata"
+                        basari_metni = (
+                            f"🎉 <b>İÇERİK BAŞARIYLA YAYINLANDI!</b>\n\n"
+                            f"• <b>Instagram Feed (4:5):</b> {'✅ Yayınlandı' if 'instagram' in sonuclar else '❌ Hata'}\n"
+                            f"• <b>Instagram Story (9:16):</b> {'✅ Yayınlandı' if 'instagram_story' in sonuclar else '❌ Hata'}\n"
+                            f"• <b>Threads (@ezanplusapp):</b> {'✅ Yayınlandı' if 'threads' in sonuclar else '❌ Hata'}\n"
+                            f"• <b>Facebook Sayfası:</b> {'✅ Yayınlandı' if 'facebook' in sonuclar else '❌ Hata'}\n"
+                            f"• <b>YouTube Shorts:</b> {yt_durum}\n"
+                            f"• <b>TikTok (@ezanplusapp):</b> {tt_durum}\n\n"
+                            f"⏰ <i>Zaman: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
+                        )
+                        yeni_butonlar = [
+                            [{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{p_id}"}]
+                        ]
+                        if sonuclar.get("youtube_url"):
+                            yeni_butonlar.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": sonuclar["youtube_url"]}])
 
-                    basari_metni = (
-                        f"🎉 <b>İÇERİK BAŞARIYLA YAYINLANDI!</b>\n\n"
-                        f"• <b>Instagram Feed (4:5):</b> {'✅ Yayınlandı' if 'instagram' in sonuclar else '❌ Hata'}\n"
-                        f"• <b>Instagram Story (9:16):</b> {'✅ Yayınlandı' if 'instagram_story' in sonuclar else '❌ Hata'}\n"
-                        f"• <b>Threads (@ezanplusapp):</b> {'✅ Yayınlandı' if 'threads' in sonuclar else '❌ Hata'}\n"
-                        f"• <b>Facebook Sayfası:</b> {'✅ Yayınlandı' if 'facebook' in sonuclar else '❌ Hata'}\n"
-                        f"• <b>YouTube Shorts:</b> {yt_durum}\n"
-                        f"• <b>TikTok (@ezanplusapp):</b> {tt_durum}\n\n"
-                        f"⏰ <i>Zaman: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
-                    )
-                    yeni_butonlar = [
-                        [{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{paylasim_id}"}]
-                    ]
-                    if sonuclar.get("youtube_url"):
-                        yeni_butonlar.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": sonuclar["youtube_url"]}])
+                        caption_ve_buton_guncelle(c_id, m_id, basari_metni, butonlar=yeni_butonlar)
 
-                    caption_ve_buton_guncelle(chat_id, msg_id, basari_metni, butonlar=yeni_butonlar)
+                    _arkaplanda_calistir(_gorev_onay)
 
                 elif data.startswith("kaldir_"):
                     paylasim_id = int(data.split("_")[1])
@@ -565,24 +637,27 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                         "⏳ <b>YAYINDAN KALDIRILIYOR...</b>\n\nİçerik Meta, YouTube ve Threads ağlarından siliniyor...",
                         butonlar=[]
                     )
-                    silme_sonuclar = yayindan_kaldir(paylasim_id)
 
-                    kaldirildi_metni = (
-                        f"🗑️ <b>BU İÇERİK YAYINDAN KALDIRILDI</b>\n\n"
-                        f"📌 <b>Paylaşım #{paylasim_id}</b> Doğukan tarafından tüm platformlardan başarıyla silindi ve arşivlendi.\n\n"
-                        f"• Instagram: {'✅ Silindi' if silme_sonuclar.get('instagram') else '—'}\n"
-                        f"• Facebook: {'✅ Silindi' if silme_sonuclar.get('facebook') else '—'}\n"
-                        f"• YouTube: {'✅ Silindi' if silme_sonuclar.get('youtube') else '—'}\n"
-                        f"• Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else '—'}\n\n"
-                        f"⏰ <i>Kaldırılma Saati: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
-                    )
-                    caption_ve_buton_guncelle(
-                        chat_id,
-                        msg_id,
-                        kaldirildi_metni,
-                        butonlar=[[{"text": "❌ Yayından Kaldırıldı (Arşivlendi)", "callback_data": "noop"}]]
-                    )
-                    mesaj_gonder(f"🗑️ <b>Paylaşım #{paylasim_id} tüm platformlardan başarıyla kaldırıldı.</b>", chat_id=str(chat_id))
+                    def _gorev_kaldir_btn(p_id=paylasim_id, c_id=chat_id, m_id=msg_id):
+                        silme_sonuclar = yayindan_kaldir(p_id)
+                        kaldirildi_metni = (
+                            f"🗑️ <b>BU İÇERİK YAYINDAN KALDIRILDI</b>\n\n"
+                            f"📌 <b>Paylaşım #{p_id}</b> Doğukan tarafından tüm platformlardan başarıyla silindi ve arşivlendi.\n\n"
+                            f"• Instagram: {'✅ Silindi' if silme_sonuclar.get('instagram') else '—'}\n"
+                            f"• Facebook: {'✅ Silindi' if silme_sonuclar.get('facebook') else '—'}\n"
+                            f"• YouTube: {'✅ Silindi' if silme_sonuclar.get('youtube') else '—'}\n"
+                            f"• Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else '—'}\n\n"
+                            f"⏰ <i>Kaldırılma Saati: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
+                        )
+                        caption_ve_buton_guncelle(
+                            c_id,
+                            m_id,
+                            kaldirildi_metni,
+                            butonlar=[[{"text": "❌ Yayından Kaldırıldı (Arşivlendi)", "callback_data": "noop"}]]
+                        )
+                        mesaj_gonder(f"🗑️ <b>Paylaşım #{p_id} tüm platformlardan başarıyla kaldırıldı.</b>", chat_id=str(c_id))
+
+                    _arkaplanda_calistir(_gorev_kaldir_btn)
 
                 elif data.startswith("red_"):
                     paylasim_id = int(data.split("_")[1])
@@ -602,6 +677,13 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                 metin = (msg.get("text") or "").strip()
                 chat_id = msg.get("chat", {}).get("id")
                 msg_id = msg.get("message_id")
+                msg_date = msg.get("date", 0)
+
+                # 15 dakikadan eski komutları atla (bot kapalıyken birikmiş eski testleri çalıştırmasın)
+                if msg_date > 0 and (time.time() - msg_date) > 900:
+                    log.info(f"Eski Telegram mesajı atlandı ({int(time.time() - msg_date)} sn önce): '{metin}'")
+                    continue
+
                 if metin.startswith("/") and chat_id:
                     komut_isle(chat_id, msg_id, metin)
 
@@ -614,14 +696,23 @@ def tek_sefer_dinle(offset: int = 0) -> int:
 def surekli_dinle(aralik_saniye: float = 2.0):
     """
     Telegram botunu sürekli dinleme (daemon) modunda çalıştırır.
-    Ctrl+C ile durdurulana kadar aktif kalır.
+    Ağ kesintilerine karşı otomatik yeniden bağlanır.
     """
     log.info("Telegram komutları ve buton onayları dinleniyor (Çıkmak için Ctrl+C)...")
     komutlari_kaydet()
     offset = 0
-    try:
-        while True:
+    while True:
+        try:
             offset = tek_sefer_dinle(offset)
-            time.sleep(aralik_saniye)
-    except KeyboardInterrupt:
-        log.info("Telegram dinleyici kullanıcı tarafından durduruldu.")
+        except KeyboardInterrupt:
+            log.info("Telegram dinleyici kullanıcı tarafından durduruldu.")
+            break
+        except Exception as e:
+            log.error(f"Telegram yoklama döngüsü hatası: {e}, 5 sn sonra yeniden deneniyor...")
+            time.sleep(5)
+        time.sleep(aralik_saniye)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    surekli_dinle()
