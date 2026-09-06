@@ -224,18 +224,21 @@ def _statik_taban_ciz(
 
 def arapca_kelimeleri_ayristir(metin: str) -> List[str]:
     """
-    Arapça ayet metnini kelimelerine ayırır,
-    secavend işaretlerini (ۚ ۖ ۗ ۘ ۙ ۛ ۜ) tek başına kelime yapmayıp
-    önceki kelimenin sonuna ekler. Böylece kelime sayısı ve senkron bozulmaz.
+    Arapça ayet metnini kelimelerine ayırır.
+    Secavend işaretleri (ۚ ۖ ۗ ۘ ۙ ۛ ۜ ؕ ۞ ۩ ۝) telaffuz edilen birer kelime veya harf
+    olmayıp mushaf içi kıraat/durak sembolleridir. Video karaoke metninde ve kelime
+    senkronunda bağımsız uçuşan garip harfler oluşturmaması için listeden elenir.
     """
     secavendler = {"ۚ", "ۖ", "ۗ", "ۘ", "ۙ", "ۛ", "ۜ", "ؕ", "۞", "۩", "۝"}
     ham = [w.strip() for w in metin.split() if w.strip()]
     sonuc: List[str] = []
     for w in ham:
-        if w in secavendler and sonuc:
-            sonuc[-1] = f"{sonuc[-1]} {w}"
-        else:
-            sonuc.append(w)
+        if w in secavendler:
+            continue
+        # Kelime sonuna yapışık durak işareti varsa temizle
+        w_clean = re.sub(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9]+$", "", w).strip()
+        if w_clean:
+            sonuc.append(w_clean)
     return sonuc
 
 
@@ -542,51 +545,59 @@ class _SayfaVerisi:
         else:
             start_pt = 72
 
-        # 1. Dinamik Arapça Satırlama ve Autofit Döngüsü
+        # 1. Dinamik Arapça Satırlama ve Autofit Döngüsü (Önce 2 satır, sığmazsa 3 satır hedeflenir)
         im_temp = Image.new("RGB", (100, 100))
         d_temp = ImageDraw.Draw(im_temp)
 
         chosen_pt = 64
         chosen_lines = []
+        found_layout = False
 
-        for pt in range(start_pt, 52, -2):
-            font = font_al(FONT_ARAPCA_NORMAL, pt)
-            font_bold = font_al(FONT_ARAPCA_BOLD, pt)
+        for max_l in [2, 3]:
+            for pt in range(start_pt, 48, -2):
+                font = font_al(FONT_ARAPCA_NORMAL, pt)
+                font_bold = font_al(FONT_ARAPCA_BOLD, pt)
 
-            w_sizes = []
-            for w in page_ar:
-                gw = arapca_hazirla(w)
-                b1 = d_temp.textbbox((0, 0), gw, font=font)
-                b2 = d_temp.textbbox((0, 0), gw, font=font_bold)
-                # Aktif kelime bold olduğunda satırın taşmaması için emniyetli azami genişlik
-                w_sizes.append(max(b1[2] - b1[0], b2[2] - b2[0]))
+                w_sizes = []
+                for w in page_ar:
+                    gw = arapca_hazirla(w)
+                    b1 = d_temp.textbbox((0, 0), gw, font=font)
+                    b2 = d_temp.textbbox((0, 0), gw, font=font_bold)
+                    # Aktif kelime bold olduğunda satırın taşmaması için emniyetli azami genişlik
+                    w_sizes.append(max(b1[2] - b1[0], b2[2] - b2[0]))
 
-            lines = []
-            cur_line = []
-            cur_w = 0
-            fits = True
-            min_gap = 18
+                lines = []
+                cur_line = []
+                cur_w = 0
+                fits = True
+                min_gap = 18
 
-            for idx, w_px in enumerate(w_sizes):
-                needed = w_px + (min_gap if cur_line else 0)
-                if cur_w + needed <= MAX_TEXT_W:
-                    cur_line.append(idx)
-                    cur_w += needed
-                else:
-                    if not cur_line:
-                        fits = False
-                        break
+                for idx, w_px in enumerate(w_sizes):
+                    needed = w_px + (min_gap if cur_line else 0)
+                    if cur_w + needed <= MAX_TEXT_W:
+                        cur_line.append(idx)
+                        cur_w += needed
+                    else:
+                        if not cur_line:
+                            fits = False
+                            break
+                        lines.append(cur_line)
+                        cur_line = [idx]
+                        cur_w = w_px
+
+                if cur_line:
                     lines.append(cur_line)
-                    cur_line = [idx]
-                    cur_w = w_px
 
-            if cur_line:
-                lines.append(cur_line)
-
-            if fits and len(lines) <= 3:
-                chosen_pt = pt
-                chosen_lines = lines
+                if fits and len(lines) <= max_l:
+                    chosen_pt = pt
+                    chosen_lines = lines
+                    found_layout = True
+                    break
+            if found_layout:
                 break
+
+        if not chosen_lines:
+            chosen_lines = [list(range(len(page_ar)))]
 
         self.pt_ar = chosen_pt
         self.pt_okunus = max(24, int(self.pt_ar * 0.38))
@@ -696,6 +707,26 @@ class _SayfaVerisi:
                 d_w.text((0, 0), gw, font=self.font_ar_bold, fill=KIRMIZI)
                 self.ar_red_cache[idx] = (im_w, wt, ht, gw)
 
+        # Arapça satırların Y koordinatlarını dinamik bounding box ile hesapla
+        # Her satırın gerçek piksel mürekkep sınırları (harfler ve alt/üst harekeler) ölçülür.
+        # İki satır arasında MUTLAKA en az MIN_VERTICAL_GAP (28px) net boşluk bırakılır.
+        # Böylece alt satırın şedde/fethaları ile üst satırın kesra/tenvinleri ASLA çakışmaz!
+        self.ar_satir_y_list = []
+        MIN_VERTICAL_GAP = 28
+        prev_ink_bottom = self.ar_y_start
+
+        for s_idx, satir in enumerate(self.ar_satir_bilgileri):
+            line_top_ink = min(draw_t.textbbox((0, 0), self.ar_red_cache[w_idx][3], font=self.font_ar_bold)[1] for _, w_idx, _ in satir)
+            line_bottom_ink = max(draw_t.textbbox((0, 0), self.ar_red_cache[w_idx][3], font=self.font_ar_bold)[3] for _, w_idx, _ in satir)
+
+            if s_idx == 0:
+                line_y = self.ar_y_start
+            else:
+                line_y = prev_ink_bottom + MIN_VERTICAL_GAP - line_top_ink
+
+            self.ar_satir_y_list.append(line_y)
+            prev_ink_bottom = line_y + line_bottom_ink
+
         # 3. Dinamik Flex Mizanpaj (Üste dayalı tilavet, alta dayalı tefekkür, kalan alanı esnek paylaşan meal)
         # A) ALTA DAYALI GÜNÜN HİKMETİ & TEFEKKÜRÜ
         font_tef_baslik = self.font_tef_baslik
@@ -710,9 +741,7 @@ class _SayfaVerisi:
 
         # B) ÜSTE DAYALI ARAPÇA TİLAVET VE SAFE AREA
         # Arapça harflerin alt uzantıları ve harekeleri (ر, ي, و, kesra vb.) için güvenli pay
-        y_ar_bottom = self.ar_y_start + len(self.ar_satir_bilgileri) * self.ar_h
-        ar_safe_area = max(52, int(self.pt_ar * 0.44))
-        y_ar_safe_bottom = y_ar_bottom + ar_safe_area
+        y_ar_safe_bottom = prev_ink_bottom + 32
 
         # C) ORTA ALAN HESAPLAMA:
         # Okunuş, altın ayraç ve meal ortadaki serbest alanı dengeli paylaşır.
@@ -779,8 +808,8 @@ class _SayfaVerisi:
         draw_k = ImageDraw.Draw(kare)
 
         # Arapça Kelimeler (Sağdan sola loading akışı)
-        cur_y = self.ar_y_start
-        for satir in self.ar_satir_bilgileri:
+        for s_idx, satir in enumerate(self.ar_satir_bilgileri):
+            cur_y = self.ar_satir_y_list[s_idx]
             for w, w_idx, mid_x in satir:
                 im_w, wt, ht, gw = self.ar_red_cache[w_idx]
                 x_start = mid_x - wt // 2
@@ -796,7 +825,6 @@ class _SayfaVerisi:
                     draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=ISLAM_YESILI)
                 else:
                     draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=YESIL_INACTIVE)
-            cur_y += self.ar_h
 
         # Türkçe Okunuş Kelimeler (Ayracın hemen üstünde, self.tr_y_start'tan başlar)
         cur_y = self.tr_y_start

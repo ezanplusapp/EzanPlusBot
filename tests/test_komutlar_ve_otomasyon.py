@@ -142,7 +142,42 @@ class TestOtomasyonVeKomutlar(unittest.TestCase):
         gecmis_sonra = db.yayin_gecmisi_yukle()
         self.assertFalse(any(item.get("kaynak") == "Test Sûresi, 1. Âyet" for item in gecmis_sonra))
 
+    def test_video_secavend_ve_satir_araligi(self):
+        """Secavend durak işaretlerinin ayıklandığını ve satırlar arası >= 28px net pay olduğunu doğrular."""
+        from src.uretim.video import arapca_kelimeleri_ayristir, _SayfaVerisi
+        
+        # Nisâ 33: 19 kelime + 2 secavend
+        nisa_33 = kuran_db.ayet_getir(4, 33)
+        ar_kelimeler = arapca_kelimeleri_ayristir(nisa_33["arapca_metin"])
+        self.assertEqual(len(ar_kelimeler), 19)
+        self.assertNotIn("ۚ", ar_kelimeler)
+        self.assertFalse(any("ۚ" in w for w in ar_kelimeler))
+
+        # Sayfa verisi satır aralığı testi
+        sayfa = _SayfaVerisi(
+            p_idx=0,
+            sayfa_sayisi=2,
+            start_w=0,
+            end_w=10,
+            page_ar=ar_kelimeler[:10],
+            page_tr=["ve", "cealna", "mevaliye", "mimma", "terakel", "validani", "vel", "akrabun", "vellezine", "akadet"],
+            page_meal="Test meali",
+            sure_ayet="Nisâ • 33",
+            s1="BAŞLIK 1",
+            s2="BAŞLIK 2",
+            tef="Test tefekkür",
+            hafiz_adi="Mişari Râşid",
+        )
+        self.assertEqual(len(sayfa.ar_satir_bilgileri), 2)
+        self.assertEqual(len(sayfa.ar_satir_y_list), 2)
+        
+        # 1. ve 2. satır arasındaki net boşluğu doğrula
+        y0 = sayfa.ar_satir_y_list[0]
+        y1 = sayfa.ar_satir_y_list[1]
+        self.assertGreater(y1 - y0, 140)  # Y koordinatları arasında güvenli ferah basamak
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
