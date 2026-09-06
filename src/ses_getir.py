@@ -36,7 +36,8 @@ def ayet_sesi_indir(sure_no: int, ayet_no: int) -> Path:
 
     url = f"{HAFIZ_URL_TABAN}/{dosya_adi}"
     log.info(f"Ayet sesi indiriliyor: {url}")
-    res = requests.get(url, timeout=30)
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+    res = requests.get(url, headers=headers, timeout=30)
     res.raise_for_status()
 
     hedef_yol.write_bytes(res.content)
@@ -103,35 +104,46 @@ def ayet_seslerini_birlestir(sure_no: int, ayet_listesi: List[int], cikti_adi: O
     return cikti_yolu
 
 
+_ZAMAN_CACHE: Dict[int, dict] = {}
+
+
 def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[float, float]]:
     """
-    QuranCDN resmi API'sinden Şeyh Mişari Râşid el-Afâsî için
-    kelime kelime milisaniye hassasiyetinde [baslangic_saniye, bitis_saniye] listesi döner.
-    Sure bazlı yerel önbellekleme (cache) yapar.
+    Şeyh Mişari Râşid el-Afâsî için yerel repodaki (data/zamanlar/sure_{sure_no}.json)
+    tescilli kelime başlangıç/bitiş zaman damgalarını döner.
+    114 sûrenin tamamı yerel repoda saklandığı için harici API bağımlılığı ve gecikmesi yoktur.
     """
-    zaman_klasoru = KOK_DIZIN / "data" / "zamanlar"
-    zaman_klasoru.mkdir(parents=True, exist_ok=True)
-    cache_dosyasi = zaman_klasoru / f"sure_{sure_no}.json"
-
-    data = None
-    if cache_dosyasi.exists():
-        try:
-            import json
-            data = json.loads(cache_dosyasi.read_text(encoding="utf-8"))
-        except Exception as e:
-            log.warning(f"Zaman önbelleği okunamadı: {e}")
-
-    if not data:
-        url = f"https://api.qurancdn.com/api/qdc/audio/reciters/7/audio_files?chapter={sure_no}&segments=true"
-        try:
-            res = requests.get(url, timeout=12)
-            if res.status_code == 200:
-                data = res.json()
+    global _ZAMAN_CACHE
+    if sure_no in _ZAMAN_CACHE:
+        data = _ZAMAN_CACHE[sure_no]
+    else:
+        zaman_klasoru = KOK_DIZIN / "data" / "zamanlar"
+        cache_dosyasi = zaman_klasoru / f"sure_{sure_no}.json"
+        data = None
+        if cache_dosyasi.exists():
+            try:
                 import json
-                cache_dosyasi.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-        except Exception as e:
-            log.warning(f"QuranCDN zaman damgaları alınamadı: {e}")
-            return []
+                data = json.loads(cache_dosyasi.read_text(encoding="utf-8"))
+                _ZAMAN_CACHE[sure_no] = data
+            except Exception as e:
+                log.warning(f"Zaman önbelleği okunamadı: {e}")
+
+        if not data:
+            url = f"https://api.qurancdn.com/api/qdc/audio/reciters/7/audio_files?chapter={sure_no}&segments=true"
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+            try:
+                res = requests.get(url, headers=headers, timeout=15)
+                if res.status_code == 200:
+                    data = res.json()
+                    import json
+                    cache_dosyasi.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                    _ZAMAN_CACHE[sure_no] = data
+                    log.info(f"QuranCDN zaman damgaları indirildi ve önbelleğe alındı (Sûre: {sure_no})")
+                else:
+                    log.warning(f"QuranCDN zaman damgaları yanıt kodu: {res.status_code}")
+            except Exception as e:
+                log.warning(f"QuranCDN zaman damgaları alınamadı ({url}): {e}")
+                return []
 
     if not data:
         return []

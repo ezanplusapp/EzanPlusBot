@@ -374,3 +374,32 @@ def instagram_story_paylas(
     log.info(f"Instagram Story başarıyla yayınlandı! Medya ID: {p_data['id']}")
     return p_data
 
+
+def medyayi_sil(media_id: str) -> bool:
+    """
+    Instagram veya Facebook üzerinden yayınlanmış bir gönderiyi / videoyu siler.
+    Meta Graph API: DELETE /{media_id}
+    """
+    if not media_id:
+        return False
+
+    _, _, token = get_meta_bilgileri()
+    page_token = get_env("FACEBOOK_PAGE_ACCESS_TOKEN") or token
+
+    # Önce sayfa tokeni / genel token ile silmeyi dene
+    for t in [token, page_token]:
+        if not t:
+            continue
+        try:
+            url = f"{GRAPH_API_URL}/{media_id}"
+            res = requests.delete(url, params={"access_token": t}, timeout=30)
+            data = res.json()
+            if data.get("success") is True or res.status_code == 200:
+                log.info(f"Meta medyası başarıyla silindi: ID {media_id}")
+                return True
+        except Exception as e:
+            log.warning(f"Meta medya silme denemesi başarısız ({media_id}): {e}")
+
+    log.error(f"Meta medyası silinemedi: ID {media_id}")
+    return False
+

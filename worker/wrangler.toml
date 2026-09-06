@@ -9,4 +9,17 @@ preview_urls = false
 GITHUB_REPO = "ezanplusapp/EzanPlusBot"
 
 [triggers]
-crons = ["45 16 * * *"]
+# Günde 6 Dağıtım Slotu (TSİ = UTC+3)
+# 1. Slot: 11:30 TSİ (08:30 UTC) — Kur'an Tilaveti Reels 1
+# 2. Slot: 13:45 TSİ (10:45 UTC) — Sahih Hadis-i Şerif Kartı (4:5 + 9:16)
+# 3. Slot: 16:30 TSİ (13:30 UTC) — Kur'an Tilaveti Reels 2
+# 4. Slot: 18:45 TSİ (15:45 UTC) — Günün Duası Kartı (4:5 + 9:16)
+# 5. Slot: 20:30 TSİ (17:30 UTC) — Kur'an Tilaveti Reels 3 (Prime Time)
+# 6. Slot: 22:00 TSİ (19:00 UTC) — Kur'an Sözlüğü Kartı (4:5 + 9:16)
+# Cloudflare Workers Ücretsiz Plan (Hesap başına toplam 5 cron sınırı) için
+# Tek bir 15 dakikalık akıllı yoklayıcı kuralı kullanılır.
+# Worker her 15 dakikada uyanır; tam 11:30, 13:45, 16:30, 18:45, 20:30 veya 22:00 TSİ ise
+# ilgili içerik türünü GitHub Actions'a iletir, aksi halde uykuya geçer.
+crons = [
+  "*/15 8-19 * * *"
+]

@@ -7,9 +7,10 @@ ve Telegram grubuna onay butonuyla iletir.
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from . import db
 from .uretim import ai as icerik_uret
@@ -84,18 +85,26 @@ def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
         durum="taslak",
     )
 
-    log.info("5/5: Telegram grubuna önizleme ve onay butonları gönderiliyor...")
-    telegram_bot.onay_istegi_gonder(paylasim_id)
+    log.info("5/5: Kur'an tilaveti otomatik yayınlanıyor ve Telegram'a yayın detay kartı iletiliyor...")
+    sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
+    telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
 
-    log.info(f"Reels içeriği hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")
+    log.info(f"Reels tilaveti başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
     return paylasim_id
 
 
-def gorsel_icerik_olustur_ve_gonder(kategori: str = "ayet", tema: Optional[str] = None) -> int:
+def gorsel_icerik_olustur_ve_gonder(
+    kategori: str = "ayet",
+    tema: Optional[str] = None,
+    format_tipi: str = "4:5",
+) -> int:
     """
-    1080x1350 formatında tekil görsel post üretip Telegram grubuna gönderir.
+    4:5 (Feed) ve 9:16 (Story) formatlarında tescilli görsel post üretip Telegram grubuna onay için gönderir.
+    Hadis, Dua ve Kelime kartlarında hem 4:5 hem de 9:16 çıktıları eş zamanlı üretilir.
     """
     dosya_eki = int(time.time())
+    format_etiketi = format_tipi.replace(":", "_")
+    gorsel_yollari: List[str] = []
 
     if kategori == "ayet":
         icerik = icerik_uret.ayet_icerigi_uret(tema=tema)
@@ -105,13 +114,23 @@ def gorsel_icerik_olustur_ve_gonder(kategori: str = "ayet", tema: Optional[str] 
         tefekkur = icerik.get("tefekkur_notu")
         caption = icerik.get("instagram_caption", "")
 
-        gorsel_yolu = sablon_ciz.ayet_karti_ciz(
+        gorsel_4_5 = sablon_ciz.ayet_karti_ciz(
             sure_ayet=kaynak,
             turkce_meal=turkce,
             arapca_metin=arapca,
             tefekkur_notu=tefekkur,
-            cikti_dosya_adi=f"ayet_{dosya_eki}.png",
+            cikti_dosya_adi=f"ayet_4_5_{dosya_eki}.png",
+            format_tipi="4:5",
         )
+        gorsel_9_16 = sablon_ciz.ayet_karti_ciz(
+            sure_ayet=kaynak,
+            turkce_meal=turkce,
+            arapca_metin=arapca,
+            tefekkur_notu=tefekkur,
+            cikti_dosya_adi=f"ayet_9_16_{dosya_eki}.png",
+            format_tipi="9:16",
+        )
+        gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
 
     elif kategori == "hadis":
         icerik = icerik_uret.hadis_icerigi_uret(tema=tema)
@@ -119,79 +138,219 @@ def gorsel_icerik_olustur_ve_gonder(kategori: str = "ayet", tema: Optional[str] 
         kaynak = icerik.get("kaynak_ravi", "Hadis-i Şerif")
         tefekkur = icerik.get("tefekkur_notu")
         caption = icerik.get("instagram_caption", "")
+        arapca = icerik.get("arapca_metin")
+        okunus = icerik.get("arapca_okunus")
+        ravi = icerik.get("ravi")
 
-        gorsel_yolu = sablon_ciz.hadis_karti_ciz(
+        gorsel_4_5 = sablon_ciz.hadis_karti_ciz(
             hadis_metni=turkce,
-            kaynak=kaynak,
+            kaynak_ravi=kaynak,
             tefekkur_notu=tefekkur,
-            cikti_dosya_adi=f"hadis_{dosya_eki}.png",
+            cikti_dosya_adi=f"hadis_4_5_{dosya_eki}.png",
+            format_tipi="4:5",
+            arapca_metin=arapca,
+            arapca_okunus=okunus,
+            ravi=ravi,
         )
+        gorsel_9_16 = sablon_ciz.hadis_karti_ciz(
+            hadis_metni=turkce,
+            kaynak_ravi=kaynak,
+            tefekkur_notu=tefekkur,
+            cikti_dosya_adi=f"hadis_9_16_{dosya_eki}.png",
+            format_tipi="9:16",
+            arapca_metin=arapca,
+            arapca_okunus=okunus,
+            ravi=ravi,
+        )
+        gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
 
-    else:  # dua
+        if icerik.get("hadis_id"):
+            from . import hadis_db
+            hadis_db.hadisi_paylasildi_isaretle(icerik["hadis_id"])
+
+    elif kategori == "dua":
         icerik = icerik_uret.dua_icerigi_uret(ruh_hali=tema)
         baslik = icerik.get("dua_basligi", "Günün Duası")
         turkce = icerik.get("turkce_anlam", "")
         arapca = icerik.get("arapca_metin")
-        kaynak = icerik.get("okunus_veya_fazilet")
+        okunus = icerik.get("arapca_okunus")
+        fazilet = icerik.get("okunus_veya_fazilet")
+        kaynak = baslik
+        tefekkur = fazilet
         caption = icerik.get("instagram_caption", "")
 
-        gorsel_yolu = sablon_ciz.dua_karti_ciz(
+        gorsel_4_5 = sablon_ciz.dua_karti_ciz(
             dua_basligi=baslik,
             turkce_anlam=turkce,
             arapca_metin=arapca,
-            kaynak_fazilet=kaynak,
-            cikti_dosya_adi=f"dua_{dosya_eki}.png",
+            arapca_okunus=okunus,
+            okunus_veya_fazilet=fazilet,
+            cikti_dosya_adi=f"dua_4_5_{dosya_eki}.png",
+            format_tipi="4:5",
         )
+        gorsel_9_16 = sablon_ciz.dua_karti_ciz(
+            dua_basligi=baslik,
+            turkce_anlam=turkce,
+            arapca_metin=arapca,
+            arapca_okunus=okunus,
+            okunus_veya_fazilet=fazilet,
+            cikti_dosya_adi=f"dua_9_16_{dosya_eki}.png",
+            format_tipi="9:16",
+        )
+        gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
+
+        if icerik.get("dua_id"):
+            from . import dua_db
+            dua_db.duayi_paylasildi_isaretle(icerik["dua_id"])
+
+    elif kategori == "kelime":
+        icerik = icerik_uret.kelime_icerigi_uret(kelime_tr=tema)
+        kavram_adi = icerik.get("kelime_tr", "Kur'an Sözlüğü")
+        arapca_kelime = icerik.get("kelime_ar", "")
+        kok = icerik.get("kok", "")
+        lugat_anlami = icerik.get("lugat_anlami", "")
+        ayet_ornek = icerik.get("kuran_boyutu", "")
+        ayet_referans = icerik.get("ayet_ref", "")
+        hikmet_notu = icerik.get("hayat_dersi", "")
+        caption = icerik.get("instagram_caption", "")
+        kaynak = f"Kur'an Sözlüğü • {kavram_adi}"
+        turkce = lugat_anlami
+        arapca = arapca_kelime
+        tefekkur = hikmet_notu
+
+        gorsel_4_5 = sablon_ciz.kelime_karti_ciz(
+            kelime_tr=kavram_adi,
+            kelime_ar=arapca_kelime,
+            okunus=icerik.get("okunus", ""),
+            kok=kok,
+            lugat_anlami=lugat_anlami,
+            kuran_boyutu=ayet_ornek,
+            hayat_dersi=hikmet_notu,
+            ayet_ref=ayet_referans,
+            cikti_dosya_adi=f"kelime_4_5_{dosya_eki}.png",
+            format_tipi="4:5",
+            palet="yakut_kirmizi",
+        )
+        gorsel_9_16 = sablon_ciz.kelime_karti_ciz(
+            kelime_tr=kavram_adi,
+            kelime_ar=arapca_kelime,
+            okunus=icerik.get("okunus", ""),
+            kok=kok,
+            lugat_anlami=lugat_anlami,
+            kuran_boyutu=ayet_ornek,
+            hayat_dersi=hikmet_notu,
+            ayet_ref=ayet_referans,
+            cikti_dosya_adi=f"kelime_9_16_{dosya_eki}.png",
+            format_tipi="9:16",
+            palet="yakut_kirmizi",
+        )
+        gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
+
+        if icerik.get("kelime_id"):
+            from . import kelime_db
+            kelime_db.kelimeyi_paylasildi_isaretle(icerik["kelime_id"])
+
+    else:
+        raise ValueError(f"Bilinmeyen içerik kategorisi: {kategori}")
 
     paylasim_id = db.paylasim_ekle(
         kategori=kategori,
-        format_tipi="post_4_5",
+        format_tipi=f"post_{format_etiketi}",
         turkce_metin=turkce,
         baslik=kaynak,
-        arapca_metin=arapca if kategori != "hadis" else None,
+        arapca_metin=arapca,
         kaynak=kaynak,
-        tefekkur=tefekkur if kategori != "dua" else None,
+        tefekkur=tefekkur,
         caption=caption,
-        gorsel_yollari=[str(gorsel_yolu)],
+        gorsel_yollari=gorsel_yollari,
         durum="taslak",
     )
 
     telegram_bot.onay_istegi_gonder(paylasim_id)
-    log.info(f"Görsel post hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")
+    log.info(f"Görsel post ({kategori.upper()} Çift Format 4:5 + 9:16) hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")
     return paylasim_id
 
 
-def dinle_ve_bekle(sure_saniye: int = 1800, paylasim_id: Optional[int] = None) -> bool:
+def hadis_postu_olustur_ve_gonder(tema: Optional[str] = None, format_tipi: str = "4:5") -> int:
+    """Sahih Hadis-i Şerif kartı üretip Telegram grubuna onay için iletir."""
+    return gorsel_icerik_olustur_ve_gonder(kategori="hadis", tema=tema, format_tipi=format_tipi)
+
+
+def dua_postu_olustur_ve_gonder(ruh_hali: Optional[str] = None, format_tipi: str = "4:5") -> int:
+    """Günün Duası / Manevi Niyaz kartı üretip Telegram grubuna onay için iletir."""
+    return gorsel_icerik_olustur_ve_gonder(kategori="dua", tema=ruh_hali, format_tipi=format_tipi)
+
+
+def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5") -> int:
+    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip Telegram grubuna onay için iletir."""
+    return gorsel_icerik_olustur_ve_gonder(kategori="kelime", tema=kavram, format_tipi=format_tipi)
+
+
+def icerik_olustur_ve_gonder(tur: str = "reels", tema: Optional[str] = None, format_tipi: str = "4:5") -> int:
     """
-    Belirtilen süre boyunca Telegram'daki onay butonlarına basılmasını bekler.
-    Eğer paylasim_id belirtilmişse ve onay/ret gelirse döngü erken tamamlanır.
+    Belirtilen türe göre (reels, hadis, dua, kelime, ayet) içeriği üretip Telegram onayına sunar.
+    """
+    tur_temiz = tur.lower().strip()
+    if tur_temiz in ("reels", "video"):
+        return reels_icerigi_olustur_ve_gonder(tema=tema)
+    elif tur_temiz == "hadis":
+        return hadis_postu_olustur_ve_gonder(tema=tema, format_tipi=format_tipi)
+    elif tur_temiz == "dua":
+        return dua_postu_olustur_ve_gonder(ruh_hali=tema, format_tipi=format_tipi)
+    elif tur_temiz == "kelime":
+        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi)
+    elif tur_temiz in ("ayet", "gorsel"):
+        return gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=tema, format_tipi=format_tipi)
+    else:
+        raise ValueError(f"Geçersiz içerik türü: {tur}")
+
+
+def dinle_ve_bekle(sure_saniye: int = 1800, paylasim_id: Optional[int] = None, yayin_sonrasi: bool = False) -> bool:
+    """
+    Belirtilen süre boyunca Telegram'daki butonları ve komutları dinler.
+    yayin_sonrasi=True ise: İçerik zaten yayınlanmıştır, 'yayindan_kaldirildi' durumu oluşursa erkenden çıkar.
+    yayin_sonrasi=False ise: Onay bekleniyordur, 'yayinlandi' veya 'iptal_edildi' olduğunda erkenden çıkar.
     """
     dakika = sure_saniye // 60
-    log.info(f"Telegram onay butonları dinleniyor (Maksimum bekleme: {dakika} dakika)...")
+    durum_tipi = "Yayından Kaldır butonu" if yayin_sonrasi else "Onay butonları"
+    log.info(f"Telegram {durum_tipi} dinleniyor (Maksimum bekleme: {dakika} dakika)...")
     offset = 0
     baslangic = time.time()
     while time.time() - baslangic < sure_saniye:
         offset = telegram_bot.tek_sefer_dinle(offset)
         if paylasim_id:
             kayit = db.paylasim_getir(paylasim_id)
-            if kayit and kayit.get("durum") in ("yayinlandi", "iptal_edildi"):
+            if kayit:
                 durum = kayit.get("durum")
-                log.info(f"Paylaşım #{paylasim_id} '{durum}' durumuna geçti, işlem tamam.")
-                return durum == "yayinlandi"
+                if yayin_sonrasi:
+                    if durum == "yayindan_kaldirildi":
+                        log.info(f"Paylaşım #{paylasim_id} kullanıcı tarafından yayından kaldırıldı.")
+                        return False
+                else:
+                    if durum in ("yayinlandi", "iptal_edildi"):
+                        log.info(f"Paylaşım #{paylasim_id} '{durum}' durumuna geçti, işlem tamam.")
+                        return durum == "yayinlandi"
         time.sleep(2)
 
-    log.warning(f"Zaman aşımı: {sure_saniye} saniye içinde onay/ret gelmedi.")
-    return False
+    if yayin_sonrasi:
+        log.info(f"Yayın sonrası kontrol süresi ({dakika} dk) tamamlandı. İçerik yayında kalmaya devam ediyor.")
+        return True
+    else:
+        log.warning(f"Zaman aşımı: {sure_saniye} saniye içinde onay/ret gelmedi.")
+        return False
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Ezan Plus Sosyal Medya Otomasyon Motoru")
-    parser.add_argument("--tur", choices=["reels", "gorsel"], default="reels", help="İçerik türü (reels veya gorsel)")
-    parser.add_argument("--tema", type=str, default=None, help="Özel tema veya ayet konusu")
+    parser.add_argument("komut", nargs="?", default=None, choices=["reels", "ayet", "hadis", "dua", "kelime", "gorsel"], help="Üretilecek içerik türü")
+    parser.add_argument("--tur", choices=["reels", "ayet", "hadis", "dua", "kelime", "gorsel"], default=None, help="İçerik türü")
+    parser.add_argument("--format", choices=["4:5", "9:16"], default="4:5", help="Görsel formatı (4:5 feed veya 9:16 story)")
+    parser.add_argument("--tema", type=str, default=None, help="Özel tema, sure:ayet veya arama terimi")
     parser.add_argument("--otomatik", action="store_true", help="Onay beklemeden doğrudan yayınla")
     parser.add_argument("--bekleme", type=int, default=1800, help="Onay bekleme süresi (saniye)")
+    parser.add_argument("--dinle", action="store_true", help="Sürekli dinleme modunda Telegram botunu çalıştır")
 
     args = parser.parse_args()
 
@@ -200,14 +359,24 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    if args.tur == "reels":
-        pid = reels_icerigi_olustur_ve_gonder(tema=args.tema)
-    else:
-        pid = gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=args.tema)
+    if args.dinle:
+        log.info("Ezan Plus Telegram Dinleyici (Daemon) başlatılıyor...")
+        telegram_bot.surekli_dinle()
+        sys.exit(0)
 
-    if args.otomatik:
+    tur = args.komut or args.tur or "reels"
+    pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format)
+
+    if tur in ("reels", "video"):
+        # Reels otomatik olarak yayınlandı; 10 dakika boyunca 'Yayından Kaldır' butonu dinlenir
+        log.info(f"Kur'an Reels #{pid} otomatik yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor...")
+        dinle_ve_bekle(sure_saniye=min(args.bekleme, 600), paylasim_id=pid, yayin_sonrasi=True)
+    elif args.otomatik:
         log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")
-        telegram_bot.yayinla_hepsi(pid)
+        sonuclar = telegram_bot.yayinla_hepsi(pid)
+        telegram_bot.yayin_detay_karti_gonder(pid, sonuclar)
+        dinle_ve_bekle(sure_saniye=min(args.bekleme, 600), paylasim_id=pid, yayin_sonrasi=True)
     else:
-        dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid)
+        dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=False)
+
 

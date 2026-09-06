@@ -345,3 +345,27 @@ def threads_video_paylas(video_url_veya_yolu: str | Path, metin: str) -> Dict[st
 
     log.info(f"Threads video gönderisi yayınlandı! ID: {p_data['id']}")
     return p_data
+
+
+def gonderiyi_sil(media_id: str) -> bool:
+    """
+    Threads üzerinden yayınlanmış bir gönderiyi siler.
+    Threads API: DELETE /{threads_media_id}
+    """
+    if not media_id:
+        return False
+    try:
+        _, token = get_threads_bilgileri()
+        res = requests.delete(
+            f"{THREADS_API_URL}/{media_id}",
+            params={"access_token": token},
+            timeout=30,
+        )
+        data = res.json()
+        if data.get("success") is True or res.status_code == 200:
+            log.info(f"Threads gönderisi başarıyla silindi: {media_id}")
+            return True
+    except Exception as e:
+        log.warning(f"Threads silme hatası ({media_id}): {e}")
+    return False
+

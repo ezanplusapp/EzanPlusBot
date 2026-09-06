@@ -57,9 +57,13 @@ def tabloları_hazirla():
                 hata_mesaji TEXT
             )
         """)
-        # Migration: youtube_post_id yoksa ekle
+        # Migration: youtube_post_id ve facebook_post_id yoksa ekle
         try:
             con.execute("ALTER TABLE paylasimlar ADD COLUMN youtube_post_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            con.execute("ALTER TABLE paylasimlar ADD COLUMN facebook_post_id TEXT")
         except sqlite3.OperationalError:
             pass
         # Hızlı mükerrer arama için index
@@ -103,6 +107,22 @@ def yayin_gecmisi_kaydet(kayit: Dict[str, Any]):
         with open(YAYIN_GECMISI_DOSYASI, "w", encoding="utf-8") as f:
             json.dump(gecmis, f, ensure_ascii=False, indent=2)
         log.info(f"Yayın geçmişi JSON güncellendi: {kaynak}")
+
+
+def yayin_gecmisinden_sil(paylasim_id: int) -> bool:
+    """Paylaşım ID'sine göre JSON geçmişinden kaydı temizler."""
+    gecmis = yayin_gecmisi_yukle()
+    yeni_gecmis = [item for item in gecmis if item.get("id") != paylasim_id]
+    if len(yeni_gecmis) != len(gecmis):
+        try:
+            with open(YAYIN_GECMISI_DOSYASI, "w", encoding="utf-8") as f:
+                json.dump(yeni_gecmis, f, ensure_ascii=False, indent=2)
+            log.info(f"Paylaşım #{paylasim_id} JSON yayın geçmişinden silindi.")
+            return True
+        except Exception as e:
+            log.warning(f"Yayın geçmişi silme hatası: {e}")
+    return False
+
 
 
 def son_paylasilan_kaynaklar(limit: int = 60) -> List[str]:
@@ -204,6 +224,8 @@ def durum_guncelle(
     telegram_mesaj_id: Optional[int] = None,
     youtube_post_id: Optional[str] = None,
     tiktok_post_id: Optional[str] = None,
+    threads_post_id: Optional[str] = None,
+    facebook_post_id: Optional[str] = None,
 ):
     """Paylaşımın durumunu günceller."""
     with baglanti_al() as con:
@@ -225,6 +247,12 @@ def durum_guncelle(
         if tiktok_post_id is not None:
             updates.append("tiktok_post_id = ?")
             params.append(tiktok_post_id)
+        if threads_post_id is not None:
+            updates.append("threads_post_id = ?")
+            params.append(threads_post_id)
+        if facebook_post_id is not None:
+            updates.append("facebook_post_id = ?")
+            params.append(facebook_post_id)
         if yeni_durum == "yayinlandi":
             updates.append("yayin_zamani = CURRENT_TIMESTAMP")
 
@@ -238,6 +266,12 @@ def durum_guncelle(
             if k:
                 yayin_gecmisi_kaydet(k)
         except Exception as e:
+            log.warning(f"JSON yayın geçmişi kaydedilemedi: {e}")
+    elif yeni_durum == "yayindan_kaldirildi":
+        try:
+            yayin_gecmisinden_sil(paylasim_id)
+        except Exception as e:
+            log.warning(f"JSON yayın geçmişinden silinemedi: {e}")
             log.warning(f"JSON yayın geçmişi kaydedilemedi: {e}")
 
 

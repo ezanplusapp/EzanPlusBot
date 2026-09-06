@@ -156,3 +156,20 @@ def youtube_shorts_yukle(
         "url": shorts_url,
         "raw": cevap,
     }
+
+
+def videoyu_sil(video_id: str) -> bool:
+    """
+    YouTube Data API v3 üzerinden yüklenmiş bir videoyu / Shorts'u siler.
+    """
+    if not video_id:
+        return False
+    try:
+        servis = yetkilendir()
+        servis.videos().delete(id=video_id).execute()
+        log.info(f"✅ YouTube videosu başarıyla silindi: {video_id}")
+        return True
+    except Exception as e:
+        log.error(f"YouTube video silme hatası ({video_id}): {e}")
+        return False
+
