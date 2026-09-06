@@ -502,6 +502,124 @@ class _SayfaVerisi:
     """
     Reels videosundaki tek bir sayfanın mizanpaj, font, slot ve taban görselini yönetir.
     """
+    @staticmethod
+    def uygun_pt_bul(page_ar: List[str], max_text_w: int = 840) -> int:
+        """Belirtilen kelime grubu için en heybetli ve taşmayan Arapça puntoyu belirler."""
+        n_kelime = len(page_ar)
+        if n_kelime <= 4:
+            start_pt = 114
+        elif n_kelime <= 7:
+            start_pt = 94
+        elif n_kelime <= 10:
+            start_pt = 84
+        else:
+            start_pt = 74
+
+        im_temp = Image.new("RGB", (100, 100))
+        d_temp = ImageDraw.Draw(im_temp)
+
+        for max_l in [2, 3]:
+            for pt in range(start_pt, 48, -2):
+                font = font_al(FONT_ARAPCA_NORMAL, pt)
+                font_bold = font_al(FONT_ARAPCA_BOLD, pt)
+                w_sizes = [
+                    max(
+                        d_temp.textbbox((0, 0), arapca_hazirla(w), font=font)[2] - d_temp.textbbox((0, 0), arapca_hazirla(w), font=font)[0],
+                        d_temp.textbbox((0, 0), arapca_hazirla(w), font=font_bold)[2] - d_temp.textbbox((0, 0), arapca_hazirla(w), font=font_bold)[0],
+                    )
+                    for w in page_ar
+                ]
+                lines = []
+                cur_line = []
+                cur_w = 0
+                fits = True
+                min_gap = 18
+                for idx, w_px in enumerate(w_sizes):
+                    needed = w_px + (min_gap if cur_line else 0)
+                    if cur_w + needed <= max_text_w:
+                        cur_line.append(idx)
+                        cur_w += needed
+                    else:
+                        if not cur_line:
+                            fits = False
+                            break
+                        lines.append(cur_line)
+                        cur_line = [idx]
+                        cur_w = w_px
+                if cur_line:
+                    lines.append(cur_line)
+                if fits and len(lines) <= max_l:
+                    return pt
+        return 56
+
+    @staticmethod
+    def satirlari_dengeli_bol(page_ar: List[str], pt: int, max_text_w: int = 840) -> List[List[int]]:
+        """Arapça kelimeleri satırlara dengeli dağıtır (satırlar arası asimetriyi ve sıkışıklığı önler)."""
+        im_temp = Image.new("RGB", (100, 100))
+        d_temp = ImageDraw.Draw(im_temp)
+        font = font_al(FONT_ARAPCA_NORMAL, pt)
+        font_bold = font_al(FONT_ARAPCA_BOLD, pt)
+        w_sizes = [
+            max(
+                d_temp.textbbox((0, 0), arapca_hazirla(w), font=font)[2] - d_temp.textbbox((0, 0), arapca_hazirla(w), font=font)[0],
+                d_temp.textbbox((0, 0), arapca_hazirla(w), font=font_bold)[2] - d_temp.textbbox((0, 0), arapca_hazirla(w), font=font_bold)[0],
+            )
+            for w in page_ar
+        ]
+        n = len(page_ar)
+        if n <= 1:
+            return [[0]]
+
+        for n_lines in [2, 3]:
+            best_diff = 999999
+            best_part = None
+            if n_lines == 2:
+                for split_idx in range(1, n):
+                    l0 = w_sizes[:split_idx]
+                    l1 = w_sizes[split_idx:]
+                    w0 = sum(l0) + (len(l0) - 1) * 18
+                    w1 = sum(l1) + (len(l1) - 1) * 18
+                    if w0 <= max_text_w and w1 <= max_text_w:
+                        diff = abs(w0 - w1)
+                        if diff < best_diff:
+                            best_diff = diff
+                            best_part = [list(range(split_idx)), list(range(split_idx, n))]
+                if best_part:
+                    return best_part
+            elif n_lines == 3:
+                for i in range(1, n - 1):
+                    for j in range(i + 1, n):
+                        l0 = w_sizes[:i]
+                        l1 = w_sizes[i:j]
+                        l2 = w_sizes[j:]
+                        w0 = sum(l0) + (len(l0) - 1) * 18
+                        w1 = sum(l1) + (len(l1) - 1) * 18
+                        w2 = sum(l2) + (len(l2) - 1) * 18
+                        if w0 <= max_text_w and w1 <= max_text_w and w2 <= max_text_w:
+                            diff = max(w0, w1, w2) - min(w0, w1, w2)
+                            if diff < best_diff:
+                                best_diff = diff
+                                best_part = [list(range(i)), list(range(i, j)), list(range(j, n))]
+                if best_part:
+                    return best_part
+
+        # Fallback greedy
+        lines = []
+        cur_line = []
+        cur_w = 0
+        for idx, w_px in enumerate(w_sizes):
+            needed = w_px + (18 if cur_line else 0)
+            if cur_w + needed <= max_text_w:
+                cur_line.append(idx)
+                cur_w += needed
+            else:
+                lines.append(cur_line)
+                cur_line = [idx]
+                cur_w = w_px
+        if cur_line:
+            lines.append(cur_line)
+        return lines
+
     def __init__(
         self,
         p_idx: int,
@@ -516,6 +634,7 @@ class _SayfaVerisi:
         s2: str,
         tef: str,
         hafiz_adi: str,
+        pt_ar_override: Optional[int] = None,
     ):
         self.p_idx = p_idx
         self.start_w = start_w
@@ -531,83 +650,34 @@ class _SayfaVerisi:
             page_title = sure_ayet
 
         # Dinamik Orantılı Tipografi ve Mizanpaj Ölçekleme (Piksel Genişliği ve Satır Sınırı Analizi)
-        # Kart: 54..1026 = 972px. MAX_TEXT_W = 760px seçilerek her iki yanda 106px kart içi emniyet payı bırakılır.
-        MAX_TEXT_W = 760
-        n_kelime = len(page_ar)
+        # Kart: 54..1026 = 972px. MAX_TEXT_W = 840px seçilerek ferah nefes alanı ve asil büyük punto sağlanır.
+        MAX_TEXT_W = 840
 
-        # Başlangıç hedef punto (Kelime sayısına göre üst tavan)
-        if n_kelime <= 4:
-            start_pt = 114
-        elif n_kelime <= 7:
-            start_pt = 94
-        elif n_kelime <= 10:
-            start_pt = 82
+        if pt_ar_override is not None:
+            chosen_pt = pt_ar_override
         else:
-            start_pt = 72
+            chosen_pt = _SayfaVerisi.uygun_pt_bul(page_ar, MAX_TEXT_W)
 
-        # 1. Dinamik Arapça Satırlama ve Autofit Döngüsü (Önce 2 satır, sığmazsa 3 satır hedeflenir)
-        im_temp = Image.new("RGB", (100, 100))
-        d_temp = ImageDraw.Draw(im_temp)
-
-        chosen_pt = 64
-        chosen_lines = []
-        found_layout = False
-
-        for max_l in [2, 3]:
-            for pt in range(start_pt, 48, -2):
-                font = font_al(FONT_ARAPCA_NORMAL, pt)
-                font_bold = font_al(FONT_ARAPCA_BOLD, pt)
-
-                w_sizes = []
-                for w in page_ar:
-                    gw = arapca_hazirla(w)
-                    b1 = d_temp.textbbox((0, 0), gw, font=font)
-                    b2 = d_temp.textbbox((0, 0), gw, font=font_bold)
-                    # Aktif kelime bold olduğunda satırın taşmaması için emniyetli azami genişlik
-                    w_sizes.append(max(b1[2] - b1[0], b2[2] - b2[0]))
-
-                lines = []
-                cur_line = []
-                cur_w = 0
-                fits = True
-                min_gap = 18
-
-                for idx, w_px in enumerate(w_sizes):
-                    needed = w_px + (min_gap if cur_line else 0)
-                    if cur_w + needed <= MAX_TEXT_W:
-                        cur_line.append(idx)
-                        cur_w += needed
-                    else:
-                        if not cur_line:
-                            fits = False
-                            break
-                        lines.append(cur_line)
-                        cur_line = [idx]
-                        cur_w = w_px
-
-                if cur_line:
-                    lines.append(cur_line)
-
-                if fits and len(lines) <= max_l:
-                    chosen_pt = pt
-                    chosen_lines = lines
-                    found_layout = True
-                    break
-            if found_layout:
-                break
-
-        if not chosen_lines:
-            chosen_lines = [list(range(len(page_ar)))]
+        chosen_lines = _SayfaVerisi.satirlari_dengeli_bol(page_ar, chosen_pt, MAX_TEXT_W)
 
         self.pt_ar = chosen_pt
         self.pt_okunus = max(24, int(self.pt_ar * 0.38))
         self.ar_h = int(self.pt_ar * 1.44)
         self.tr_h = int(self.pt_okunus * 1.32)
 
-        # 2. Türkçe Meal Ölçeği
+        # 2. Türkçe Meal Ölçeği (Hero Element: Okunaklı, tok ve asil editoryal punto)
         meal_len = len(page_meal)
-        self.pt_meal = 44 if meal_len < 90 else (38 if meal_len < 140 else 34)
-        self.meal_h = int(self.pt_meal * 1.34)
+        if meal_len < 55:
+            self.pt_meal = 56
+        elif meal_len < 95:
+            self.pt_meal = 50
+        elif meal_len < 145:
+            self.pt_meal = 46
+        elif meal_len < 200:
+            self.pt_meal = 42
+        else:
+            self.pt_meal = 38
+        self.meal_h = int(self.pt_meal * 1.36)
 
         # 3. Günün Hikmeti & Tefekkür Ölçeği
         tef_len = len(tef)
@@ -914,7 +984,11 @@ def reels_videosu_uret(
         sayfa_araliklari.append((cur_w, end_w))
         cur_w = end_w
 
-    # 3. Sayfa Verilerini Hazırla
+    # 3. Sayfa Verilerini Hazırla (Tüm sayfalar için birleşik Arapça punto ile tutarlı boyut)
+    page_ar_list = [ar_kelimeler[w_s:w_e] for w_s, w_e in sayfa_araliklari]
+    uygun_ptler = [_SayfaVerisi.uygun_pt_bul(words, max_text_w=840) for words in page_ar_list]
+    birlesik_pt = min(uygun_ptler) if uygun_ptler else 76
+
     sayfalar: List[_SayfaVerisi] = []
     for p_idx, (w_s, w_e) in enumerate(sayfa_araliklari):
         s = _SayfaVerisi(
@@ -930,6 +1004,7 @@ def reels_videosu_uret(
             s2=s2,
             tef=tef,
             hafiz_adi=hafiz_adi,
+            pt_ar_override=birlesik_pt,
         )
         sayfalar.append(s)
 
