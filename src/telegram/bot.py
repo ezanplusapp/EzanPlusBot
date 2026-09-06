@@ -141,7 +141,8 @@ def onay_istegi_gonder(paylasim_id: int) -> int:
         ozet_metin = (
             f"📖 <b>EZAN PLUS — KUR'AN SÖZLÜĞÜ</b>\n\n"
             f"✨ <b>Kavram:</b> {kayit.get('kaynak') or baslik}\n"
-            f"🎨 <b>Palet:</b> Ezan Yakut Kırmızısı (4:5 Feed + 9:16 Story)\n\n"
+            f"🎨 <b>Palet:</b> Ezan Yakut Kırmızısı (4:5 Feed + 9:16 Story)\n"
+            f"🛡️ <b>Kalite Denetimi:</b> Başarılı (Boyut, Metin & Mizanpaj Onaylandı)\n\n"
             f"📝 <b>Açıklama:</b>\n"
             f"<i>{caption[:450]}...</i>\n\n"
             f"👇 <b>Lütfen yayını onaylayın veya iptal edin:</b>"
@@ -150,7 +151,8 @@ def onay_istegi_gonder(paylasim_id: int) -> int:
         ozet_metin = (
             f"🕌 <b>EZAN PLUS YENİ İÇERİK ONAYI</b>\n\n"
             f"📌 <b>Kategori:</b> #{kategori} ({format_tipi})\n"
-            f"📖 <b>Başlık/Kaynak:</b> {kayit.get('kaynak') or baslik}\n\n"
+            f"📖 <b>Başlık/Kaynak:</b> {kayit.get('kaynak') or baslik}\n"
+            f"🛡️ <b>Kalite Denetimi:</b> Başarılı (Boyut, Metin & Mizanpaj Onaylandı)\n\n"
             f"📝 <b>Açıklama:</b>\n"
             f"<i>{caption[:350]}...</i>\n\n"
             f"👇 <b>Lütfen yayını onaylayın veya iptal edin:</b>"

@@ -25,6 +25,17 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
     if not kayit:
         raise ValueError(f"Paylaşım ID bulunamadı: {paylasim_id}")
 
+    # Yayın Öncesi Son Güvenlik & Kalite Kapısı
+    from .. import denetleyici
+    denetim = denetleyici.denetle_paylasim(paylasim_id)
+    if not denetim.gecerli:
+        hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+        log.critical(f"Yayın Öncesi Kalite Kontrolü Başarısız! Paylaşım #{paylasim_id} yayını durduruldu:\n{hata_metni}")
+        db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+        from . import bot as telegram_bot
+        telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+        return {"hata": "Kalite kontrolünden geçemedi", "hatalar": denetim.hatalar}
+
     format_tipi = kayit["format"]
     caption = kayit.get("caption") or ""
     video_yolu = kayit.get("video_yolu")

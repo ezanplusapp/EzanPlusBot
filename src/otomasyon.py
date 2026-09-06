@@ -85,6 +85,18 @@ def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
         durum="taslak",
     )
 
+    # 4.5/5: Yayın Öncesi Kalite, Taşma & Boyut Denetimi
+    from . import denetleyici
+    denetim = denetleyici.denetle_paylasim(paylasim_id)
+    if not denetim.gecerli:
+        hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+        log.critical(f"Reels #{paylasim_id} kalite denetiminden GEÇEMEDİ:\n{hata_metni}")
+        db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+        telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+        raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
+
+    log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
+
     log.info("5/5: Kur'an tilaveti otomatik yayınlanıyor ve Telegram'a yayın detay kartı iletiliyor...")
     sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
     telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
@@ -265,6 +277,18 @@ def gorsel_icerik_olustur_ve_gonder(
         gorsel_yollari=gorsel_yollari,
         durum="taslak",
     )
+
+    # Yayın Öncesi Kalite & Güvenlik Denetimi
+    from . import denetleyici
+    denetim = denetleyici.denetle_paylasim(paylasim_id)
+    if not denetim.gecerli:
+        hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+        log.critical(f"Görsel post #{paylasim_id} kalite denetiminden GEÇEMEDİ:\n{hata_metni}")
+        db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+        telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+        raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
+
+    log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
     telegram_bot.onay_istegi_gonder(paylasim_id)
     log.info(f"Görsel post ({kategori.upper()} Çift Format 4:5 + 9:16) hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")

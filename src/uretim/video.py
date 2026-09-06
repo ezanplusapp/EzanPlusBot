@@ -860,7 +860,9 @@ class _SayfaVerisi:
         meal_blok_h = len(meal_wrapped_lines) * self.meal_h
 
         kalan_orta = ay_y - tr_bottom
-        serbest_meal = max(16, kalan_orta - (meal_blok_h + gap_ayrac_meal))
+        self.net_serbest_meal = kalan_orta - (meal_blok_h + gap_ayrac_meal)
+        serbest_meal = max(16, self.net_serbest_meal)
+        self.serbest_meal = serbest_meal
         ayrac_y = tr_bottom + int(serbest_meal * 0.40)
 
         # Tırnak filigranı & Altın ayraç
