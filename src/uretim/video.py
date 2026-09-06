@@ -507,18 +507,20 @@ class _SayfaVerisi:
         """Belirtilen kelime grubu için en heybetli ve taşmayan Arapça puntoyu belirler."""
         n_kelime = len(page_ar)
         if n_kelime <= 4:
-            start_pt = 114
+            start_pt = 138
         elif n_kelime <= 7:
-            start_pt = 94
+            start_pt = 114
         elif n_kelime <= 10:
+            start_pt = 94
+        elif n_kelime <= 14:
             start_pt = 84
         else:
-            start_pt = 74
+            start_pt = 76
 
         im_temp = Image.new("RGB", (100, 100))
         d_temp = ImageDraw.Draw(im_temp)
 
-        for max_l in [2, 3]:
+        for max_l in [1, 2, 3]:
             for pt in range(start_pt, 48, -2):
                 font = font_al(FONT_ARAPCA_NORMAL, pt)
                 font_bold = font_al(FONT_ARAPCA_BOLD, pt)
@@ -666,20 +668,20 @@ class _SayfaVerisi:
         chosen_lines = _SayfaVerisi.satirlari_dengeli_bol(page_ar, chosen_pt, MAX_TEXT_W)
 
         self.pt_ar = chosen_pt
-        self.pt_okunus = max(24, int(self.pt_ar * 0.38))
+        self.pt_okunus = max(26, int(self.pt_ar * 0.36))
         self.ar_h = int(self.pt_ar * 1.44)
         self.tr_h = int(self.pt_okunus * 1.32)
 
         # 2. Türkçe Meal Ölçeği (Hero Element: Okunaklı, tok ve asil editoryal punto)
         meal_len = len(page_meal)
-        if meal_len < 55:
-            self.pt_meal = 56
-        elif meal_len < 95:
+        if meal_len < 45:
+            self.pt_meal = 66
+        elif meal_len < 80:
+            self.pt_meal = 58
+        elif meal_len < 130:
             self.pt_meal = 50
-        elif meal_len < 145:
-            self.pt_meal = 46
-        elif meal_len < 200:
-            self.pt_meal = 42
+        elif meal_len < 185:
+            self.pt_meal = 44
         else:
             self.pt_meal = 38
         self.meal_h = int(self.pt_meal * 1.36)
@@ -706,6 +708,10 @@ class _SayfaVerisi:
             tefekkur_notu=tef,
             hafiz_adi=hafiz_adi,
         )
+        # Tek sayfalı kısa âyetlerde üst çizgiye çok yapışmaması için hafif nefes payı
+        if sayfa_sayisi == 1 and len(page_ar) <= 4:
+            self.ar_y_start += 24
+
         draw_t = ImageDraw.Draw(self.taban_img)
 
         # 2. Satır grupları oluştur ve slotları milimetrik hesapla
@@ -814,29 +820,24 @@ class _SayfaVerisi:
         y_bottom_safe = 1566
         ay_y = y_bottom_safe - tef_h - 16
 
-        # B) ÜSTE DAYALI ARAPÇA TİLAVET VE SAFE AREA
-        # Arapça harflerin alt uzantıları ve harekeleri (ر, ي, و, kesra vb.) için güvenli pay
-        y_ar_safe_bottom = prev_ink_bottom + 32
+        # B) LATİN OKUNUŞ: TİLAVET BÜTÜNLÜĞÜ İÇİN DOĞRUDAN ARAPÇA METNİN HEMEN ALTINA YERLEŞTİRİLİR
+        # (Arapça ile okunuş arasında kopukluk / devasa boşluk kalmaması sağlanır)
+        gap_ar_tr = max(24, int(self.pt_ar * 0.24))
+        self.tr_y_start = prev_ink_bottom + gap_ar_tr
+        okunus_blok_h = len(self.tr_satir_bilgileri) * self.tr_h
+        tr_bottom = self.tr_y_start + okunus_blok_h
 
-        # C) ORTA ALAN HESAPLAMA:
-        # Okunuş, altın ayraç ve meal ortadaki serbest alanı dengeli paylaşır.
-        # Okunuş ayracın üstünde, ayraç ortada, meal ayracın altında yer alır.
+        # C) ORTA ALAN: OKUNUŞ BİTİŞİ İLE TEFEKKÜR ARASINDA ALTIN AYRAÇ VE MEAL DENGELİ ORTALANIR
         temiz_meal = page_meal.strip("“”\"' ")
         meal_metin = f"“{temiz_meal}”"
         meal_satirlar = metin_satirla(meal_metin, self.font_meal, self.kart_ic_w - 60, draw_t)
 
-        okunus_blok_h = len(self.tr_satir_bilgileri) * self.tr_h
-        gap_ok_ayrac = 22
-        gap_ayrac_meal = 36
+        gap_ayrac_meal = max(32, int(self.pt_meal * 0.55))
         meal_blok_h = len(meal_satirlar) * self.meal_h
 
-        toplam_orta_h = okunus_blok_h + gap_ok_ayrac + gap_ayrac_meal + meal_blok_h
-        kalan_yukseklik = ay_y - y_ar_safe_bottom
-        serbest_bosluk = max(16, kalan_yukseklik - toplam_orta_h)
-        pad_ust = int(serbest_bosluk * 0.44)
-
-        self.tr_y_start = y_ar_safe_bottom + pad_ust
-        ayrac_y = self.tr_y_start + okunus_blok_h + gap_ok_ayrac
+        kalan_orta = ay_y - tr_bottom
+        serbest_meal = max(16, kalan_orta - (meal_blok_h + gap_ayrac_meal))
+        ayrac_y = tr_bottom + int(serbest_meal * 0.40)
 
         # Tırnak filigranı & Altın ayraç
         font_giant_quote = font_al(FONT_BASLIK, 150, agirlik=700)
