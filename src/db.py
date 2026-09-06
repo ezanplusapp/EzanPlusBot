@@ -288,5 +288,25 @@ def paylasim_getir(paylasim_id: int) -> Optional[Dict[str, Any]]:
         return d
 
 
+def paylasim_guncelle(paylasim_id: int, **kwargs) -> bool:
+    """Paylaşım tablosundaki belirtilen sütunları (caption, turkce_metin, video_yolu vb.) günceller."""
+    if not kwargs:
+        return False
+    with baglanti_al() as con:
+        sutunlar = []
+        params = []
+        for k, v in kwargs.items():
+            if k == "gorsel_yollari" and isinstance(v, list):
+                sutunlar.append(f"{k} = ?")
+                params.append(json.dumps(v))
+            else:
+                sutunlar.append(f"{k} = ?")
+                params.append(v)
+        params.append(paylasim_id)
+        con.execute(f"UPDATE paylasimlar SET {', '.join(sutunlar)} WHERE id = ?", params)
+        con.commit()
+    return True
+
+
 # Modül yüklendiğinde tablolar hazır olsun
 tabloları_hazirla()

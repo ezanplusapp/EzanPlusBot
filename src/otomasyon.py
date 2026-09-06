@@ -89,11 +89,17 @@ def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
     from . import denetleyici
     denetim = denetleyici.denetle_paylasim(paylasim_id)
     if not denetim.gecerli:
-        hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
-        log.critical(f"Reels #{paylasim_id} kalite denetiminden GEÇEMEDİ:\n{hata_metni}")
-        db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
-        telegram_bot.mesaj_gonder(denetim.formatli_rapor())
-        raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
+        log.warning(f"Reels #{paylasim_id} kalite denetiminde eksikler tespit etti, otomatik onarım deneniyor...")
+        onarildi, duzeltmeler = denetleyici.otomatik_onar(paylasim_id)
+        if onarildi:
+            denetim = denetleyici.denetle_paylasim(paylasim_id)
+            log.info(f"Reels #{paylasim_id} başarıyla otomatik onarıldı ve doğrulandı! Düzeltmeler: {duzeltmeler}")
+        else:
+            hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+            log.critical(f"Reels #{paylasim_id} kalite denetiminden GEÇEMEDİ ve onarılamadı:\n{hata_metni}")
+            db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+            telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+            raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
 
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
@@ -282,11 +288,17 @@ def gorsel_icerik_olustur_ve_gonder(
     from . import denetleyici
     denetim = denetleyici.denetle_paylasim(paylasim_id)
     if not denetim.gecerli:
-        hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
-        log.critical(f"Görsel post #{paylasim_id} kalite denetiminden GEÇEMEDİ:\n{hata_metni}")
-        db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
-        telegram_bot.mesaj_gonder(denetim.formatli_rapor())
-        raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
+        log.warning(f"Görsel post #{paylasim_id} kalite denetiminde eksikler tespit etti, otomatik onarım deneniyor...")
+        onarildi, duzeltmeler = denetleyici.otomatik_onar(paylasim_id)
+        if onarildi:
+            denetim = denetleyici.denetle_paylasim(paylasim_id)
+            log.info(f"Görsel post #{paylasim_id} başarıyla otomatik onarıldı ve doğrulandı! Düzeltmeler: {duzeltmeler}")
+        else:
+            hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+            log.critical(f"Görsel post #{paylasim_id} kalite denetiminden GEÇEMEDİ ve onarılamadı:\n{hata_metni}")
+            db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+            telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+            raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
 
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 

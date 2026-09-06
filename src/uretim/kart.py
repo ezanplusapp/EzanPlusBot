@@ -535,8 +535,10 @@ def ayet_karti_ciz(
     ar_len = len(ar_ham)
 
     if format_tipi == "9:16":
-        if meal_len < 80:
-            font_meal_boyut = 60
+        if meal_len < 45:
+            font_meal_boyut = 66
+        elif meal_len < 80:
+            font_meal_boyut = 58
         elif meal_len < 140:
             font_meal_boyut = 50
         elif meal_len < 200:
@@ -544,7 +546,9 @@ def ayet_karti_ciz(
         else:
             font_meal_boyut = 40
     else:
-        if meal_len < 80:
+        if meal_len < 45:
+            font_meal_boyut = 62
+        elif meal_len < 80:
             font_meal_boyut = 54
         elif meal_len < 140:
             font_meal_boyut = 46
@@ -576,7 +580,9 @@ def ayet_karti_ciz(
     # Dinamik Arapça Punto (Kısa âyetlerde daha heybetli ve asil!)
     if ar_len > 0:
         if format_tipi == "9:16":
-            if ar_len < 45:
+            if ar_len < 35:
+                pt_ar = 114
+            elif ar_len < 55:
                 pt_ar = 96
             elif ar_len < 90:
                 pt_ar = 78
@@ -585,7 +591,9 @@ def ayet_karti_ciz(
             else:
                 pt_ar = 46
         else:
-            if ar_len < 45:
+            if ar_len < 35:
+                pt_ar = 98
+            elif ar_len < 55:
                 pt_ar = 86
             elif ar_len < 90:
                 pt_ar = 68
@@ -884,20 +892,24 @@ def hadis_karti_ciz(
     ar_ham = (arapca_metin or "لاَ يُلْدَغُ الْمُؤْمِنُ مِنْ جُحْرٍ وَاحِدٍ مَرَّتَيْنِ").strip()
     ar_len = len(ar_ham)
 
-    # 1. Meal Punto Seçimi (Ters Orantılı: Kısa hadislerde daha heybetli 58-64pt!)
+    # 1. Meal Punto Seçimi (Ters Orantılı: Kısa hadislerde daha heybetli 58-66pt!)
     if format_tipi == "9:16":
-        if hadis_len < 60:
-            font_hadis_boyut = 64
-        elif hadis_len < 110:
+        if hadis_len < 40:
+            font_hadis_boyut = 66
+        elif hadis_len < 75:
+            font_hadis_boyut = 60
+        elif hadis_len < 120:
             font_hadis_boyut = 54
         elif hadis_len < 180:
             font_hadis_boyut = 48
         else:
             font_hadis_boyut = 42
     else:
-        if hadis_len < 60:
-            font_hadis_boyut = 58
-        elif hadis_len < 110:
+        if hadis_len < 40:
+            font_hadis_boyut = 62
+        elif hadis_len < 75:
+            font_hadis_boyut = 56
+        elif hadis_len < 120:
             font_hadis_boyut = 50
         elif hadis_len < 180:
             font_hadis_boyut = 45
@@ -949,12 +961,12 @@ def hadis_karti_ciz(
     ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
     gap_ar_ok = (28 if format_tipi == "9:16" else 22) if ok_satirlar else 0
 
-    # Safe area bazlı Arapça autofit (Kısa hadislerde 88-104pt heybetli hat!)
+    # Safe area bazlı Arapça autofit (Kısa hadislerde 88-114pt heybetli hat!)
     if format_tipi == "9:16":
-        max_pt = 104 if ar_len < 65 else (86 if ar_len < 120 else 74)
+        max_pt = 114 if ar_len < 35 else (104 if ar_len < 65 else (86 if ar_len < 120 else 74))
         min_pt = 56
     else:
-        max_pt = 88 if ar_len < 65 else (70 if ar_len < 120 else 52)
+        max_pt = 98 if ar_len < 35 else (88 if ar_len < 65 else (70 if ar_len < 120 else 52))
         min_pt = 44
 
     font_ar_boyut = min_pt
@@ -1310,10 +1322,12 @@ def dua_karti_ciz(
     ar_ham = (arapca_metin or "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً").strip()
     ar_len = len(ar_ham)
 
-    # 1. Dua Anlamı Punto Seçimi (Ters Orantılı: Kısa dualarda 56-62pt heybetli punto!)
+    # 1. Dua Anlamı Punto Seçimi (Ters Orantılı: Kısa dualarda 56-66pt heybetli punto!)
     if format_tipi == "9:16":
-        if anlam_len < 70:
-            font_anlam_boyut = 62
+        if anlam_len < 45:
+            font_anlam_boyut = 66
+        elif anlam_len < 75:
+            font_anlam_boyut = 60
         elif anlam_len < 130:
             font_anlam_boyut = 52
         elif anlam_len < 190:
@@ -1321,8 +1335,10 @@ def dua_karti_ciz(
         else:
             font_anlam_boyut = 41
     else:
-        if anlam_len < 70:
-            font_anlam_boyut = 56
+        if anlam_len < 45:
+            font_anlam_boyut = 60
+        elif anlam_len < 75:
+            font_anlam_boyut = 54
         elif anlam_len < 130:
             font_anlam_boyut = 48
         elif anlam_len < 190:
@@ -1366,12 +1382,12 @@ def dua_karti_ciz(
     ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
     gap_ar_ok = (28 if format_tipi == "9:16" else 22) if ok_satirlar else 0
 
-    # Safe area bazlı Arapça autofit (Kısa dualarda 88-104pt heybetli hat!)
+    # Safe area bazlı Arapça autofit (Kısa dualarda 88-114pt heybetli hat!)
     if format_tipi == "9:16":
-        max_pt = 104 if ar_len < 65 else (86 if ar_len < 120 else 72)
+        max_pt = 114 if ar_len < 35 else (104 if ar_len < 65 else (86 if ar_len < 120 else 72))
         min_pt = 54
     else:
-        max_pt = 88 if ar_len < 65 else (70 if ar_len < 120 else 50)
+        max_pt = 98 if ar_len < 35 else (88 if ar_len < 65 else (70 if ar_len < 120 else 50))
         min_pt = 42
 
     font_ar_boyut = min_pt

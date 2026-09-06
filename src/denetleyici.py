@@ -468,3 +468,232 @@ def denetle_paylasim(paylasim_id: int) -> DenetimSonucu:
         log.error(f"Paylaşım #{paylasim_id} ({kategori.upper()}) kalite kontrolünden GEÇEMEDİ! Hatalar: {tum_hatalar}")
 
     return sonuc
+
+
+def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
+    """
+    Tespit edilen kalite, boyut veya mizanpaj hatalarını akıllı telafi algoritmalarıyla otomatik olarak onarır.
+    Düzeltilen alanları veritabanına kaydeder, gerekiyorsa medyayı optimize ederek yeniden üretir
+    ve ikinci bir doğrulama süzgecinden geçirir.
+
+    Döner: (onarıldı_mı: bool, yapılan_düzeltmeler: List[str])
+    """
+    import time
+    kayit = db.paylasim_getir(paylasim_id)
+    if not kayit:
+        return False, ["Paylaşım kaydı bulunamadı."]
+
+    ilk_denetim = denetle_paylasim(paylasim_id)
+    if ilk_denetim.gecerli:
+        return True, ["İçerik zaten geçerli, onarıma ihtiyaç duyulmadı."]
+
+    duzeltmeler: List[str] = []
+    guncellemeler: Dict[str, Any] = {}
+    kategori = kayit.get("kategori", "ayet")
+    format_tipi = kayit.get("format", "")
+
+    # 1. Caption & Hashtag Telafisi
+    caption = str(kayit.get("caption") or "").strip()
+    caption_degisti = False
+
+    # Yasaklı ifadeleri temizle
+    for yasakli in YASAKLI_IFADELER:
+        if re.search(rf"\b{re.escape(yasakli)}\b", caption, flags=re.IGNORECASE):
+            caption = re.sub(rf"\b{re.escape(yasakli)}\b", "", caption, flags=re.IGNORECASE).strip()
+            caption_degisti = True
+            duzeltmeler.append(f"Açıklama metninden yasaklı '{yasakli}' ibaresi temizlendi.")
+
+    if not caption or len(caption) < 20:
+        baslik = kayit.get("baslik", "Ezan Plus")
+        metin = kayit.get("turkce_metin", "")
+        caption = f"“{metin}”\n\n{baslik}\n\n#ezanplus #ayet #kuran #dua #huzur"
+        caption_degisti = True
+        duzeltmeler.append("Eksik açıklama metni tescilli külliyat içeriğinden otomatik oluşturuldu.")
+    elif "#ezanplus" not in caption.lower():
+        caption = caption + "\n\n#ezanplus #ayet #kuran #dua #huzur"
+        caption_degisti = True
+        duzeltmeler.append("Açıklama metnine zorunlu '#ezanplus' ve konu etiketleri eklendi.")
+
+    if caption_degisti:
+        guncellemeler["caption"] = caption
+
+    # 2. Tescilli Külliyat ile Metin Eşitleme (Halüsinasyon Telafisi)
+    turkce_metin = kayit.get("turkce_metin", "")
+    if kategori in ("ayet", "reels"):
+        from . import kuran_db
+        sure_no = kayit.get("sure_no")
+        ayet_no = kayit.get("ayet_no")
+        if not (sure_no and ayet_no):
+            m_s = re.search(r'(\d+)\.\s*(?:Sure|Sûre)', kayit.get("baslik", ""))
+            m_a = re.search(r'(\d+)\.\s*(?:Ayet|Âyet)', kayit.get("baslik", ""))
+            if m_s and m_a:
+                sure_no, ayet_no = int(m_s.group(1)), int(m_a.group(1))
+
+        if sure_no and ayet_no:
+            db_ayet = kuran_db.ayet_getir(int(sure_no), int(ayet_no))
+            if db_ayet:
+                c_turkce = _metin_temizle(turkce_metin)
+                c_elmalili = _metin_temizle(db_ayet.get("meal_elmalili", ""))
+                c_diyanet = _metin_temizle(db_ayet.get("meal_diyanet", ""))
+                if c_turkce != c_elmalili and c_turkce != c_diyanet:
+                    guncellemeler["turkce_metin"] = db_ayet["meal_elmalili"]
+                    guncellemeler["arapca_metin"] = db_ayet["arapca_metin"]
+                    turkce_metin = db_ayet["meal_elmalili"]
+                    duzeltmeler.append("Türkçe meal tescilli Kur'an veritabanı (Elmalılı) ile %100 eşitlendi.")
+
+    elif kategori == "hadis":
+        from . import hadis_db
+        hadis_id = kayit.get("hadis_id")
+        if hadis_id:
+            db_hadis = hadis_db.hadis_getir(int(hadis_id))
+            if db_hadis:
+                c_turkce = _metin_temizle(turkce_metin)
+                c_hadis = _metin_temizle(db_hadis.get("hadis_metni", ""))
+                if c_turkce != c_hadis:
+                    guncellemeler["turkce_metin"] = db_hadis["hadis_metni"]
+                    turkce_metin = db_hadis["hadis_metni"]
+                    duzeltmeler.append("Hadis metni tescilli Riyâzü's-Sâlihîn külliyatı ile eşitlendi.")
+
+    # 3. Reels Dikey Mizanpaj Çakışması Telafisi
+    if format_tipi == "reels_9_16":
+        r_hatalar, _, r_metrikler = denetle_reels_mizanpaj(
+            sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+            turkce_meal=turkce_metin,
+            arapca_metin=kayit.get("arapca_metin", ""),
+            arapca_okunus=kayit.get("arapca_okunus"),
+            tefekkur_notu=kayit.get("tefekkur", ""),
+            s1=kayit.get("video_baslik_satir1", ""),
+            s2=kayit.get("video_baslik_satir2", ""),
+        )
+        if r_hatalar or (r_metrikler.get("serbest_alan_px", 999) < 10) or ("turkce_metin" in guncellemeler) or ("arapca_metin" in guncellemeler):
+            log.warning("Mizanpaj taşması veya güncellenen tescilli metin tespit edildi, güvenli punto override ile video yeniden üretiliyor...")
+            try:
+                from .uretim.video import reels_videosu_uret
+                from .uretim.ses import ayet_kelime_zamanlari_getir
+                sure_no = kayit.get("sure_no", 94)
+                ayet_no = kayit.get("ayet_no", 5)
+                kelime_zamanlari = ayet_kelime_zamanlari_getir(int(sure_no), int(ayet_no)) if sure_no and ayet_no else None
+                yeni_video = reels_videosu_uret(
+                    sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                    turkce_meal=turkce_metin,
+                    ses_yolu=kayit.get("ses_yolu"),
+                    arapca_metin=kayit.get("arapca_metin"),
+                    arapca_okunus=kayit.get("arapca_okunus"),
+                    video_baslik_satir1=kayit.get("video_baslik_satir1"),
+                    video_baslik_satir2=kayit.get("video_baslik_satir2"),
+                    tefekkur_notu=kayit.get("tefekkur"),
+                    hafiz_adi=kayit.get("hafiz_adi", "Mişari Râşid el-Afâsî"),
+                    pt_ar_override=76,
+                    kelime_zamanlari=kelime_zamanlari,
+                )
+                guncellemeler["video_yolu"] = str(yeni_video)
+                duzeltmeler.append("Video, güncellenen tescilli metin ve 76pt güvenlik tavanı ile yeniden render edildi.")
+            except Exception as e:
+                log.error(f"Otomatik Reels yeniden render hatası: {e}")
+
+    # 4. Görsel Kart Boyut / Format Eksikliği Telafisi
+    else:
+        g_yollari = kayit.get("gorsel_yollari") or []
+        g_hatalar, _, _ = denetle_gorsel_dosyalari(g_yollari)
+        if g_hatalar or len(g_yollari) < 2 or ("turkce_metin" in guncellemeler) or ("arapca_metin" in guncellemeler):
+            log.warning("Görsel boyut, eksik dosya veya güncellenen metin tespit edildi, şablonlar yeniden çiziliyor...")
+            try:
+                from .uretim import kart as sablon_ciz
+                kategori = kayit.get("kategori", "hadis")
+                dosya_eki = int(time.time())
+
+                if kategori == "hadis":
+                    p_4_5 = sablon_ciz.hadis_karti_ciz(
+                        hadis_metni=turkce_metin,
+                        kaynak_ravi=kayit.get("kaynak"),
+                        tefekkur_notu=kayit.get("tefekkur"),
+                        cikti_dosya_adi=f"hadis_4_5_fix_{dosya_eki}.png",
+                        format_tipi="4:5",
+                        arapca_metin=kayit.get("arapca_metin"),
+                    )
+                    p_9_16 = sablon_ciz.hadis_karti_ciz(
+                        hadis_metni=turkce_metin,
+                        kaynak_ravi=kayit.get("kaynak"),
+                        tefekkur_notu=kayit.get("tefekkur"),
+                        cikti_dosya_adi=f"hadis_9_16_fix_{dosya_eki}.png",
+                        format_tipi="9:16",
+                        arapca_metin=kayit.get("arapca_metin"),
+                    )
+                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
+                    duzeltmeler.append("Hadis kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
+
+                elif kategori == "ayet":
+                    p_4_5 = sablon_ciz.ayet_karti_ciz(
+                        sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                        turkce_meal=turkce_metin,
+                        arapca_metin=kayit.get("arapca_metin"),
+                        tefekkur_notu=kayit.get("tefekkur"),
+                        cikti_dosya_adi=f"ayet_4_5_fix_{dosya_eki}.png",
+                        format_tipi="4:5",
+                    )
+                    p_9_16 = sablon_ciz.ayet_karti_ciz(
+                        sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                        turkce_meal=turkce_metin,
+                        arapca_metin=kayit.get("arapca_metin"),
+                        tefekkur_notu=kayit.get("tefekkur"),
+                        cikti_dosya_adi=f"ayet_9_16_fix_{dosya_eki}.png",
+                        format_tipi="9:16",
+                    )
+                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
+                    duzeltmeler.append("Ayet kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
+
+                elif kategori == "dua":
+                    p_4_5 = sablon_ciz.dua_karti_ciz(
+                        dua_basligi=kayit.get("baslik", "Günün Duası"),
+                        turkce_anlam=turkce_metin,
+                        arapca_metin=kayit.get("arapca_metin"),
+                        okunus_veya_fazilet=kayit.get("tefekkur"),
+                        cikti_dosya_adi=f"dua_4_5_fix_{dosya_eki}.png",
+                        format_tipi="4:5",
+                    )
+                    p_9_16 = sablon_ciz.dua_karti_ciz(
+                        dua_basligi=kayit.get("baslik", "Günün Duası"),
+                        turkce_anlam=turkce_metin,
+                        arapca_metin=kayit.get("arapca_metin"),
+                        okunus_veya_fazilet=kayit.get("tefekkur"),
+                        cikti_dosya_adi=f"dua_9_16_fix_{dosya_eki}.png",
+                        format_tipi="9:16",
+                    )
+                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
+                    duzeltmeler.append("Dua kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
+
+                elif kategori == "kelime":
+                    p_4_5 = sablon_ciz.kelime_karti_ciz(
+                        kelime_tr=kayit.get("baslik", "Kur'an Sözlüğü"),
+                        kelime_ar=kayit.get("arapca_metin", ""),
+                        lugat_anlami=turkce_metin,
+                        hayat_dersi=kayit.get("tefekkur", ""),
+                        cikti_dosya_adi=f"kelime_4_5_fix_{dosya_eki}.png",
+                        format_tipi="4:5",
+                    )
+                    p_9_16 = sablon_ciz.kelime_karti_ciz(
+                        kelime_tr=kayit.get("baslik", "Kur'an Sözlüğü"),
+                        kelime_ar=kayit.get("arapca_metin", ""),
+                        lugat_anlami=turkce_metin,
+                        hayat_dersi=kayit.get("tefekkur", ""),
+                        cikti_dosya_adi=f"kelime_9_16_fix_{dosya_eki}.png",
+                        format_tipi="9:16",
+                    )
+                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
+                    duzeltmeler.append("Kur'an Sözlüğü kartları 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
+
+            except Exception as e:
+                log.error(f"Otomatik kart yeniden render hatası: {e}")
+
+    # Yapılan değişiklikleri veritabanına işle
+    if guncellemeler:
+        db.paylasim_guncelle(paylasim_id, **guncellemeler)
+
+    # İkinci Doğrulama Geçişi (Onarım Gerçekleşti mi?)
+    ikinci_denetim = denetle_paylasim(paylasim_id)
+    if ikinci_denetim.gecerli:
+        log.info(f"Paylaşım #{paylasim_id} başarıyla otomatik onarıldı! Düzeltmeler: {duzeltmeler}")
+        return True, duzeltmeler
+    else:
+        log.error(f"Paylaşım #{paylasim_id} otomatik onarılamadı! Kalan hatalar: {ikinci_denetim.hatalar}")
+        return False, ikinci_denetim.hatalar

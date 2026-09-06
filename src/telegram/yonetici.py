@@ -29,12 +29,19 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
     from .. import denetleyici
     denetim = denetleyici.denetle_paylasim(paylasim_id)
     if not denetim.gecerli:
-        hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
-        log.critical(f"Yayın Öncesi Kalite Kontrolü Başarısız! Paylaşım #{paylasim_id} yayını durduruldu:\n{hata_metni}")
-        db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
-        from . import bot as telegram_bot
-        telegram_bot.mesaj_gonder(denetim.formatli_rapor())
-        return {"hata": "Kalite kontrolünden geçemedi", "hatalar": denetim.hatalar}
+        log.warning(f"Yayın Öncesi Denetim: Paylaşım #{paylasim_id} için otomatik onarım deneniyor...")
+        onarildi, duzeltmeler = denetleyici.otomatik_onar(paylasim_id)
+        if onarildi:
+            denetim = denetleyici.denetle_paylasim(paylasim_id)
+            log.info(f"Paylaşım #{paylasim_id} yayın öncesi başarıyla onarıldı: {duzeltmeler}")
+            kayit = db.paylasim_getir(paylasim_id)
+        else:
+            hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+            log.critical(f"Yayın Öncesi Kalite Kontrolü Başarısız! Paylaşım #{paylasim_id} yayını durduruldu:\n{hata_metni}")
+            db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+            from . import bot as telegram_bot
+            telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+            return {"hata": "Kalite kontrolünden geçemedi ve onarılamadı", "hatalar": denetim.hatalar}
 
     format_tipi = kayit["format"]
     caption = kayit.get("caption") or ""
