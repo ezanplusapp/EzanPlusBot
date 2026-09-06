@@ -47,17 +47,22 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
 ### C. Stüdyo Sesi & Kelime Bazlı Senkron Karaoke
 * **Resmi Kelime Zaman Damgaları:** 114 sûre ve 6.236 âyetin tamamına ait Mişari Râşid el-Afâsî stüdyo tilavet zaman damgaları (80.537 kelime) yerel repoda `data/zamanlar/sure_{1..114}.json` altında saklanır. Sıfır harici API bağımlılığı ve sıfır gecikmeyle %100 offline çalışır (`ayet_kelime_zamanlari_getir`).
 * **Çift Katmanlı Karaoke:**
-  - Arapça orijinal lafız ve Türkçe Latin okunuşu 1:1 kelime bazında hizalanır (`turkce_okunus_hizala`).
+  - Arapça orijinal lafız ve Türkçe Latin okunuşu 1:1 kelime bazında kusursuz hizalanır (`turkce_okunus_hizala`). Tireli birleşik lafızlar (örn. `entes-semîul` ➔ `entes`, `semîul`) dinamik açılır; ayrık bağlaçlar (`ve`, `fe`, `li`, `bi`) Arapça karşılığına göre birleştirilir. Sıfır indis kayması ve sıfır boş kelime güvencesiyle son kelime tilavetin bittiği ana kadar tam senkron kırmızı kalır.
   - Okunan kelime anında kırmızıya (`#9B1B1B`) boyanır; başından sonuna doğru akan dinamik loading dolum çizgisi akar.
   - Okunan kelimeye odaklanılırken meal ve tefekkür bölümü kartın alt kısmında huzurlu bir şekilde eşlik eder.
 
 ### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru & Dinamik Flex Mizanpaj
-* **Otomatik Tetikleme:** Ayet 20 kelimeyi aştığında metni sıkıştırmak veya fontu küçültmek yerine otomatik olarak 2 veya 3 sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 18)`).
+* **Otomatik Tetikleme:** 16 kelimeye kadar olan âyetler tek sayfada ferahça sunulur. 16 kelimeyi aştığında metni sıkıştırmak yerine otomatik olarak çoklu sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 16)`).
+* **Akıllı Secavend & Nefes Odaklı Sayfa Bölücü (`akilli_sayfa_araliklari`):** Metni körlemesine matematiksel ortadan (örn. 14 / 2 = 7) bölmek kesinlikle yasaktır. Kur'an secavend durak işaretleri (`ۚ ۖ ۗ ۘ ۙ ۛ ۜ`), hafızın ses dosyasındaki doğal nefes duraklama pencereleri (ses dalgası durak süresi) ve sayfa denge skoru birlikte ağırlıklandırılarak âyetin manevi ve tilavet ahengine göre en kusursuz durak noktasından bölünür.
+* **Akıllı Cümle & Meal Bölücü (`akilli_meal_parcala` / `_meal_parcala`):** 
+  - Arapça sayfa oranına göre mealin karşılık gelen bölgesinde en mantıklı cümle bitişini arar.
+  - Öncelik Hiyerarşisi: Cümle sonları (`.!?`) ➔ Güçlü ayraçlar (`:;—`) ➔ Virgül ve nefes yerleri (`,`).
+  - **Bold Blok Koruma Standardı:** Asla `**bold**` vurgu bloklarının içinden (örn. `**Ey Rabbimiz, bizden kabul buyur**`) bölünemez; tırnak veya parantez bütünlüğü parçalanamaz.
+  - **Sıfır Yıldız (`**`) Garantisi:** Kart ve video motorunda `parse_markdown_bold` katmanı yetim veya kapanmamış `**` / `*` işaretlerini ayıklar ve stili bold'a dönüştürür; ekranda çıplak markdown syntax'ı belirmesi %100 imkansızdır.
 * **Dinamik Flex Mizanpaj:**
   - *Üste Dayalı Tilavet (`Y = 484`):* Arapça satır yüksekliği `96px` (66pt ferah font), Türkçe okunuş ile arasında `24px` nefes payı bırakılır. 4 satırlık metinlerde dahi çakışma ve taşma imkansızdır.
   - *Alta Dayalı Günün Hikmeti & Tefekkür (`Y = 1566 - tef_h - 16`):* `_tefekkur_yukseklik_hesapla` formülü ile hesaplanan tefekkür bloğu kartın alt sınırına dayalıdır. Çok sayfalı geçişlerde Sayfa 1 ve Sayfa 2'de milimetrik olarak aynı pikselde sabitlenir; geçişte sıfır ghosting (çift görüntü) ve sıfır titreme sağlanır.
   - *Orta Flex Alan (Meal & Ayraç):* Tilavet bitişi ile tefekkür başlangıcı arasındaki kalan serbest dikey boşluk hesaplanarak Türkçe meal ve altın ayraç dikeyde ortalanır (`pad_ust = int(serbest_bosluk * 0.42)`).
-* **Akıllı Cümle / Meal Bölücü (`_meal_parcala`):** Türkçe meal rastgele kesilmez; nokta, soru işareti veya virgül gibi doğal durak yerlerinden bölünerek her sayfaya anlam bütünlüğü tam olan kısım yerleştirilir.
 * **Sinematik Erime (Crossfade) & Zaman Odaklı Sayfa Seçimi:** Sayfa sonlarında hafızın nefes aralığında 0.45 saniyelik pürüzsüz `Image.blend` erimesi gerçekleşir.
   - *Zaman Odaklı Kilitleme:* Kare döngüsünde aktif sayfa (`active_p`), `aktif_idx` kelime sayacına göre değil; kesin olarak `gecisler` zaman pencerelerine göre (`t_sec < t_s` / `t_sec > t_e`) belirlenir. Bu sayede hafızın nefes duraklamalarında veya ses gecikmelerinde Sayfa 2'den tekrar Sayfa 1'e geri sıçrama (ghosting/snapback/freeze) tamamen engellenmiştir.
   - *Kelime Zaman Damgası Normalizasyonu (`kelime_zamanlarini_hizala`):* QuranCDN segment sayıları ile Kur'an metnindeki kelime sayıları farklılık gösterse dahi (örn. 40 segmente karşılık 39 kelime) zaman damgaları kümülatif zaman enterpolasyonu ile 1:1 kelime sayısına eşitlenir; kelime sapması veya sayacın erken durması önlenir.

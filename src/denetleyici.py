@@ -275,26 +275,23 @@ def denetle_reels_mizanpaj(
     metrikler: Dict[str, Any] = {}
 
     try:
-        from .uretim.video import _SayfaVerisi, _meal_parcala
+        from .uretim.video import _SayfaVerisi, _meal_parcala, akilli_sayfa_araliklari, arapca_kelimeleri_ayristir
 
-        ar_kelimeler = arapca_metin.split()
+        ar_kelimeler = arapca_kelimeleri_ayristir(arapca_metin)
         tr_kelimeler = (arapca_okunus or "").split()
         toplam_kelime = len(ar_kelimeler)
 
         # Sayfa bölme algoritması
-        sayfa_sayisi = 1
-        if toplam_kelime > 20:
-            sayfa_sayisi = math.ceil(toplam_kelime / 18)
+        if toplam_kelime <= 16:
+            sayfa_sayisi = 1
+        elif toplam_kelime <= 28:
+            sayfa_sayisi = 2
+        else:
+            sayfa_sayisi = math.ceil(toplam_kelime / 16)
 
-        # Kelime indeks aralıkları
-        sayfa_araliklari = []
-        adim = math.ceil(toplam_kelime / sayfa_sayisi)
-        for p in range(sayfa_sayisi):
-            s_idx = p * adim
-            e_idx = min((p + 1) * adim, toplam_kelime)
-            sayfa_araliklari.append((s_idx, e_idx))
-
-        meal_parcalari = _meal_parcala(turkce_meal, sayfa_sayisi)
+        sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, arapca_metin, None, sayfa_sayisi)
+        split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]
+        meal_parcalari = _meal_parcala(turkce_meal, sayfa_sayisi, split_ratios=split_ratios)
 
         en_dar_serbest_alan = 9999
 

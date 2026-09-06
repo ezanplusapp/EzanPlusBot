@@ -250,33 +250,67 @@ def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
     Arapça'da bitişik yazılan 've' (و), 'fe' (ف), 'bi' (ب), 'li' (ل), 'ke' (ك)
     bağlaçlarını ve harf-i tariflerini Türkçe'deki sonraki kelimeyle birleştirerek
     Arapça kelime sayısına tam eşitler.
+    Tire ile bağlanmış bileşikleri açar, hiçbir kelimenin boş kalmamasını ve
+    karaoke takibinin vaktinden önce bitmemesini garanti eder.
     """
-    baglaclar = ["ve", "fe", "bi", "li", "vel", "fel", "bil", "lil", "ke", "kel"]
-    yeni_tr: List[str] = []
+    if not ar_list:
+        return []
+    if not tr_list:
+        return [""] * len(ar_list)
+
+    # 1. Anlamlı tireli bileşikleri aç (Örn: 'entes-semîul' -> ['entes', 'semîul'])
+    expanded = []
+    for w in tr_list:
+        if "-" in w and not w.startswith("-") and not w.endswith("-"):
+            parts = [p for p in w.split("-") if len(p.strip()) >= 2]
+            if len(parts) > 1:
+                expanded.extend(parts)
+            else:
+                expanded.append(w)
+        else:
+            expanded.append(w)
+
+    baglaclar = {"ve", "fe", "bi", "li", "vel", "fel", "bil", "lil", "ke", "kel"}
+    num_ar = len(ar_list)
+
+    # 2. Bağlaç birleştirme geçişi
+    merged: List[str] = []
     i = 0
-    while i < len(tr_list):
-        w = tr_list[i]
-        if (
-            w.lower() in baglaclar
-            and i + 1 < len(tr_list)
-            and len(yeni_tr) < len(ar_list)
-            and len(tr_list) - i > len(ar_list) - len(yeni_tr)
-        ):
-            ar_karsi = ar_list[len(yeni_tr)]
-            if ar_karsi.startswith(("و", "ف", "ب", "ل", "ك")):
-                yeni_tr.append(f"{w} {tr_list[i+1]}")
+    while i < len(expanded):
+        w = expanded[i]
+        clean_w = w.lower().strip("',.:;!?\"”’")
+        if clean_w in baglaclar and i + 1 < len(expanded):
+            rem_tokens_if_merged = len(expanded) - (i + 2)
+            rem_ar = num_ar - (len(merged) + 1)
+            ar_target = ar_list[min(len(merged), num_ar - 1)]
+            if ar_target.startswith(("و", "ف", "ب", "ل", "ك")) and rem_tokens_if_merged >= rem_ar:
+                merged.append(f"{w} {expanded[i+1]}")
                 i += 2
                 continue
-        yeni_tr.append(w)
+
+        merged.append(w)
         i += 1
 
-    if len(yeni_tr) < len(ar_list):
-        yeni_tr.extend([""] * (len(ar_list) - len(yeni_tr)))
-    elif len(ar_list) < len(yeni_tr):
-        birlestirilen = " ".join(yeni_tr[len(ar_list) - 1 :])
-        yeni_tr = yeni_tr[: len(ar_list) - 1] + [birlestirilen]
+    # 3. Sayıyı tam num_ar'a eşitle (Eksikse boşluklu olanları böl, fazlaysa son kelimeye ekle)
+    if len(merged) < num_ar:
+        while len(merged) < num_ar:
+            idx_space = -1
+            max_len = 0
+            for idx, tok in enumerate(merged):
+                if " " in tok and len(tok) > max_len:
+                    max_len = len(tok)
+                    idx_space = idx
+            if idx_space >= 0:
+                parts = merged[idx_space].split(" ", 1)
+                merged[idx_space] = parts[0]
+                merged.insert(idx_space + 1, parts[1])
+            else:
+                merged.append(merged[-1] if merged else "")
+    elif len(merged) > num_ar:
+        excess = " ".join(merged[num_ar - 1 :])
+        merged = merged[: num_ar - 1] + [excess]
 
-    return yeni_tr
+    return merged
 
 
 def kelime_zamanlarini_hizala(
@@ -404,58 +438,176 @@ def zengin_metin_ciz_baseline(
     return int(cur_baseline_y)
 
 
-def _meal_parcala(meal_metin: str, parca_sayisi: int) -> List[str]:
+def akilli_sayfa_araliklari(
+    ar_kelimeler: List[str],
+    raw_ar: str,
+    zamanlar: Optional[List[Tuple[float, float]]],
+    sayfa_sayisi: int,
+) -> List[Tuple[int, int]]:
     """
-    Türkçe meali anlam ve cümle bütünlüğünü bozmadan parça sayısına böler.
-    Öncelikle nokta, ünlem, soru işareti, noktalı virgül gibi cümle sonlarına bakar;
-    cümle sayısı yetersizse virgüllere veya kelime bloklarına böler.
-    Her durumda kesinlikle parca_sayisi uzunluğunda liste döner.
+    Uzun ayetlerde sayfa aralıklarını rastgele kelime sayısına göre değil;
+    Kur'an'daki tescilli secavend duraklarına (ۚ ۖ ۗ ۘ ۙ ۛ ۜ ؕ ۞ ۩ ۝) ve
+    kıraat nefes duraklama sürelerine göre en doğal geçiş anlarından böler.
+    """
+    N = len(ar_kelimeler)
+    if sayfa_sayisi <= 1 or N <= 1:
+        return [(0, N)]
+
+    secavendler = {"ۚ", "ۖ", "ۗ", "ۘ", "ۙ", "ۛ", "ۜ", "ؕ", "۞", "۩", "۝"}
+    raw_tokens = raw_ar.split()
+    secavend_after = {}
+    c_i = 0
+    for tok in raw_tokens:
+        if tok in secavendler:
+            if c_i > 0:
+                secavend_after[c_i - 1] = tok
+        else:
+            c_i += 1
+
+    split_points = []
+    for k in range(1, sayfa_sayisi):
+        target = int(round(k * (N / sayfa_sayisi)))
+        best_w = target - 1
+        best_score = -9999.0
+
+        min_w = max(2, target - 5)
+        max_w = min(N - 2, target + 5)
+
+        for w in range(min_w, max_w + 1):
+            score = 0.0
+            # 1. Secavend puanı
+            if w in secavend_after:
+                sec = secavend_after[w]
+                if sec in {"ۗ", "ۚ", "ۙ", "ۖ"}:
+                    score += 160.0
+                elif sec == "ۘ":  # Lâ durağında durma
+                    score -= 50.0
+                else:
+                    score += 90.0
+
+            # 2. Nefes duraklama süresi puanı
+            if zamanlar and w + 1 < len(zamanlar):
+                pause = zamanlar[w + 1][0] - zamanlar[w][1]
+                if pause > 0.3:
+                    score += min(120.0, pause * 65.0)
+
+            # 3. İdeal merkezden sapma cezası
+            score -= 3.5 * abs(w - (target - 1))
+
+            if score > best_score:
+                best_score = score
+                best_w = w
+
+        split_points.append(best_w + 1)
+
+    ranges = []
+    cur = 0
+    for sp in split_points:
+        ranges.append((cur, sp))
+        cur = sp
+    ranges.append((cur, N))
+    return ranges
+
+
+def _meal_parcala(
+    meal_metin: str,
+    parca_sayisi: int,
+    split_ratios: Optional[List[float]] = None,
+) -> List[str]:
+    """
+    Türkçe meali anlam, cümle ve dua bütünlüğünü bozmadan,
+    asla **bold** vurgu bloklarının veya doğrudan duaların ortasından kesmeden
+    parça sayısına böler. Arapça sayfa oranlarıyla (split_ratios) 1:1 uyumlu çalışır.
     """
     if parca_sayisi <= 1:
         return [meal_metin.strip()]
 
-    parcalar: List[str] = []
-    cumleler = [c.strip() for c in re.split(r"(?<=[.!?;\n])\s+", meal_metin.strip()) if c.strip()]
-    if len(cumleler) >= parca_sayisi:
-        hedef_len = len(meal_metin) / parca_sayisi
-        cur = []
-        cur_len = 0
-        for c in cumleler:
-            cur.append(c)
-            cur_len += len(c)
-            if cur_len >= hedef_len and len(parcalar) < parca_sayisi - 1:
-                parcalar.append(" ".join(cur).strip())
-                cur = []
-                cur_len = 0
-        if cur:
-            parcalar.append(" ".join(cur).strip())
-    else:
-        # Virgüllere göre bölmeyi dene
-        yan_cumleler = [c.strip() for c in re.split(r"(?<=[,])\s+", meal_metin.strip()) if c.strip()]
-        if len(yan_cumleler) >= parca_sayisi:
-            hedef_len = len(meal_metin) / parca_sayisi
-            cur = []
-            cur_len = 0
-            for c in yan_cumleler:
-                cur.append(c)
-                cur_len += len(c)
-                if cur_len >= hedef_len and len(parcalar) < parca_sayisi - 1:
-                    parcalar.append(" ".join(cur).strip())
-                    cur = []
-                    cur_len = 0
-            if cur:
-                parcalar.append(" ".join(cur).strip())
-        else:
-            kelimeler = meal_metin.split()
-            adim = math.ceil(len(kelimeler) / parca_sayisi) if len(kelimeler) >= parca_sayisi else 1
-            parcalar = [" ".join(kelimeler[i:i + adim]) for i in range(0, len(kelimeler), adim)]
+    metin = meal_metin.strip()
+    L = len(metin)
 
-    # Güvenlik kilidi: Boyutu kesinlikle parca_sayisi'na eşitle
-    if len(parcalar) < parca_sayisi:
-        while len(parcalar) < parca_sayisi:
-            parcalar.append("")
-    elif len(parcalar) > parca_sayisi:
-        parcalar = parcalar[:parca_sayisi - 1] + [" ".join(parcalar[parca_sayisi - 1:])]
+    # 1. Bold (**...**) alanlarını tespit et — Bu alanların içi KESİNLİKLE bölünemez
+    bold_spans = [m.span() for m in re.finditer(r"\*\*.*?\*\*", metin)]
+
+    def is_inside_bold(pos: int) -> bool:
+        for s, e in bold_spans:
+            if s <= pos < e:
+                return True
+        return False
+
+    # 2. Aday noktalama işaretlerini öncelik katmanlarına ayır
+    tier1 = []  # Cümle sonları [. ! ? \n]
+    tier2 = []  # Diyalog / doğrudan dua / iki nokta / noktalı virgül / tire [: ; —]
+    tier3 = []  # Yan cümle virgülleri [,]
+
+    for m in re.finditer(r"([.!?\n])\s+", metin):
+        if not is_inside_bold(m.start()):
+            tier1.append(m.end())
+
+    for m in re.finditer(r"([;:])\s+|(\s+—\s+)", metin):
+        if not is_inside_bold(m.start()):
+            tier2.append(m.end())
+
+    for m in re.finditer(r"([,])\s+", metin):
+        if not is_inside_bold(m.start()):
+            tier3.append(m.end())
+
+    if not split_ratios:
+        split_ratios = [k / parca_sayisi for k in range(1, parca_sayisi)]
+
+    target_positions = [int(round(r * L)) for r in split_ratios]
+
+    chosen_splits = []
+    last_split = 0
+    for t_pos in target_positions:
+        all_candidates = []
+        for p in tier1:
+            if p > last_split + 20 and p < L - 20:
+                all_candidates.append((p, 1, abs(p - t_pos)))
+        for p in tier2:
+            if p > last_split + 20 and p < L - 20:
+                all_candidates.append((p, 2, abs(p - t_pos)))
+        for p in tier3:
+            if p > last_split + 20 and p < L - 20:
+                all_candidates.append((p, 3, abs(p - t_pos)))
+
+        if not all_candidates:
+            spaces = [
+                m.end()
+                for m in re.finditer(r"\s+", metin)
+                if not is_inside_bold(m.start())
+                and m.end() > last_split + 15
+                and m.end() < L - 15
+            ]
+            if spaces:
+                best_candidate = min(spaces, key=lambda p: abs(p - t_pos))
+            else:
+                best_candidate = t_pos
+        else:
+            def _puanla(c):
+                p, tier, dist = c
+                tier_penalty = {1: 0, 2: 25, 3: 45}[tier]
+                return dist + tier_penalty
+
+            best = min(all_candidates, key=_puanla)
+            best_candidate = best[0]
+
+        chosen_splits.append(best_candidate)
+        last_split = best_candidate
+
+    parcalar = []
+    cur = 0
+    for sp in chosen_splits:
+        p_str = metin[cur:sp].strip()
+        p_str = re.sub(r"[,;:]$", "", p_str).strip()
+        if p_str.count("**") % 2 != 0:
+            p_str = p_str + "**"
+        parcalar.append(p_str)
+        cur = sp
+
+    son_parca = metin[cur:].strip()
+    if son_parca.count("**") % 2 != 0:
+        son_parca = "**" + son_parca
+    parcalar.append(son_parca)
 
     return parcalar
 
@@ -999,25 +1151,20 @@ def reels_videosu_uret(
     toplam_kelime = len(ar_kelimeler)
     kelime_zamanlari = kelime_zamanlarini_hizala(kelime_zamanlari, toplam_kelime, toplam_sure)
 
-    # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Çoklu Sayfa Motoru)
-    # Her sayfada en fazla 10-12 kelime yer alacak şekilde bölünür;
-    # böylece Arapça hat asla sıkışmaz, devasa puntoyla ve ferah mizanpajla render edilir.
-    if toplam_kelime <= 12:
+    # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Kıraat & Çoklu Sayfa Motoru)
+    # 16 kelimeye kadar olan âyetler tek sayfada ferahça ve kesintisiz sunulur;
+    # 16 kelimeyi aşan uzun âyetlerde metin secavend duraklarına ve hafızın nefes
+    # aralıklarına göre anlam bütünlüğü korunarak 2-3 sayfaya bölünür.
+    if toplam_kelime <= 16:
         sayfa_sayisi = 1
-    elif toplam_kelime <= 24:
+    elif toplam_kelime <= 28:
         sayfa_sayisi = 2
     else:
-        sayfa_sayisi = math.ceil(toplam_kelime / 12)
+        sayfa_sayisi = math.ceil(toplam_kelime / 16)
 
-    meal_parcalari = _meal_parcala(turkce_meal, sayfa_sayisi)
-
-    kelimeler_per_sayfa = math.ceil(toplam_kelime / sayfa_sayisi)
-    sayfa_araliklari = []
-    cur_w = 0
-    for s_idx in range(sayfa_sayisi):
-        end_w = min(cur_w + kelimeler_per_sayfa, toplam_kelime)
-        sayfa_araliklari.append((cur_w, end_w))
-        cur_w = end_w
+    sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, ar_str, kelime_zamanlari, sayfa_sayisi)
+    split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]
+    meal_parcalari = _meal_parcala(turkce_meal, sayfa_sayisi, split_ratios=split_ratios)
 
     # 3. Sayfa Verilerini Hazırla (Tüm sayfalar için birleşik Arapça punto ile tutarlı boyut)
     page_ar_list = [ar_kelimeler[w_s:w_e] for w_s, w_e in sayfa_araliklari]

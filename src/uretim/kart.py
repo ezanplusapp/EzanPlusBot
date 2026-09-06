@@ -195,7 +195,11 @@ def kelime_basligi_satirla(metin: str, font: ImageFont.FreeTypeFont, azami_genis
 
 def parse_markdown_bold(metin: str) -> List[Tuple[str, bool]]:
     """Metindeki **bold** kısımları ayrıştırarak (kelime, is_bold) listesi döner.
-    Noktalama işaretlerini önceki kelimeye yapıştırarak 'kelime ,' boşluk hatasını önler."""
+    Noktalama işaretlerini önceki kelimeye yapıştırarak 'kelime ,' boşluk hatasını önler.
+    Kapanmamış veya artık kalan '**' işaretlerini temizleyerek ekranda ham yıldız çıkmasını önler."""
+    if metin.count('**') % 2 != 0:
+        metin = metin + '**'
+
     parcalar = re.split(r'(\*\*.*?\*\*)', metin)
     tokenlar = []
     noktalama_regex = re.compile(r'^([,\.;:!?\)’”"]+)(.*)$')
@@ -203,20 +207,27 @@ def parse_markdown_bold(metin: str) -> List[Tuple[str, bool]]:
         if not parca:
             continue
         if parca.startswith('**') and parca.endswith('**'):
-            icerik = parca[2:-2]
+            icerik = parca[2:-2].replace('**', '').replace('*', '')
             for kelime in icerik.split():
-                tokenlar.append((kelime, True))
+                kelime = kelime.replace('*', '')
+                if kelime:
+                    tokenlar.append((kelime, True))
         else:
             for kelime in parca.split():
+                is_b = False
+                if '*' in kelime:
+                    kelime = kelime.replace('*', '')
+                    is_b = True
                 m = noktalama_regex.match(kelime)
                 if m and tokenlar:
                     nokta, kalan = m.group(1), m.group(2)
                     onceki_kelime, onceki_bold = tokenlar[-1]
                     tokenlar[-1] = (onceki_kelime + nokta, onceki_bold)
                     if kalan:
-                        tokenlar.append((kalan, False))
+                        tokenlar.append((kalan, is_b))
                 else:
-                    tokenlar.append((kelime, False))
+                    if kelime:
+                        tokenlar.append((kelime, is_b))
     return tokenlar
 
 
