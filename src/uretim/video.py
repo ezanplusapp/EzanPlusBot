@@ -168,7 +168,7 @@ def _statik_taban_ciz(
 
     c_y += 48
     draw.line([(kx1 + 40, c_y), (kx2 - 40, c_y)], fill="#F1ECE1", width=2)
-    c_y += 26
+    c_y += 70
 
     kart_ic_genislik = (kx2 - kx1) - 80
     arapca_y_baslangic = c_y
@@ -527,73 +527,81 @@ class _SayfaVerisi:
         else:
             page_title = sure_ayet
 
-        # Dinamik Orantılı Tipografi ve Mizanpaj Ölçekleme (Kısalık / Yoğunluk Analizi)
+        # Dinamik Orantılı Tipografi ve Mizanpaj Ölçekleme (Piksel Genişliği ve Satır Sınırı Analizi)
+        # Kart: 54..1026 = 972px. MAX_TEXT_W = 760px seçilerek her iki yanda 106px kart içi emniyet payı bırakılır.
+        MAX_TEXT_W = 760
         n_kelime = len(page_ar)
-        meal_len = len(page_meal)
-        tef_len = len(tef)
 
-        # 1. Arapça Tilavet & Okunuş Ölçeği (Kademe 3 Onaylı Anıtsal Boyut)
-        if n_kelime <= 6:
-            self.pt_ar = 134
-            self.pt_okunus = 48
-            self.satir_s = 2
-            self.ar_h = 180
-            self.tr_h = 62
-            self.gap_ar_tr = 28
-            self.hedef_kart_w = 870
-            self.ayrac_w = 280
-        elif n_kelime <= 11:
-            self.pt_ar = 98
-            self.pt_okunus = 36
-            self.satir_s = 3
-            self.ar_h = 134
-            self.tr_h = 48
-            self.gap_ar_tr = 24
-            self.hedef_kart_w = 850
-            self.ayrac_w = 250
-        elif n_kelime <= 16:
-            self.pt_ar = 80
-            self.pt_okunus = 30
-            self.satir_s = 3
-            self.ar_h = 110
-            self.tr_h = 40
-            self.gap_ar_tr = 24
-            self.hedef_kart_w = 840
-            self.ayrac_w = 220
+        # Başlangıç hedef punto (Kelime sayısına göre üst tavan)
+        if n_kelime <= 4:
+            start_pt = 114
+        elif n_kelime <= 7:
+            start_pt = 94
+        elif n_kelime <= 10:
+            start_pt = 82
         else:
-            self.pt_ar = 66
-            self.pt_okunus = 26
-            self.satir_s = 4
-            self.ar_h = 96
-            self.tr_h = 34
-            self.gap_ar_tr = 22
-            self.hedef_kart_w = 820
-            self.ayrac_w = 220
+            start_pt = 72
+
+        # 1. Dinamik Arapça Satırlama ve Autofit Döngüsü
+        im_temp = Image.new("RGB", (100, 100))
+        d_temp = ImageDraw.Draw(im_temp)
+
+        chosen_pt = 64
+        chosen_lines = []
+
+        for pt in range(start_pt, 52, -2):
+            font = font_al(FONT_ARAPCA_NORMAL, pt)
+            font_bold = font_al(FONT_ARAPCA_BOLD, pt)
+
+            w_sizes = []
+            for w in page_ar:
+                gw = arapca_hazirla(w)
+                b1 = d_temp.textbbox((0, 0), gw, font=font)
+                b2 = d_temp.textbbox((0, 0), gw, font=font_bold)
+                # Aktif kelime bold olduğunda satırın taşmaması için emniyetli azami genişlik
+                w_sizes.append(max(b1[2] - b1[0], b2[2] - b2[0]))
+
+            lines = []
+            cur_line = []
+            cur_w = 0
+            fits = True
+            min_gap = 18
+
+            for idx, w_px in enumerate(w_sizes):
+                needed = w_px + (min_gap if cur_line else 0)
+                if cur_w + needed <= MAX_TEXT_W:
+                    cur_line.append(idx)
+                    cur_w += needed
+                else:
+                    if not cur_line:
+                        fits = False
+                        break
+                    lines.append(cur_line)
+                    cur_line = [idx]
+                    cur_w = w_px
+
+            if cur_line:
+                lines.append(cur_line)
+
+            if fits and len(lines) <= 3:
+                chosen_pt = pt
+                chosen_lines = lines
+                break
+
+        self.pt_ar = chosen_pt
+        self.pt_okunus = max(24, int(self.pt_ar * 0.38))
+        self.ar_h = int(self.pt_ar * 1.44)
+        self.tr_h = int(self.pt_okunus * 1.32)
 
         # 2. Türkçe Meal Ölçeği
-        if meal_len < 70:
-            self.pt_meal = 56
-            self.meal_h = 76
-        elif meal_len < 120:
-            self.pt_meal = 48
-            self.meal_h = 64
-        elif meal_len < 170:
-            self.pt_meal = 42
-            self.meal_h = 54
-        else:
-            self.pt_meal = 36
-            self.meal_h = 46
+        meal_len = len(page_meal)
+        self.pt_meal = 44 if meal_len < 90 else (38 if meal_len < 140 else 34)
+        self.meal_h = int(self.pt_meal * 1.34)
 
         # 3. Günün Hikmeti & Tefekkür Ölçeği
-        if tef_len < 90:
-            self.pt_tef = 32
-            self.tef_line_h = 46
-        elif tef_len < 140:
-            self.pt_tef = 28
-            self.tef_line_h = 40
-        else:
-            self.pt_tef = 24
-            self.tef_line_h = 34
+        tef_len = len(tef)
+        self.pt_tef = 28 if tef_len < 120 else 24
+        self.tef_line_h = int(self.pt_tef * 1.42)
 
         self.font_ar_norm = font_al(FONT_ARAPCA_NORMAL, self.pt_ar)
         self.font_ar_bold = font_al(FONT_ARAPCA_BOLD, self.pt_ar)
@@ -602,7 +610,7 @@ class _SayfaVerisi:
         self.font_meal = font_al(FONT_BASLIK, self.pt_meal, agirlik=600)
         self.font_tef_norm = font_al(FONT_GOVDE, self.pt_tef, agirlik=400)
         self.font_tef_bold = font_al(FONT_GOVDE, self.pt_tef, agirlik=700)
-        self.font_tef_baslik = font_al(FONT_UI, max(24, int(self.pt_tef * 0.9)), agirlik=800)
+        self.font_tef_baslik = font_al(FONT_UI, max(22, int(self.pt_tef * 0.9)), agirlik=800)
 
         # 1. Taban görseli oluştur
         self.taban_img, self.ar_y_start, _, self.kart_ic_w = _statik_taban_ciz(
@@ -614,62 +622,55 @@ class _SayfaVerisi:
         )
         draw_t = ImageDraw.Draw(self.taban_img)
 
-        # 2. Satır grupları oluştur
-        eleman_basi = math.ceil(len(page_ar) / self.satir_s)
-        ar_gruplar = []
-        tr_gruplar = []
-        cur_i = 0
-        while cur_i < len(page_ar):
-            end_i = min(cur_i + eleman_basi, len(page_ar))
-            global_s = start_w + cur_i
-            ar_gruplar.append((page_ar[cur_i:end_i], global_s))
-            tr_gruplar.append((page_tr[cur_i:end_i], global_s))
-            cur_i = end_i
-
-        # Arapça kelime slotları (merkez X koordinatları)
+        # 2. Satır grupları oluştur ve slotları milimetrik hesapla
         self.ar_satir_bilgileri = []
-        for words, g_start in ar_gruplar:
+        self.tr_satir_bilgileri = []
+
+        for line_indices in chosen_lines:
+            sub_ar = [page_ar[i] for i in line_indices]
+            sub_tr = [page_tr[i] for i in line_indices]
+            g_start = start_w + line_indices[0]
+
+            # Arapça kelime genişlikleri
             harf_w_list = [
                 draw_t.textbbox((0, 0), arapca_hazirla(w), font=self.font_ar_norm)[2]
                 - draw_t.textbbox((0, 0), arapca_hazirla(w), font=self.font_ar_norm)[0]
-                for w in words
+                for w in sub_ar
             ]
             toplam_harf_w = sum(harf_w_list)
-            gap = max(16, (self.hedef_kart_w - toplam_harf_w) // (len(words) - 1)) if len(words) > 1 else 28
-            gap = min(gap, 48)
-            toplam_w = toplam_harf_w + (len(words) - 1) * gap
+            gap = max(16, (MAX_TEXT_W - toplam_harf_w) // (len(sub_ar) - 1)) if len(sub_ar) > 1 else 28
+            gap = min(gap, 42)
+            toplam_w = toplam_harf_w + (len(sub_ar) - 1) * gap
 
             kelime_yuvalari = []
             cur_x = (GENISLIK_9_16 + toplam_w) // 2
-            for j, w in enumerate(words):
+            for j, w in enumerate(sub_ar):
                 width = harf_w_list[j]
                 cur_x -= width
                 slot_mid_x = cur_x + width // 2
-                kelime_yuvalari.append((words[j], g_start + j, slot_mid_x))
+                kelime_yuvalari.append((w, g_start + j, slot_mid_x))
                 cur_x -= gap
             self.ar_satir_bilgileri.append(kelime_yuvalari)
 
-        # Türkçe Latin okunuş slotları
-        self.tr_satir_bilgileri = []
-        for words, g_start in tr_gruplar:
-            kelime_w_list = [
+            # Türkçe Latin okunuş slotları
+            tr_w_list = [
                 draw_t.textbbox((0, 0), w, font=self.font_okunus_norm)[2]
                 - draw_t.textbbox((0, 0), w, font=self.font_okunus_norm)[0]
-                for w in words
+                for w in sub_tr
             ]
-            toplam_w_kelime = sum(kelime_w_list)
-            gap = max(10, (self.hedef_kart_w - toplam_w_kelime) // (len(words) - 1)) if len(words) > 1 else 14
-            gap = min(gap, 28)
-            toplam_w = toplam_w_kelime + (len(words) - 1) * gap
+            toplam_tr_w = sum(tr_w_list)
+            gap_tr = max(10, (MAX_TEXT_W - toplam_tr_w) // (len(sub_tr) - 1)) if len(sub_tr) > 1 else 16
+            gap_tr = min(gap_tr, 30)
+            toplam_tr_full = toplam_tr_w + (len(sub_tr) - 1) * gap_tr
 
-            kelime_yuvalari = []
-            cur_x = (GENISLIK_9_16 - toplam_w) // 2
-            for j, w_str in enumerate(words):
-                width = kelime_w_list[j]
-                slot_mid_x = cur_x + width // 2
-                kelime_yuvalari.append((w_str, g_start + j, slot_mid_x))
-                cur_x += width + gap
-            self.tr_satir_bilgileri.append(kelime_yuvalari)
+            cur_tr_x = (GENISLIK_9_16 - toplam_tr_full) // 2
+            tr_yuvalari = []
+            for j, w_str in enumerate(sub_tr):
+                width = tr_w_list[j]
+                slot_mid_x = cur_tr_x + width // 2
+                tr_yuvalari.append((w_str, g_start + j, slot_mid_x))
+                cur_tr_x += width + gap_tr
+            self.tr_satir_bilgileri.append(tr_yuvalari)
 
         # Kırmızı dolum önbellekleri
         self.latin_red_cache = {}
@@ -865,13 +866,15 @@ def reels_videosu_uret(
     toplam_kelime = len(ar_kelimeler)
     kelime_zamanlari = kelime_zamanlarini_hizala(kelime_zamanlari, toplam_kelime, toplam_sure)
 
-    # 2. Sayfa Sayısını ve Aralıkları Belirle (1. Yol — Çoklu Sayfa Motoru)
-    if toplam_kelime <= 20:
+    # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Çoklu Sayfa Motoru)
+    # Her sayfada en fazla 10-12 kelime yer alacak şekilde bölünür;
+    # böylece Arapça hat asla sıkışmaz, devasa puntoyla ve ferah mizanpajla render edilir.
+    if toplam_kelime <= 12:
         sayfa_sayisi = 1
-    elif toplam_kelime <= 40:
+    elif toplam_kelime <= 24:
         sayfa_sayisi = 2
     else:
-        sayfa_sayisi = math.ceil(toplam_kelime / 18)
+        sayfa_sayisi = math.ceil(toplam_kelime / 12)
 
     meal_parcalari = _meal_parcala(turkce_meal, sayfa_sayisi)
 

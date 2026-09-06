@@ -165,7 +165,12 @@ def videoyu_sil(video_id: str) -> bool:
     if not video_id:
         return False
     try:
-        servis = yetkilendir()
+        from googleapiclient.discovery import build
+        creds = yetki_al()
+        if not creds:
+            log.error("YouTube yetkilendirmesi başarısız, video silinemedi.")
+            return False
+        servis = build("youtube", "v3", credentials=creds)
         servis.videos().delete(id=video_id).execute()
         log.info(f"✅ YouTube videosu başarıyla silindi: {video_id}")
         return True
