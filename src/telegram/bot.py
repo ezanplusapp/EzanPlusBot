@@ -33,22 +33,63 @@ def get_token_ve_chat_id() -> tuple[str, str]:
     return token, chat_id
 
 
-def _istek(metot: str, data: Optional[Dict[str, Any]] = None, files: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Telegram Bot API'ye HTTP isteği atar."""
+def _istek(
+    metot: str,
+    data: Optional[Dict[str, Any]] = None,
+    files: Optional[Dict[str, Any]] = None,
+    timeout: Optional[int] = None,
+    maks_deneme: int = 3,
+) -> Dict[str, Any]:
+    """Telegram Bot API'ye güvenli, otomatik yeniden denemeli (retry) HTTP isteği atar."""
     token, _ = get_token_ve_chat_id()
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN tanımlı değil! .env dosyasını kontrol edin.")
 
     url = TABAN_URL.format(token=token, metot=metot)
-    res = requests.post(url, data=data, files=files, timeout=60)
-    res_json = res.json()
+    timeout_val = timeout or (120 if files else 35)
 
-    if not res_json.get("ok"):
-        hata = res_json.get("description", "Bilinmeyen hata")
-        log.error(f"Telegram API Hatası ({metot}): {hata}")
-        raise RuntimeError(f"Telegram Hatası: {hata}")
+    for deneme in range(1, maks_deneme + 1):
+        try:
+            # Dosya pointer'larını sıfırla (yeniden denemelerde eksik/boş yüklemeyi önler)
+            if files:
+                for val in files.values():
+                    if hasattr(val, "seek"):
+                        try:
+                            val.seek(0)
+                        except Exception:
+                            pass
+                    elif isinstance(val, (tuple, list)) and len(val) > 1 and hasattr(val[1], "seek"):
+                        try:
+                            val[1].seek(0)
+                        except Exception:
+                            pass
 
-    return res_json.get("result", {})
+            res = requests.post(url, data=data, files=files, timeout=timeout_val)
+            try:
+                res_json = res.json()
+            except Exception as json_err:
+                log.warning(f"Telegram API ({metot}) yanıtı JSON olarak okunamadı (Status: {res.status_code}): {res.text[:150]}")
+                raise json_err
+
+            if not res_json.get("ok"):
+                hata = res_json.get("description", "Bilinmeyen hata")
+                retry_after = res_json.get("parameters", {}).get("retry_after")
+                if retry_after and deneme < maks_deneme:
+                    log.warning(f"Telegram rate limit uygulandı ({retry_after}s bekleniyor): {hata}")
+                    time.sleep(int(retry_after) + 1)
+                    continue
+                log.error(f"Telegram API Hatası ({metot}): {hata}")
+                raise RuntimeError(f"Telegram Hatası: {hata}")
+
+            return res_json.get("result", {})
+
+        except (requests.exceptions.RequestException, ConnectionResetError, ConnectionError, TimeoutError, json.JSONDecodeError) as e:
+            log.warning(f"Telegram API isteği ({metot}) ağ/bağlantı hatası (deneme {deneme}/{maks_deneme}): {e}")
+            if deneme < maks_deneme:
+                time.sleep(2.0 * deneme)
+            else:
+                log.error(f"Telegram API ({metot}) tüm yeniden denemeler ({maks_deneme}) başarısız oldu: {e}")
+                raise e
 
 
 def mesaj_gonder(metin: str, chat_id: Optional[str] = None, butonlar: Optional[List[List[Dict[str, str]]]] = None) -> int:
@@ -90,8 +131,8 @@ def gorsel_gonder(
         payload["reply_markup"] = json.dumps({"inline_keyboard": butonlar})
 
     with open(gorsel_yolu, "rb") as f:
-        files = {"photo": f}
-        res = _istek("sendPhoto", data=payload, files=files)
+        files = {"photo": (gorsel_yolu.name, f, "image/png")}
+        res = _istek("sendPhoto", data=payload, files=files, timeout=60)
 
     return res.get("message_id", 0)
 
@@ -116,8 +157,8 @@ def video_gonder(
         payload["reply_markup"] = json.dumps({"inline_keyboard": butonlar})
 
     with open(video_yolu, "rb") as f:
-        files = {"video": f}
-        res = _istek("sendVideo", data=payload, files=files)
+        files = {"video": (video_yolu.name, f, "video/mp4")}
+        res = _istek("sendVideo", data=payload, files=files, timeout=120)
 
     return res.get("message_id", 0)
 
@@ -301,15 +342,49 @@ def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
     if yt_url:
         buton_satirlari.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": yt_url}])
 
-    # Medyayı gönder
+    # Medyayı gönder (Video -> Thumbnail -> Metin Mesajı Kademeli Güvenlik Fallback'i)
+    msg_id = 0
     if format_tipi == "reels_9_16" and kayit.get("video_yolu") and Path(kayit["video_yolu"]).exists():
-        msg_id = video_gonder(Path(kayit["video_yolu"]), caption=rapor_metin, butonlar=buton_satirlari)
+        try:
+            msg_id = video_gonder(Path(kayit["video_yolu"]), caption=rapor_metin, butonlar=buton_satirlari)
+        except Exception as e:
+            log.warning(f"Telegram'a video yüklenemedi: {e}. Görsel/thumbnail fallback deneniyor...")
+            thumbnail_yolu = Path(kayit["video_yolu"]).with_suffix(".png")
+            if thumbnail_yolu.exists():
+                try:
+                    msg_id = gorsel_gonder(thumbnail_yolu, caption=rapor_metin, butonlar=buton_satirlari)
+                except Exception as e2:
+                    log.warning(f"Telegram'a thumbnail yüklenemedi: {e2}. Metin mesajı fallback deneniyor...")
+            elif kayit.get("gorsel_yollari") and len(kayit["gorsel_yollari"]) > 0 and Path(kayit["gorsel_yollari"][0]).exists():
+                try:
+                    msg_id = gorsel_gonder(Path(kayit["gorsel_yollari"][0]), caption=rapor_metin, butonlar=buton_satirlari)
+                except Exception as e2:
+                    log.warning(f"Telegram'a görsel yüklenemedi: {e2}. Metin mesajı fallback deneniyor...")
+            
+            if not msg_id:
+                try:
+                    msg_id = mesaj_gonder(rapor_metin, butonlar=buton_satirlari)
+                except Exception as e3:
+                    log.error(f"Telegram'a metin raporu dahi gönderilemedi: {e3}")
     elif kayit.get("gorsel_yollari") and len(kayit["gorsel_yollari"]) > 0 and Path(kayit["gorsel_yollari"][0]).exists():
-        msg_id = gorsel_gonder(Path(kayit["gorsel_yollari"][0]), caption=rapor_metin, butonlar=buton_satirlari)
+        try:
+            msg_id = gorsel_gonder(Path(kayit["gorsel_yollari"][0]), caption=rapor_metin, butonlar=buton_satirlari)
+        except Exception as e:
+            log.warning(f"Telegram'a görsel yüklenemedi: {e}. Metin mesajı fallback deneniyor...")
+            try:
+                msg_id = mesaj_gonder(rapor_metin, butonlar=buton_satirlari)
+            except Exception as e2:
+                log.error(f"Telegram'a metin raporu dahi gönderilemedi: {e2}")
     else:
-        msg_id = mesaj_gonder(rapor_metin, butonlar=buton_satirlari)
+        try:
+            msg_id = mesaj_gonder(rapor_metin, butonlar=buton_satirlari)
+        except Exception as e:
+            log.error(f"Telegram'a metin raporu dahi gönderilemedi: {e}")
 
-    db.durum_guncelle(paylasim_id, yeni_durum="yayinlandi", telegram_mesaj_id=msg_id)
+    if msg_id:
+        db.durum_guncelle(paylasim_id, yeni_durum="yayinlandi", telegram_mesaj_id=msg_id)
+    else:
+        db.durum_guncelle(paylasim_id, yeni_durum="yayinlandi")
     return msg_id
 
 
@@ -511,7 +586,10 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         def _gorev_yayinla():
             try:
                 sonuclar = yayinla_hepsi(pid)
-                yayin_detay_karti_gonder(pid, sonuclar)
+                try:
+                    yayin_detay_karti_gonder(pid, sonuclar)
+                except Exception as e_k:
+                    log.error(f"Paylaşım #{pid} yayınlandı ancak detay kartı Telegram'a iletilemedi: {e_k}")
             except Exception as e:
                 log.error(f"/yayinla hatası: {e}")
                 mesaj_gonder(f"❌ <b>Yayınlama hatası:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
@@ -566,10 +644,10 @@ def tek_sefer_dinle(offset: int = 0) -> int:
     try:
         params = {
             "offset": offset,
-            "timeout": 2,
+            "timeout": 3,
             "allowed_updates": json.dumps(["message", "callback_query", "channel_post", "my_chat_member"]),
         }
-        res = requests.get(url, params=params, timeout=5)
+        res = requests.get(url, params=params, timeout=15)
         res_json = res.json()
         if not res_json.get("ok"):
             return offset
@@ -653,7 +731,7 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                             c_id,
                             m_id,
                             kaldirildi_metni,
-                            butonlar=[[{"text": "❌ Yayından Kaldırıldı (Arşivlendi)", "callback_data": "noop"}]]
+                            butonlar=[]
                         )
                         mesaj_gonder(f"🗑️ <b>Paylaşım #{p_id} tüm platformlardan başarıyla kaldırıldı.</b>", chat_id=str(c_id))
 
@@ -687,6 +765,11 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                 if metin.startswith("/") and chat_id:
                     komut_isle(chat_id, msg_id, metin)
 
+    except requests.exceptions.Timeout:
+        # Uzun yoklama zaman aşımı normaldir, sessizce devam et
+        pass
+    except (requests.exceptions.ConnectionError, ConnectionResetError) as ce:
+        log.warning(f"Telegram dinleme bağlantı geçici koptu: {ce}")
     except Exception as e:
         log.error(f"Telegram dinleme hatası: {e}")
 

@@ -105,7 +105,10 @@ def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
 
     log.info("5/5: Kur'an tilaveti otomatik yayınlanıyor ve Telegram'a yayın detay kartı iletiliyor...")
     sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
-    telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
+    try:
+        telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
+    except Exception as e:
+        log.error(f"Reels #{paylasim_id} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
 
     log.info(f"Reels tilaveti başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
     return paylasim_id
@@ -410,7 +413,10 @@ if __name__ == "__main__":
     elif args.otomatik:
         log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")
         sonuclar = telegram_bot.yayinla_hepsi(pid)
-        telegram_bot.yayin_detay_karti_gonder(pid, sonuclar)
+        try:
+            telegram_bot.yayin_detay_karti_gonder(pid, sonuclar)
+        except Exception as e:
+            log.error(f"Paylaşım #{pid} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
         dinle_ve_bekle(sure_saniye=min(args.bekleme, 600), paylasim_id=pid, yayin_sonrasi=True)
     else:
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=False)
