@@ -573,45 +573,89 @@ def ayet_karti_ciz(
     kaynak_h = 42 if format_tipi == "4:5" else 46
 
     # 5. SERLEVHA KUTUSU (ARAPÇA METİN VE PARŞÖMEN TAÇ)
+    MIN_VERTICAL_GAP = 28 if format_tipi == "9:16" else 24
     tac_h = 48 if format_tipi == "9:16" else (46 if meal_len < 80 else 42)
     pad_ic_ust = 40 if format_tipi == "9:16" else (34 if meal_len < 80 else 28)
     pad_ic_alt = 38 if format_tipi == "9:16" else (34 if meal_len < 80 else 28)
 
-    # Dinamik Arapça Punto (Kısa âyetlerde daha heybetli ve asil!)
-    if ar_len > 0:
-        if format_tipi == "9:16":
-            if ar_len < 35:
-                pt_ar = 114
-            elif ar_len < 55:
-                pt_ar = 96
-            elif ar_len < 90:
-                pt_ar = 78
-            elif ar_len < 160:
-                pt_ar = 58
-            else:
-                pt_ar = 46
-        else:
-            if ar_len < 35:
-                pt_ar = 98
-            elif ar_len < 55:
-                pt_ar = 86
-            elif ar_len < 90:
-                pt_ar = 68
-            elif ar_len < 160:
-                pt_ar = 52
-            else:
-                pt_ar = 42
+    # Arapça Metin Temizliği (Secavend ve durak işaretlerini ayıkla)
+    secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
+    ar_temiz = secavend_regex.sub("", ar_ham).strip()
+    if not ar_temiz:
+        ar_temiz = ar_ham
 
-        ar_satir_h = int(pt_ar * 1.55)
-        font_ar = font_al(FONT_ARAPCA, pt_ar)
-        ar_satirlar = arapca_satirla(ar_ham, font_ar, text_max_w, draw)
-        ar_toplam_h = len(ar_satirlar) * ar_satir_h
+    # Akıllı Arapça Autofit & Dinamik Ink Clearance (Ayet Motoru Standardı)
+    if format_tipi == "9:16":
+        start_pt = 114 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))
+        min_pt = 46
     else:
-        pt_ar = 0
-        ar_satirlar = []
-        ar_toplam_h = 0
+        start_pt = 98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 52))
+        min_pt = 40
 
-    kutu_icerik_h = pad_ic_ust + ar_toplam_h + pad_ic_alt
+    hedef_satir_sayilari = [1, 2] if ar_len < 65 else [2, 3, 4]
+    font_ar_boyut = min_pt
+    ar_satirlar = []
+    found_ar = False
+
+    if ar_len > 0:
+        for target_l in hedef_satir_sayilari:
+            for test_pt in range(start_pt, min_pt - 1, -2):
+                f_test = font_al(FONT_ARAPCA, test_pt)
+                sats = arapca_satirla(ar_temiz, f_test, text_max_w, draw)
+                if not sats or len(sats) > target_l:
+                    continue
+
+                max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
+                if max_line_w > text_max_w:
+                    continue
+
+                # Yetim kelime önleme: Son satırda tek kelime kalmışsa reddet
+                if len(sats) >= 2 and len(sats[-1].split()) == 1 and len(sats[-1].strip()) < 16:
+                    if test_pt > min_pt + 4:
+                        continue
+
+                # Gerçek mürekkep yüksekliği simülasyonu
+                sim_prev_ink = 0
+                for s_idx, s in enumerate(sats):
+                    bb = draw.textbbox((0, 0), s, font=f_test)
+                    top_ink, bottom_ink = bb[1], bb[3]
+                    l_y = -top_ink if s_idx == 0 else (sim_prev_ink + MIN_VERTICAL_GAP - top_ink)
+                    sim_prev_ink = l_y + bottom_ink
+
+                sim_total_ar_h = sim_prev_ink
+                sim_box_h = tac_h + pad_ic_ust + sim_total_ar_h + pad_ic_alt
+                sim_kalan = free_vertical - (sim_box_h + tr_toplam_h + kaynak_h)
+                min_kalan = 40 if format_tipi == "9:16" else 28
+
+                if sim_kalan >= min_kalan:
+                    font_ar_boyut = test_pt
+                    ar_satirlar = sats
+                    found_ar = True
+                    break
+            if found_ar:
+                break
+
+        if not ar_satirlar:
+            font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
+            ar_satirlar = arapca_satirla(ar_temiz, font_ar, text_max_w, draw)
+        else:
+            font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
+
+        ar_offsets = []
+        prev_ink_bottom = 0
+        for s_idx, asat in enumerate(ar_satirlar):
+            bb = draw.textbbox((0, 0), asat, font=font_ar)
+            top_ink, bottom_ink = bb[1], bb[3]
+            l_y = -top_ink if s_idx == 0 else (prev_ink_bottom + MIN_VERTICAL_GAP - top_ink)
+            ar_offsets.append(l_y)
+            prev_ink_bottom = l_y + bottom_ink
+        total_ar_h = prev_ink_bottom
+    else:
+        font_ar = font_al(FONT_ARAPCA, min_pt)
+        ar_offsets = []
+        total_ar_h = 0
+
+    kutu_icerik_h = pad_ic_ust + total_ar_h + pad_ic_alt
     kutu_toplam_h = tac_h + kutu_icerik_h
 
     # 6. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANI)
@@ -640,13 +684,15 @@ def ayet_karti_ciz(
     intro_bb = draw.textbbox((0, 0), intro_txt, font=font_intro)
     draw.text(((w - (intro_bb[2] - intro_bb[0])) // 2, box_y1 + (tac_h - (intro_bb[3] - intro_bb[1])) // 2 - intro_bb[1]), intro_txt, font=font_intro, fill=yesil_ton)
 
-    # Arapça Hat Çizimi
+    # Arapça Hat Çizimi (Gerçek Mürekkep Hizalaması)
     if ar_satirlar:
-        cur_ar_y = box_y1 + tac_h + pad_ic_ust
-        for s in ar_satirlar:
+        content_base_y = box_y1 + tac_h + pad_ic_ust
+        for s_idx, s in enumerate(ar_satirlar):
             bb = draw.textbbox((0, 0), s, font=font_ar)
-            draw.text(((w - (bb[2] - bb[0])) // 2, cur_ar_y), s, font=font_ar, fill=yesil_ton)
-            cur_ar_y += ar_satir_h
+            line_w = bb[2] - bb[0]
+            line_x = (w - line_w) // 2
+            line_y = content_base_y + ar_offsets[s_idx]
+            draw.text((line_x, line_y), s, font=font_ar, fill=yesil_ton)
 
     # 7. TÜRKÇE MEAL ÇİZİMİ (Ortalanmış ve Tırnak Filigranlı)
     meal_y = box_y2 + gap_kutu_tr
@@ -939,7 +985,8 @@ def hadis_karti_ciz(
         kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
     kaynak_h = 42 if format_tipi == "4:5" else 46
 
-    # 4. SERLEVHA KUTUSU SAFE AREA & ARAPÇA OTO-ÖLÇEKLENDİRME
+    # 4. SERLEVHA KUTUSU SAFE AREA & AKILLI ARAPÇA MİZANPAJ (Ayet Standardı)
+    MIN_VERTICAL_GAP = 28 if format_tipi == "9:16" else 24
     tac_h = 48 if format_tipi == "9:16" else (46 if hadis_len < 75 else 42)
     pad_ic_ust = 40 if format_tipi == "9:16" else (34 if hadis_len < 75 else 28)
     pad_ic_alt = 38 if format_tipi == "9:16" else (34 if hadis_len < 75 else 28)
@@ -961,70 +1008,92 @@ def hadis_karti_ciz(
     ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
     gap_ar_ok = (28 if format_tipi == "9:16" else 22) if ok_satirlar else 0
 
-    # Safe area bazlı Arapça autofit (Kısa hadislerde 88-114pt heybetli hat!)
-    if format_tipi == "9:16":
-        max_pt = 114 if ar_len < 35 else (104 if ar_len < 65 else (86 if ar_len < 120 else 74))
-        min_pt = 56
-    else:
-        max_pt = 98 if ar_len < 35 else (88 if ar_len < 65 else (70 if ar_len < 120 else 52))
-        min_pt = 44
+    # Arapça Metin Temizliği (Secavend ve durak işaretlerini ayıkla)
+    secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
+    ar_temiz = secavend_regex.sub("", ar_ham).strip()
+    if not ar_temiz:
+        ar_temiz = ar_ham
 
+    # Ayet motoru standartlarında satır hedefli autofit (Önce 2 satır, sığmazsa 3 satır)
+    if format_tipi == "9:16":
+        start_pt = 114 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))
+        min_pt = 50
+    else:
+        start_pt = 98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 54))
+        min_pt = 42
+
+    hedef_satir_sayilari = [1, 2] if ar_len < 65 else [2, 3]
     font_ar_boyut = min_pt
     ar_satirlar = []
-    for test_pt in range(max_pt, min_pt - 1, -2):
-        f_test = font_al(FONT_ARAPCA, test_pt)
-        sats = arapca_satirla(ar_ham, f_test, text_max_w, draw)
-        if not sats:
-            continue
-        max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
-        if max_line_w > text_max_w:
-            continue
+    found_ar = False
 
-        max_allowed = 4 if format_tipi == "9:16" else (2 if ar_len < 65 else 3)
-        if len(sats) > max_allowed:
-            continue
+    for target_l in hedef_satir_sayilari:
+        for test_pt in range(start_pt, min_pt - 1, -2):
+            f_test = font_al(FONT_ARAPCA, test_pt)
+            sats = arapca_satirla(ar_temiz, f_test, text_max_w, draw)
+            if not sats or len(sats) > target_l:
+                continue
 
-        test_line_h = int(test_pt * (1.40 if format_tipi == "9:16" else 1.36))
-        sim_ar_h = len(sats) * test_line_h + int(test_pt * 0.25)
-        test_box_s_h = tac_h + pad_ic_ust + sim_ar_h + gap_ar_ok + ok_toplam_h + pad_ic_alt
-        sim_kalan = free_vertical - (test_box_s_h + tr_toplam_h + kaynak_h)
-        min_kalan = 50 if format_tipi == "9:16" else 35
-        if sim_kalan >= min_kalan:
-            font_ar_boyut = test_pt
-            ar_satirlar = sats
+            max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
+            if max_line_w > text_max_w:
+                continue
+
+            # Yetim kelime önleme: Son satırda tek kelime kalmışsa reddet
+            if len(sats) >= 2 and len(sats[-1].split()) == 1 and len(sats[-1].strip()) < 16:
+                if test_pt > min_pt + 4:
+                    continue
+
+            # Gerçek mürekkep yüksekliği ve satır arası net clearance simülasyonu
+            sim_prev_ink = 0
+            for s_idx, s in enumerate(sats):
+                bb = draw.textbbox((0, 0), s, font=f_test)
+                top_ink, bottom_ink = bb[1], bb[3]
+                l_y = -top_ink if s_idx == 0 else (sim_prev_ink + MIN_VERTICAL_GAP - top_ink)
+                sim_prev_ink = l_y + bottom_ink
+
+            sim_total_ar_h = sim_prev_ink
+            sim_box_h = tac_h + pad_ic_ust + sim_total_ar_h + gap_ar_ok + ok_toplam_h + pad_ic_alt
+            sim_kalan = free_vertical - (sim_box_h + tr_toplam_h + kaynak_h)
+            min_kalan = 40 if format_tipi == "9:16" else 28
+
+            if sim_kalan >= min_kalan:
+                font_ar_boyut = test_pt
+                ar_satirlar = sats
+                found_ar = True
+                break
+        if found_ar:
             break
 
     if not ar_satirlar:
         font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
-        ar_satirlar = arapca_satirla(ar_ham, font_ar, text_max_w, draw)
+        ar_satirlar = arapca_satirla(ar_temiz, font_ar, text_max_w, draw)
     else:
         font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
 
-    ar_line_h = int(font_ar_boyut * (1.40 if format_tipi == "9:16" else 1.36))
+    # Her satırın Y offsetini gerçek mürekkep sınırlarına göre hesapla
+    ar_offsets = []
+    prev_ink_bottom = 0
+    for s_idx, asat in enumerate(ar_satirlar):
+        bb = draw.textbbox((0, 0), asat, font=font_ar)
+        top_ink, bottom_ink = bb[1], bb[3]
+        l_y = -top_ink if s_idx == 0 else (prev_ink_bottom + MIN_VERTICAL_GAP - top_ink)
+        ar_offsets.append(l_y)
+        prev_ink_bottom = l_y + bottom_ink
 
-    # Kutu Gerçek Yüksekliği Ölçümü
-    temp_ar_y = 100
-    temp_last_ar_bottom = temp_ar_y
-    for asat in ar_satirlar:
-        as_bb = draw.textbbox((0, 0), asat, font=font_ar)
-        as_w = as_bb[2] - as_bb[0]
-        line_x = (w - as_w) // 2
-        bb_actual = draw.textbbox((line_x, temp_ar_y), asat, font=font_ar)
-        temp_last_ar_bottom = max(temp_last_ar_bottom, bb_actual[3])
-        temp_ar_y += ar_line_h
+    total_ar_h = prev_ink_bottom
 
+    # Okunuş Satırları Offsetleri
+    ok_offsets = []
     if ok_satirlar:
-        temp_ok_y = max(temp_ar_y, temp_last_ar_bottom + (18 if format_tipi == "9:16" else 14))
-        temp_ok_bottom = temp_ok_y
+        cur_ok_off = total_ar_h + gap_ar_ok
         for osat in ok_satirlar:
-            o_bb = draw.textbbox(((w - 100)//2, temp_ok_bottom), osat, font=font_okunus)
-            temp_ok_bottom = max(temp_ok_bottom + ok_line_h, o_bb[3])
-        final_icerik_bottom = temp_ok_bottom
+            ok_offsets.append(cur_ok_off)
+            cur_ok_off += ok_line_h
+        total_content_h = cur_ok_off
     else:
-        final_icerik_bottom = temp_last_ar_bottom
+        total_content_h = total_ar_h
 
-    net_icerik_h = final_icerik_bottom - 100
-    box_s_h = tac_h + pad_ic_ust + net_icerik_h + pad_ic_alt
+    box_s_h = tac_h + pad_ic_ust + total_content_h + pad_ic_alt
 
     # 5. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANLARI)
     toplam_icerik_h = box_s_h + tr_toplam_h + kaynak_h
@@ -1106,26 +1175,23 @@ def hadis_karti_ciz(
         draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#9B1B1B")
         draw.line([(box_x1 + 30, box_s_y1 + tac_h), (box_x2 - 30, box_s_y1 + tac_h)], fill="#F0E8D9", width=1)
 
-    # Arapça Metin Çizimi (Tamamı ve Harekeli)
-    ar_y = box_s_y1 + tac_h + pad_ic_ust
-    last_ar_bottom = ar_y
-    for asat in ar_satirlar:
+    # Arapça Metin Çizimi (Tamamı ve Harekeli, Gerçek Mürekkep Hizalaması)
+    content_base_y = box_s_y1 + tac_h + pad_ic_ust
+    for s_idx, asat in enumerate(ar_satirlar):
         as_bb = draw.textbbox((0, 0), asat, font=font_ar)
         as_w = as_bb[2] - as_bb[0]
         line_x = (w - as_w) // 2
-        draw.text((line_x, ar_y), asat, font=font_ar, fill="#9B1B1B")
-        bb_actual = draw.textbbox((line_x, ar_y), asat, font=font_ar)
-        last_ar_bottom = max(last_ar_bottom, bb_actual[3])
-        ar_y += ar_line_h
+        line_y = content_base_y + ar_offsets[s_idx]
+        draw.text((line_x, line_y), asat, font=font_ar, fill="#9B1B1B")
 
     # Latin Okunuş Çizimi (Safe area garantili)
     if ok_satirlar:
-        ok_y = max(ar_y, last_ar_bottom + (18 if format_tipi == "9:16" else 14))
-        for osat in ok_satirlar:
+        for o_idx, osat in enumerate(ok_satirlar):
             o_bb = draw.textbbox((0, 0), osat, font=font_okunus)
             o_w = o_bb[2] - o_bb[0]
-            draw.text(((w - o_w) // 2, ok_y), osat, font=font_okunus, fill="#5A4B42")
-            ok_y += ok_line_h
+            ok_x = (w - o_w) // 2
+            ok_y = content_base_y + ok_offsets[o_idx]
+            draw.text((ok_x, ok_y), osat, font=font_okunus, fill="#5A4B42")
 
     # 6. TÜRKÇE HADİS & ZARİF PARŞÖMEN TIRNAK FİLİGRANI
     tr_y = box_s_y2 + gap_kutu_tr
@@ -1368,7 +1434,8 @@ def dua_karti_ciz(
         kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
     kaynak_h = 42 if format_tipi == "4:5" else 46
 
-    # 4. SERLEVHA KUTUSU SAFE AREA & ARAPÇA OTO-ÖLÇEKLENDİRME
+    # 4. SERLEVHA KUTUSU SAFE AREA & AKILLI ARAPÇA MİZANPAJ (Ayet Standardı)
+    MIN_VERTICAL_GAP = 28 if format_tipi == "9:16" else 24
     tac_h = 48 if format_tipi == "9:16" else (46 if anlam_len < 75 else 42)
     pad_ic_ust = 40 if format_tipi == "9:16" else (34 if anlam_len < 75 else 28)
     pad_ic_alt = 38 if format_tipi == "9:16" else (34 if anlam_len < 75 else 28)
@@ -1381,70 +1448,92 @@ def dua_karti_ciz(
     ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
     gap_ar_ok = (28 if format_tipi == "9:16" else 22) if ok_satirlar else 0
 
-    # Safe area bazlı Arapça autofit (Kısa dualarda 88-114pt heybetli hat!)
+    # Arapça Metin Temizliği (Secavend ve durak işaretlerini ayıkla)
+    secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
+    ar_temiz = secavend_regex.sub("", ar_ham).strip()
+    if not ar_temiz:
+        ar_temiz = ar_ham
+
+    # Safe area bazlı Arapça autofit (Kısa dualarda 88-114pt heybetli hat, yetim kelime önleme)
     if format_tipi == "9:16":
-        max_pt = 114 if ar_len < 35 else (104 if ar_len < 65 else (86 if ar_len < 120 else 72))
-        min_pt = 54
+        start_pt = 114 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))
+        min_pt = 50
     else:
-        max_pt = 98 if ar_len < 35 else (88 if ar_len < 65 else (70 if ar_len < 120 else 50))
+        start_pt = 98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 54))
         min_pt = 42
 
+    hedef_satir_sayilari = [1, 2] if ar_len < 65 else [2, 3]
     font_ar_boyut = min_pt
     ar_satirlar = []
-    for test_pt in range(max_pt, min_pt - 1, -2):
-        f_test = font_al(FONT_ARAPCA, test_pt)
-        sats = arapca_satirla(ar_ham, f_test, text_max_w, draw)
-        if not sats:
-            continue
-        max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
-        if max_line_w > text_max_w:
-            continue
+    found_ar = False
 
-        max_allowed = 4 if format_tipi == "9:16" else (2 if ar_len < 65 else 3)
-        if len(sats) > max_allowed:
-            continue
+    for target_l in hedef_satir_sayilari:
+        for test_pt in range(start_pt, min_pt - 1, -2):
+            f_test = font_al(FONT_ARAPCA, test_pt)
+            sats = arapca_satirla(ar_temiz, f_test, text_max_w, draw)
+            if not sats or len(sats) > target_l:
+                continue
 
-        test_line_h = int(test_pt * (1.40 if format_tipi == "9:16" else 1.36))
-        sim_ar_h = len(sats) * test_line_h + int(test_pt * 0.25)
-        test_box_s_h = tac_h + pad_ic_ust + sim_ar_h + gap_ar_ok + ok_toplam_h + pad_ic_alt
-        sim_kalan = free_vertical - (test_box_s_h + tr_toplam_h + kaynak_h)
-        min_kalan = 50 if format_tipi == "9:16" else 35
-        if sim_kalan >= min_kalan:
-            font_ar_boyut = test_pt
-            ar_satirlar = sats
+            max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
+            if max_line_w > text_max_w:
+                continue
+
+            # Yetim kelime önleme: Son satırda tek kelime kalmışsa reddet
+            if len(sats) >= 2 and len(sats[-1].split()) == 1 and len(sats[-1].strip()) < 16:
+                if test_pt > min_pt + 4:
+                    continue
+
+            # Gerçek mürekkep yüksekliği ve satır arası net clearance simülasyonu
+            sim_prev_ink = 0
+            for s_idx, s in enumerate(sats):
+                bb = draw.textbbox((0, 0), s, font=f_test)
+                top_ink, bottom_ink = bb[1], bb[3]
+                l_y = -top_ink if s_idx == 0 else (sim_prev_ink + MIN_VERTICAL_GAP - top_ink)
+                sim_prev_ink = l_y + bottom_ink
+
+            sim_total_ar_h = sim_prev_ink
+            sim_box_h = tac_h + pad_ic_ust + sim_total_ar_h + gap_ar_ok + ok_toplam_h + pad_ic_alt
+            sim_kalan = free_vertical - (sim_box_h + tr_toplam_h + kaynak_h)
+            min_kalan = 40 if format_tipi == "9:16" else 28
+
+            if sim_kalan >= min_kalan:
+                font_ar_boyut = test_pt
+                ar_satirlar = sats
+                found_ar = True
+                break
+        if found_ar:
             break
 
     if not ar_satirlar:
         font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
-        ar_satirlar = arapca_satirla(ar_ham, font_ar, text_max_w, draw)
+        ar_satirlar = arapca_satirla(ar_temiz, font_ar, text_max_w, draw)
     else:
         font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
 
-    ar_line_h = int(font_ar_boyut * (1.40 if format_tipi == "9:16" else 1.36))
+    # Her satırın Y offsetini gerçek mürekkep sınırlarına göre hesapla
+    ar_offsets = []
+    prev_ink_bottom = 0
+    for s_idx, asat in enumerate(ar_satirlar):
+        bb = draw.textbbox((0, 0), asat, font=font_ar)
+        top_ink, bottom_ink = bb[1], bb[3]
+        l_y = -top_ink if s_idx == 0 else (prev_ink_bottom + MIN_VERTICAL_GAP - top_ink)
+        ar_offsets.append(l_y)
+        prev_ink_bottom = l_y + bottom_ink
 
-    # Kutu Gerçek Yüksekliği Ölçümü
-    temp_ar_y = 100
-    temp_last_ar_bottom = temp_ar_y
-    for asat in ar_satirlar:
-        as_bb = draw.textbbox((0, 0), asat, font=font_ar)
-        as_w = as_bb[2] - as_bb[0]
-        line_x = (w - as_w) // 2
-        bb_actual = draw.textbbox((line_x, temp_ar_y), asat, font=font_ar)
-        temp_last_ar_bottom = max(temp_last_ar_bottom, bb_actual[3])
-        temp_ar_y += ar_line_h
+    total_ar_h = prev_ink_bottom
 
+    # Okunuş Satırları Offsetleri
+    ok_offsets = []
     if ok_satirlar:
-        temp_ok_y = max(temp_ar_y, temp_last_ar_bottom + (18 if format_tipi == "9:16" else 14))
-        temp_ok_bottom = temp_ok_y
+        cur_ok_off = total_ar_h + gap_ar_ok
         for osat in ok_satirlar:
-            o_bb = draw.textbbox(((w - 100)//2, temp_ok_bottom), osat, font=font_okunus)
-            temp_ok_bottom = max(temp_ok_bottom + ok_line_h, o_bb[3])
-        final_icerik_bottom = temp_ok_bottom
+            ok_offsets.append(cur_ok_off)
+            cur_ok_off += ok_line_h
+        total_content_h = cur_ok_off
     else:
-        final_icerik_bottom = temp_last_ar_bottom
+        total_content_h = total_ar_h
 
-    net_icerik_h = final_icerik_bottom - 100
-    box_s_h = tac_h + pad_ic_ust + net_icerik_h + pad_ic_alt
+    box_s_h = tac_h + pad_ic_ust + total_content_h + pad_ic_alt
 
     # 5. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANLARI)
     toplam_icerik_h = box_s_h + tr_toplam_h + kaynak_h
@@ -1492,26 +1581,23 @@ def dua_karti_ciz(
     in_y = box_s_y1 + (tac_h - in_h) // 2 - in_bb[1] + 1
     draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#1B4332")
 
-    # Arapça Metin Çizimi (Tamamı ve Harekeli, İslam Yeşili)
-    ar_y = box_s_y1 + tac_h + pad_ic_ust
-    last_ar_bottom = ar_y
-    for asat in ar_satirlar:
+    # Arapça Metin Çizimi (Tamamı ve Harekeli, İslam Yeşili, Gerçek Mürekkep Hizalaması)
+    content_base_y = box_s_y1 + tac_h + pad_ic_ust
+    for s_idx, asat in enumerate(ar_satirlar):
         as_bb = draw.textbbox((0, 0), asat, font=font_ar)
         as_w = as_bb[2] - as_bb[0]
         line_x = (w - as_w) // 2
-        draw.text((line_x, ar_y), asat, font=font_ar, fill="#1B4332")
-        bb_actual = draw.textbbox((line_x, ar_y), asat, font=font_ar)
-        last_ar_bottom = max(last_ar_bottom, bb_actual[3])
-        ar_y += ar_line_h
+        line_y = content_base_y + ar_offsets[s_idx]
+        draw.text((line_x, line_y), asat, font=font_ar, fill="#1B4332")
 
     # Latin Okunuş Çizimi (Safe area garantili)
     if ok_satirlar:
-        ok_y = max(ar_y, last_ar_bottom + (18 if format_tipi == "9:16" else 14))
-        for osat in ok_satirlar:
+        for o_idx, osat in enumerate(ok_satirlar):
             o_bb = draw.textbbox((0, 0), osat, font=font_okunus)
             o_w = o_bb[2] - o_bb[0]
-            draw.text(((w - o_w) // 2, ok_y), osat, font=font_okunus, fill="#5A4B42")
-            ok_y += ok_line_h
+            ok_x = (w - o_w) // 2
+            ok_y = content_base_y + ok_offsets[o_idx]
+            draw.text((ok_x, ok_y), osat, font=font_okunus, fill="#5A4B42")
 
     # 6. TÜRKÇE DUA ANLAMI & ZARİF PARŞÖMEN TIRNAK FİLİGRANI
     tr_y = box_s_y2 + gap_kutu_tr

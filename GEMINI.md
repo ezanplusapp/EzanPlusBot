@@ -88,10 +88,12 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
 - **Video Başlık Tutarlılığı (Hook Standardı):** V12 video motorunda video hook başlığı **Lora 44pt/55pt (Serif)** olarak tırnak işaretleriyle (`“ ... ”`) sabitlenmiştir. Eski prototiplerdeki Manrope Sans-serif başlıklar tamamen terk edilmiştir.
 
 ### B. V16 Sahih Hadis Kartı (`hadis_karti_ciz`)
-1. **Dinamik Serlevha Kutusu (Sıcak Parşömen Taç):**
+1. **Dinamik Serlevha Kutusu (Sıcak Parşömen Taç & Dinamik Ink Clearance):**
    - Üst taç: Açık, sıcak fildişi/parşömen (`#F5EFE3`) zemin, 1px zarif ayraç (`#E2D7C3`) ve ortasında altın süsleme (`#C29B38`). "Resûlullah sallallahu aleyhi ve sellem şöyle buyurdu:" metni bordo (`#8B1D24`) Lora Bold.
    - Ölçüler: `box_w = 888px`, `text_max_w = 844px`.
-   - Heybetli Arapça Hat: Metin uzunluğuna göre ters orantılı dinamik autofit: Kısa hadislerde **88pt - 114pt** heybetli hat; orta hadislerde **70pt - 86pt**; uzun hadislerde **44pt - 56pt**. Tam harekeli (`delete_harakat: False`).
+   - **Dinamik Ink Clearance & Sıfır Çarpışma Standardı (`MIN_VERTICAL_GAP = 28px` 9:16 / `24px` 4:5):** Harflerin ve tam hareke işaretlerinin (fetha, kesra, şedde) dikey ink sınırları (`draw.textbbox`) milimetrik hesaplanarak satırlar arasında garantili net mürekkep boşluğu bırakılır; kasraların alttaki harflere veya şeddelere değmesi kesinlikle imkansızdır.
+   - **Dengeli 2 Satır Hedefleme & Yetim Kelime Önleme:** Arapça metinlerde tek kelimelik yetim satırlar (`عَنْهُ` gibi) otomatik reddedilir; sistem önce dengeli 2 satır hedefler, sığmazsa 3 satıra geçer.
+   - **Secavend Temizliği:** Kartlarda durak/secavend sembolleri temizlenerek estetik Mushaf hat akışı sağlanır.
    - Safe Area Kilidi: Okunuş alt sınırı dinamik ölçülerek `pad_ic_alt = 28-38px` ile kutu altına yapışma engellenir.
 2. **Türkçe Hadis Meali (Hero Element & Ters Orantılı Punto):**
    - Kısa hadislerde meal **60pt - 66pt (9:16)** / **56pt - 62pt (4:5)** asil puntoya çıkar; orta hadislerde **48pt - 54pt**, uzun hadislerde **41pt - 42pt**.
@@ -103,6 +105,7 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
 
 ### C. V16 Günün Duası Kartı (`dua_karti_ciz`)
 - 8 farklı manevi ruh haline (iç sıkıntısı, kaygı, şükür, şifa, rızık, öfke, tevekkül, tevbe) göre dinamik renk paleti ve fazilet kutusu (`src/dua_db.py`).
+- **Dinamik Ink Clearance Standardı:** `MIN_VERTICAL_GAP = 28px` (9:16) / `24px` (4:5) ile çok satırlı dualarda sıfır hareke çarpışması ve yetim kelime önleme.
 - Arapça dua metninde kısa metinlerde **88pt - 114pt (9:16)** / **70pt - 98pt (4:5)** dinamik autofit.
 - Türkçe anlamda kısa dualarda **60pt - 66pt (9:16)** / **54pt - 60pt (4:5)** heybetli punto.
 - Mixed bold vurgusu ve fazilet/öğüt kutusu (`#111827` koyu kontrast).
@@ -123,6 +126,7 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
 
 ### E. V16 Ayet-i Kerime Görsel Kartı (`ayet_karti_ciz`)
 - Video dışındaki tekil görsel paylaşımlar için V16 standartlarına eşitlenmiş Mushaf kartı.
+- **Dinamik Ink Clearance Standardı:** `MIN_VERTICAL_GAP = 28px` (9:16) / `24px` (4:5) ile çok satırlı âyetlerde sıfır hareke çakışması, yetim kelime önleme ve dengeli satır dağılımı.
 - `#1B4332` İslam Yeşili Baskerville Bold 42pt rozet, sıcak parşömen taç ("Allah Teâlâ şöyle buyuruyor:"), Uthmani hat, mixed bold meal ve hikmet notu.
 - Ultra kısa ayetlerde **66pt (9:16)** / **62pt (4:5)** meal ve **114pt (9:16)** / **98pt (4:5)** Uthmani hat ölçeklendirmesi.
 
