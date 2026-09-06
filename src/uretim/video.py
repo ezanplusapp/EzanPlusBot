@@ -512,16 +512,31 @@ class _SayfaVerisi:
             start_pt = 114
         elif n_kelime <= 10:
             start_pt = 94
-        elif n_kelime <= 14:
-            start_pt = 84
         else:
             start_pt = 76
 
         im_temp = Image.new("RGB", (100, 100))
         d_temp = ImageDraw.Draw(im_temp)
 
-        for max_l in [1, 2, 3]:
-            for pt in range(start_pt, 48, -2):
+        # 1. Heybetli Tek Satır Tercihi: Eğer 110pt ve üzerinde tek satıra rahatça sığıyorsa doğrudan tek satır yap
+        for pt in range(start_pt, 108, -2):
+            font = font_al(FONT_ARAPCA_NORMAL, pt)
+            font_bold = font_al(FONT_ARAPCA_BOLD, pt)
+            w_sizes = [
+                max(
+                    d_temp.textbbox((0, 0), arapca_hazirla(w), font=font)[2] - d_temp.textbbox((0, 0), arapca_hazirla(w), font=font)[0],
+                    d_temp.textbbox((0, 0), arapca_hazirla(w), font=font_bold)[2] - d_temp.textbbox((0, 0), arapca_hazirla(w), font=font_bold)[0],
+                )
+                for w in page_ar
+            ]
+            if sum(w_sizes) + (n_kelime - 1) * 20 <= max_text_w:
+                return pt
+
+        # 2. Çoklu Satır Arama: 2 ve 3 satır dengeli mizanpaj
+        # 2 ve üzeri satıra bölünen âyetlerde dikey taşmayı önlemek için tavan 114pt'dir
+        multiline_start_pt = min(114, start_pt)
+        for max_l in [2, 3]:
+            for pt in range(multiline_start_pt, 48, -2):
                 font = font_al(FONT_ARAPCA_NORMAL, pt)
                 font_bold = font_al(FONT_ARAPCA_BOLD, pt)
                 w_sizes = [
