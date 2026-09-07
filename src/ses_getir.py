@@ -107,11 +107,12 @@ def ayet_seslerini_birlestir(sure_no: int, ayet_listesi: List[int], cikti_adi: O
 _ZAMAN_CACHE: Dict[int, dict] = {}
 
 
-def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[float, float]]:
+def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[int, float, float]]:
     """
     Şeyh Mişari Râşid el-Afâsî için yerel repodaki (data/zamanlar/sure_{sure_no}.json)
     tescilli kelime başlangıç/bitiş zaman damgalarını döner.
     114 sûrenin tamamı yerel repoda saklandığı için harici API bağımlılığı ve gecikmesi yoktur.
+    Dönen her eleman: (kelime_indeksi_0_tabanli, baslangic_sn, bitis_sn)
     """
     global _ZAMAN_CACHE
     if sure_no in _ZAMAN_CACHE:
@@ -158,14 +159,16 @@ def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[float,
             zamanlar = []
             for seg in segments:
                 if len(seg) >= 3:
+                    w_idx = int(seg[0]) - 1  # 1-based -> 0-based
                     s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
                     e_sec = max(0.0, (seg[2] - ayah_start) / 1000.0)
                 elif len(seg) == 2:
+                    w_idx = len(zamanlar)
                     s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
                     e_sec = max(s_sec, (ayah_end - ayah_start) / 1000.0)
                 else:
                     continue
-                zamanlar.append((s_sec, e_sec))
+                zamanlar.append((w_idx, round(s_sec, 3), round(e_sec, 3)))
             return zamanlar
 
     return []

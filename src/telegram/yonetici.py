@@ -143,6 +143,7 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
         paylasim_id,
         yeni_durum="yayinlandi",
         instagram_post_id=sonuclar.get("instagram"),
+        instagram_story_post_id=sonuclar.get("instagram_story"),
         youtube_post_id=sonuclar.get("youtube"),
         tiktok_post_id=sonuclar.get("tiktok"),
         threads_post_id=sonuclar.get("threads"),
@@ -166,11 +167,20 @@ def yayindan_kaldir(paylasim_id: int) -> Dict[str, Any]:
     ig_id = kayit.get("instagram_post_id")
     if ig_id:
         try:
-            log.info(f"Instagram'dan içerik siliniyor: {ig_id}")
+            log.info(f"Instagram Feed'den içerik siliniyor: {ig_id}")
             sonuclar["instagram"] = meta.medyayi_sil(ig_id)
         except Exception as e:
             log.error(f"Instagram silme hatası ({ig_id}): {e}")
             sonuclar["instagram"] = False
+
+    ig_story_id = kayit.get("instagram_story_post_id")
+    if ig_story_id:
+        try:
+            log.info(f"Instagram Story'den içerik siliniyor: {ig_story_id}")
+            sonuclar["instagram_story"] = meta.medyayi_sil(ig_story_id)
+        except Exception as e:
+            log.error(f"Instagram Story silme hatası ({ig_story_id}): {e}")
+            sonuclar["instagram_story"] = False
 
     fb_id = kayit.get("facebook_post_id")
     if fb_id:

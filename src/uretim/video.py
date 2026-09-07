@@ -250,48 +250,55 @@ def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
     Arapça'da bitişik yazılan 've' (و), 'fe' (ف), 'bi' (ب), 'li' (ل), 'ke' (ك)
     bağlaçlarını ve harf-i tariflerini Türkçe'deki sonraki kelimeyle birleştirerek
     Arapça kelime sayısına tam eşitler.
-    Tire ile bağlanmış bileşikleri açar, hiçbir kelimenin boş kalmamasını ve
-    karaoke takibinin vaktinden önce bitmemesini garanti eder.
+    Asla 'es-', 'el-', 'er-' gibi harf-i tarifleri bağımsız kelimeye bölmez.
     """
     if not ar_list:
         return []
     if not tr_list:
         return [""] * len(ar_list)
 
-    # 1. Anlamlı tireli bileşikleri aç (Örn: 'entes-semîul' -> ['entes', 'semîul'])
+    num_ar = len(ar_list)
+    if len(tr_list) == num_ar:
+        return list(tr_list)
+
+    # Harf-i tarifler ve ekler asla kelimeden ayrılamaz
+    harfi_tarifler = {"es", "el", "al", "er", "en", "et", "ed", "ez", "ec", "eş", "eb", "ey", "il", "ul", "ül"}
+
+    # 1. Yalnızca kelime sayısı eksikse (len(tr_list) < num_ar) ve anlamlı iki bağımsız kelime bağlanmışsa aç
     expanded = []
-    for w in tr_list:
-        if "-" in w and not w.startswith("-") and not w.endswith("-"):
-            parts = [p for p in w.split("-") if len(p.strip()) >= 2]
-            if len(parts) > 1:
-                expanded.extend(parts)
-            else:
-                expanded.append(w)
-        else:
+    if len(tr_list) < num_ar:
+        for w in tr_list:
+            if "-" in w and not w.startswith("-") and not w.endswith("-"):
+                prefix = w.split("-")[0].lower().strip()
+                if prefix not in harfi_tarifler:
+                    parts = [p for p in w.split("-") if len(p.strip()) >= 2]
+                    if len(parts) > 1 and len(expanded) + len(parts) <= num_ar:
+                        expanded.extend(parts)
+                        continue
             expanded.append(w)
+    else:
+        expanded = list(tr_list)
+
+    if len(expanded) == num_ar:
+        return expanded
 
     baglaclar = {"ve", "fe", "bi", "li", "vel", "fel", "bil", "lil", "ke", "kel"}
-    num_ar = len(ar_list)
 
-    # 2. Bağlaç birleştirme geçişi
+    # 2. Bağlaç birleştirme geçişi (Eğer Latin token sayısı Arapça kelime sayısından fazlaysa)
     merged: List[str] = []
     i = 0
     while i < len(expanded):
         w = expanded[i]
         clean_w = w.lower().strip("',.:;!?\"”’")
-        if clean_w in baglaclar and i + 1 < len(expanded):
-            rem_tokens_if_merged = len(expanded) - (i + 2)
-            rem_ar = num_ar - (len(merged) + 1)
-            ar_target = ar_list[min(len(merged), num_ar - 1)]
-            if ar_target.startswith(("و", "ف", "ب", "ل", "ك")) and rem_tokens_if_merged >= rem_ar:
-                merged.append(f"{w} {expanded[i+1]}")
-                i += 2
-                continue
+        if clean_w in baglaclar and i + 1 < len(expanded) and len(expanded) - i > num_ar - len(merged):
+            merged.append(f"{w} {expanded[i+1]}")
+            i += 2
+            continue
 
         merged.append(w)
         i += 1
 
-    # 3. Sayıyı tam num_ar'a eşitle (Eksikse boşluklu olanları böl, fazlaysa son kelimeye ekle)
+    # 3. Sayıyı tam num_ar'a eşitle (Eksikse boşluklu olanları böl, fazlaysa birleştir)
     if len(merged) < num_ar:
         while len(merged) < num_ar:
             idx_space = -1
@@ -305,7 +312,7 @@ def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
                 merged[idx_space] = parts[0]
                 merged.insert(idx_space + 1, parts[1])
             else:
-                merged.append(merged[-1] if merged else "")
+                merged.append("")
     elif len(merged) > num_ar:
         excess = " ".join(merged[num_ar - 1 :])
         merged = merged[: num_ar - 1] + [excess]
@@ -314,19 +321,20 @@ def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
 
 
 def kelime_zamanlarini_hizala(
-    kelime_zamanlari: Optional[List[Tuple[float, float]]],
+    kelime_zamanlari: Optional[List[Any]],
     toplam_kelime: int,
     toplam_sure: float,
-) -> List[Tuple[float, float]]:
+) -> List[Tuple[int, float, float]]:
     """
-    Kelimelerin zaman damgalarını toplam_kelime sayısına 1:1 milisaniye
-    hassasiyetinde eşitler ve doğrular.
-    Eğer zaman damgaları yoksa veya eksikse, toplam ses süresine göre
-    akıllı ve doğal bir akış üretir.
+    Kelimelerin zaman damgalarını (w_idx, s_sec, e_sec) formatında doğrular ve döner.
+    Eğer zaman damgaları yoksa, toplam ses süresine göre akıllı ve doğal bir akış üretir.
+    QuranCDN'den gelen tescilli segmentlerdeki kelime indeksleri (w_idx) korunur;
+    hafızın duraklama ve tekrar okuduğu kelimeler (secavend / vasl) sesle %100 senkron kalır.
     """
     if toplam_kelime <= 0:
         return []
 
+    # Zaman damgaları yoksa sentetik zamanlama üret
     if not kelime_zamanlari or len(kelime_zamanlari) == 0:
         pad_baslangic = min(0.6, toplam_sure * 0.05)
         pad_bitis = min(1.0, toplam_sure * 0.08)
@@ -336,41 +344,31 @@ def kelime_zamanlarini_hizala(
         for i in range(toplam_kelime):
             s = pad_baslangic + i * kelime_suresi
             e = s + kelime_suresi
-            hizali.append((round(s, 3), round(e, 3)))
+            hizali.append((i, round(s, 3), round(e, 3)))
         return hizali
 
-    n_src = len(kelime_zamanlari)
-    if n_src == toplam_kelime:
-        return kelime_zamanlari
-
-    # Boyut uyuşmazlığı varsa (örn. 40 segmente karşılık 39 kelime veya tersi):
-    # Zaman çizelgesini toplam_kelime'ye oranlayarak kesintisiz enterpolasyon yap
-    src_sinirlar = [kelime_zamanlari[0][0]]
-    for s, e in kelime_zamanlari:
-        src_sinirlar.append(e)
-
-    hizali = []
-    for i in range(toplam_kelime):
-        idx_s = i * (n_src / toplam_kelime)
-        idx_e = (i + 1) * (n_src / toplam_kelime)
-        s_int = int(idx_s)
-        s_frac = idx_s - s_int
-        if s_int + 1 < len(src_sinirlar):
-            t_s = src_sinirlar[s_int] + s_frac * (src_sinirlar[s_int + 1] - src_sinirlar[s_int])
+    # Formatı normalize et: Her eleman (w_idx, s_sec, e_sec) olmalıdır
+    normalize_segs: List[Tuple[int, float, float]] = []
+    for idx, item in enumerate(kelime_zamanlari):
+        if len(item) >= 3:
+            w_idx = int(item[0])
+            s_sec = float(item[1])
+            e_sec = float(item[2])
+        elif len(item) == 2:
+            w_idx = min(idx, toplam_kelime - 1)
+            s_sec = float(item[0])
+            e_sec = float(item[1])
         else:
-            t_s = src_sinirlar[-1]
+            continue
+        # Sınır denetimi
+        w_idx = max(0, min(w_idx, toplam_kelime - 1))
+        e_sec = max(s_sec + 0.05, e_sec)
+        normalize_segs.append((w_idx, round(s_sec, 3), round(e_sec, 3)))
 
-        e_int = int(idx_e)
-        e_frac = idx_e - e_int
-        if e_int + 1 < len(src_sinirlar):
-            t_e = src_sinirlar[e_int] + e_frac * (src_sinirlar[e_int + 1] - src_sinirlar[e_int])
-        else:
-            t_e = src_sinirlar[-1]
+    if normalize_segs:
+        return normalize_segs
 
-        t_e = max(t_s + 0.1, t_e)
-        hizali.append((round(t_s, 3), round(t_e, 3)))
-
-    return hizali
+    return [(i, 0.0, toplam_sure) for i in range(toplam_kelime)]
 
 
 
@@ -486,10 +484,19 @@ def akilli_sayfa_araliklari(
                     score += 90.0
 
             # 2. Nefes duraklama süresi puanı
-            if zamanlar and w + 1 < len(zamanlar):
-                pause = zamanlar[w + 1][0] - zamanlar[w][1]
-                if pause > 0.3:
-                    score += min(120.0, pause * 65.0)
+            if zamanlar:
+                w_end = None
+                w_next_start = None
+                for seg in zamanlar:
+                    seg_w = seg[0] if len(seg) >= 3 else 0
+                    if seg_w <= w:
+                        w_end = seg[2] if len(seg) >= 3 else seg[1]
+                    elif seg_w >= w + 1 and w_next_start is None:
+                        w_next_start = seg[1] if len(seg) >= 3 else seg[0]
+                if w_end is not None and w_next_start is not None:
+                    pause = w_next_start - w_end
+                    if pause > 0.3:
+                        score += min(120.0, pause * 65.0)
 
             # 3. İdeal merkezden sapma cezası
             score -= 3.5 * abs(w - (target - 1))
@@ -1130,8 +1137,9 @@ def reels_videosu_uret(
     tefekkur_notu: Optional[str] = None,
     hafiz_adi: str = "Mişari Râşid el-Afâsî",
     cikti_adi: Optional[str] = None,
-    kelime_zamanlari: Optional[List[Tuple[float, float]]] = None,
+    kelime_zamanlari: Optional[List[Any]] = None,
     pt_ar_override: Optional[int] = None,
+    latin_kelimeler: Optional[List[str]] = None,
 ) -> Path:
     """
     Onaylanan Klasik Mushaf Düzeni & Akıcı Loading Dolum Efekti:
@@ -1160,10 +1168,14 @@ def reels_videosu_uret(
     tr_str = (arapca_okunus or "Utlu mâ ûhıye ileyke minel kitâbi ve ekımis-salâte").strip()
 
     ar_kelimeler = arapca_kelimeleri_ayristir(ar_str)
-    tr_ham = [w.strip() for w in tr_str.split() if w.strip()]
-    tr_kelimeler = turkce_okunus_hizala(tr_ham, ar_kelimeler)
-
     toplam_kelime = len(ar_kelimeler)
+
+    if latin_kelimeler and len(latin_kelimeler) == toplam_kelime:
+        tr_kelimeler = [w.strip() for w in latin_kelimeler]
+    else:
+        tr_ham = [w.strip() for w in tr_str.split() if w.strip()]
+        tr_kelimeler = turkce_okunus_hizala(tr_ham, ar_kelimeler)
+
     kelime_zamanlari = kelime_zamanlarini_hizala(kelime_zamanlari, toplam_kelime, toplam_sure)
 
     # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Kıraat & Çoklu Sayfa Motoru)
@@ -1217,11 +1229,20 @@ def reels_videosu_uret(
         for p in range(sayfa_sayisi - 1):
             w_last = sayfa_araliklari[p][1] - 1
             w_first = sayfa_araliklari[p + 1][0]
-            if kelime_zamanlari and w_last < len(kelime_zamanlari) and w_first < len(kelime_zamanlari):
-                t_p_end = kelime_zamanlari[w_last][1]
-                t_next_start = kelime_zamanlari[w_first][0]
-            else:
+            t_p_end = None
+            t_next_start = None
+            if kelime_zamanlari:
+                for seg in kelime_zamanlari:
+                    w_k = seg[0]
+                    s_t = seg[1]
+                    e_t = seg[2]
+                    if w_k <= w_last:
+                        t_p_end = e_t
+                    if w_k >= w_first and t_next_start is None:
+                        t_next_start = s_t
+            if t_p_end is None:
                 t_p_end = (p + 1) * (toplam_sure / sayfa_sayisi)
+            if t_next_start is None:
                 t_next_start = t_p_end
 
             # Nefes payı analizi: Geçişi iki sayfa arasındaki duraklama anına denk getir
@@ -1274,17 +1295,23 @@ def reels_videosu_uret(
             aktif_progress = 0.0
 
             if kelime_zamanlari and len(kelime_zamanlari) > 0:
-                for w_i, (s_sec, e_sec) in enumerate(kelime_zamanlari):
+                last_completed_idx = -1
+                for seg_item in kelime_zamanlari:
+                    w_idx, s_sec, e_sec = seg_item[0], seg_item[1], seg_item[2]
                     dur = max(0.01, e_sec - s_sec)
                     if s_sec <= t_eval < e_sec:
-                        aktif_idx = min(w_i, toplam_kelime - 1)
+                        aktif_idx = min(w_idx, toplam_kelime - 1)
                         aktif_progress = min(1.0, max(0.0, (t_eval - s_sec) / dur))
                         break
                     elif t_eval < s_sec:
+                        aktif_idx = last_completed_idx
+                        aktif_progress = 1.0
                         break
                     else:
-                        aktif_idx = w_i
-                        aktif_progress = 1.0
+                        last_completed_idx = min(w_idx, toplam_kelime - 1)
+                else:
+                    aktif_idx = last_completed_idx if last_completed_idx >= 0 else (toplam_kelime - 1)
+                    aktif_progress = 1.0
             elif toplam_kelime > 0:
                 p_toplam = ilerleme * toplam_kelime
                 aktif_idx = min(int(p_toplam), toplam_kelime - 1)

@@ -57,13 +57,17 @@ def tabloları_hazirla():
                 hata_mesaji TEXT
             )
         """)
-        # Migration: youtube_post_id ve facebook_post_id yoksa ekle
+        # Migration: youtube_post_id, facebook_post_id ve instagram_story_post_id yoksa ekle
         try:
             con.execute("ALTER TABLE paylasimlar ADD COLUMN youtube_post_id TEXT")
         except sqlite3.OperationalError:
             pass
         try:
             con.execute("ALTER TABLE paylasimlar ADD COLUMN facebook_post_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            con.execute("ALTER TABLE paylasimlar ADD COLUMN instagram_story_post_id TEXT")
         except sqlite3.OperationalError:
             pass
         # Hızlı mükerrer arama için index
@@ -221,6 +225,7 @@ def durum_guncelle(
     yeni_durum: str,
     hata_mesaji: Optional[str] = None,
     instagram_post_id: Optional[str] = None,
+    instagram_story_post_id: Optional[str] = None,
     telegram_mesaj_id: Optional[int] = None,
     youtube_post_id: Optional[str] = None,
     tiktok_post_id: Optional[str] = None,
@@ -238,6 +243,9 @@ def durum_guncelle(
         if instagram_post_id is not None:
             updates.append("instagram_post_id = ?")
             params.append(instagram_post_id)
+        if instagram_story_post_id is not None:
+            updates.append("instagram_story_post_id = ?")
+            params.append(instagram_story_post_id)
         if telegram_mesaj_id is not None:
             updates.append("telegram_mesaj_id = ?")
             params.append(telegram_mesaj_id)

@@ -67,6 +67,7 @@ def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
         hafiz_adi=icerik.get("hafiz_adi", "Mişari Râşid el-Afâsî"),
         cikti_adi=dosya_adi,
         kelime_zamanlari=kelime_zamanlari,
+        latin_kelimeler=icerik.get("latin_kelimeler"),
     )
 
     log.info("4/5: Veritabanına kayıt ekleniyor...")
@@ -364,12 +365,16 @@ def dinle_ve_bekle(sure_saniye: int = 1800, paylasim_id: Optional[int] = None, y
                 if yayin_sonrasi:
                     if durum == "yayindan_kaldirildi":
                         log.info(f"Paylaşım #{paylasim_id} kullanıcı tarafından yayından kaldırıldı.")
+                        telegram_bot.aktif_isleri_bekle(timeout=30.0)
                         return False
                 else:
                     if durum in ("yayinlandi", "iptal_edildi"):
                         log.info(f"Paylaşım #{paylasim_id} '{durum}' durumuna geçti, işlem tamam.")
+                        telegram_bot.aktif_isleri_bekle(timeout=30.0)
                         return durum == "yayinlandi"
         time.sleep(2)
+
+    telegram_bot.aktif_isleri_bekle(timeout=10.0)
 
     if yayin_sonrasi:
         log.info(f"Yayın sonrası kontrol süresi ({dakika} dk) tamamlandı. İçerik yayında kalmaya devam ediyor.")
@@ -407,9 +412,9 @@ if __name__ == "__main__":
     pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format)
 
     if tur in ("reels", "video"):
-        # Reels otomatik olarak yayınlandı; 10 dakika boyunca 'Yayından Kaldır' butonu dinlenir
-        log.info(f"Kur'an Reels #{pid} otomatik yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor...")
-        dinle_ve_bekle(sure_saniye=min(args.bekleme, 600), paylasim_id=pid, yayin_sonrasi=True)
+        # Reels otomatik olarak yayınlandı; bekleme süresi boyunca 'Yayından Kaldır' butonu dinlenir
+        log.info(f"Kur'an Reels #{pid} otomatik yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor (Maks: {args.bekleme//60} dk)...")
+        dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
     elif args.otomatik:
         log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")
         sonuclar = telegram_bot.yayinla_hepsi(pid)
@@ -417,7 +422,7 @@ if __name__ == "__main__":
             telegram_bot.yayin_detay_karti_gonder(pid, sonuclar)
         except Exception as e:
             log.error(f"Paylaşım #{pid} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
-        dinle_ve_bekle(sure_saniye=min(args.bekleme, 600), paylasim_id=pid, yayin_sonrasi=True)
+        dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
     else:
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=False)
 

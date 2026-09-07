@@ -185,12 +185,13 @@ def ayet_icerigi_uret(
     from .video import arapca_kelimeleri_ayristir
     ar_kelime_listesi = arapca_kelimeleri_ayristir(arapca_metin)
     toplam_ar_kelime = len(ar_kelime_listesi)
+    ar_kelimeler_numarali = "\n".join(f"{i+1}. {w}" for i, w in enumerate(ar_kelime_listesi))
 
     sistem_talimati = f"""
 Sen Ezan Plus mobil uygulamasının İslami ilimler ve editoryal içerik uzmanısın.
 Sana verilen tescilli Kur'an-ı Kerim ayet metnini ve mealini ASLA değiştirmeyeceksin.
 Görevin:
-1) Verilen Arapça ayet metnindeki tam {toplam_ar_kelime} kelimeye birebir karşılık gelen, boşluklarla ayrılmış edebi ve akıcı Latin okunuşunu ("arapca_okunus") yazmak. Arapça'da kelimeye bitişik yazılan bağlaçları (Örn: Ve-İsmâîl, Ve-iz, Ve'l-beyti) tire ile bağlayarak TAM OLARAK {toplam_ar_kelime} ADET KELİME oluştur. Şapkalı harfleri (â, î, û) ve kesmeleri doğru kullan.
+1) Verilen Arapça kelime listesindeki tam {toplam_ar_kelime} kelimeye birebir (1:1) karşılık gelen Latin okunuşlarını bir dizi ("latin_kelimeler") olarak üretmek. Her bir eleman tam olarak karşılık gelen Arapça kelimenin okunuşudur. Dizi tam {toplam_ar_kelime} elemanlı olmalıdır. Şapkalı harfleri (â, î, û) ve kesmeleri doğru kullan. Harf-i tarifleri (es-süfehâe, el-kitâb vb.) tek bir kelime olarak yaz, asla ayırma. Ayrıca tüm bu kelimelerin aralarında boşluk olan tam akıcı metnini "arapca_okunus" alanında ver.
 2) İnsanın kalbine veya manevi bir haline dokunan, sonunda iki nokta üst üste olan 2-4 kelimelik bir çağrı anonsu yazmak ("video_baslik_satir1"). Örn: 'Kalbin daraldığında hatırla:', 'Dünya seni aldattığında bil ki:', 'Ruhun yorulduğunda hatırla:', 'Yalnız hissettiğinde unutma:'. Asla ucuz yapay kancalar ('bu ayet senin için' vb.) yazma! Asla tırnak koyma! Maksimum 30 karakter.
 3) Ayetin mesajından süzülen 2-4 kelimelik derin, manşet gücünde vurucu hakikat cümlesi yazmak ("video_baslik_satir2"). Örn: 'Zorlukla beraber kolaylık var.', 'Gerçek hayat ahirettir.', 'Allah sabredenlerle beraberdir.'. Asla tırnak koyma! Maksimum 32 karakter.
 4) Bu ayetin günlük hayatımıza, iç huzurumuza ve pratik yaşamımıza bakan 2-3 cümlelik çok samimi, bilgece ve kalbe dokunan bir tefekkür dersi yazmak ("tefekkur_notu").
@@ -209,14 +210,20 @@ Görevin:
 Seçilen Tescilli Kur'an Âyeti:
 Sûre ve Âyet: {sure_ayet_etiket}
 Arapça Metin: {arapca_metin}
-Arapça Kelime Sayısı: {toplam_ar_kelime} kelime
+Arapça Kelimeler ({toplam_ar_kelime} kelime):
+{ar_kelimeler_numarali}
 Türkçe Meal: "{turkce_meal}"
 Kaynak: {meal_kaynagi}
 Tema: {tema}
 
 Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında yanıt ver:
 {{
-  "arapca_okunus": "Tam olarak {toplam_ar_kelime} kelimeden oluşan (Arapça kelimelerle 1:1 eşleşen) Latin okunuşu",
+  "latin_kelimeler": [
+    "1. kelimenin okunuşu",
+    "2. kelimenin okunuşu",
+    "tam {toplam_ar_kelime} adet eleman içeren dizi"
+  ],
+  "arapca_okunus": "Latin kelimelerin aralarında tek boşluk olan tam metni",
   "meal_vurgulu": "Yukarıdaki Türkçe mealin hiçbir kelimesini değiştirmeden veya eksiltmeden, âyetin en can alıcı ve vurucu 2-5 kelimelik kısmını markdown **bold** içine alarak aynen yaz. Asla bold işaretini (**...**) cümle veya dua ortasında yarım bırakma (Örn: 'Elbette güçlükle beraber şüphesiz **bir kolaylık vardır.**')",
   "video_baslik_satir1": "Çağrı/anons cümlesi (sonunda : olsun, maks 30 karakter)",
   "video_baslik_satir2": "Vurucu hakikat cümlesi (maks 32 karakter)",
@@ -227,6 +234,12 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
 
     cevap = _gemini_cagir(prompt, sistem_talimati)
     veri = _json_ayikla(cevap)
+
+    # Latin kelimeler kontrolü: Eğer tam dizi geldiyse kullan
+    lk = veri.get("latin_kelimeler")
+    if isinstance(lk, list) and len(lk) == toplam_ar_kelime:
+        veri["latin_kelimeler"] = [str(w).strip() for w in lk]
+        veri["arapca_okunus"] = " ".join(veri["latin_kelimeler"])
 
     # Tescilli doğrulanmış alanları veriye yerleştir (AI halüsinasyonu kesinlikle İMKANSIZDIR)
     veri["sure_adi"] = sure_adi
