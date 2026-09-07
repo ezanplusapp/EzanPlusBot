@@ -45,63 +45,98 @@ def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
     if not p.exists():
         raise FileNotFoundError(f"Medya bulunamadı: {dosya_yolu}")
 
+    import mimetypes
+    mime = mimetypes.guess_type(str(p))[0] or ("video/mp4" if p.suffix.lower() == ".mp4" else "image/png")
+
     ua_headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
+    cdn_hatalari: List[str] = []
 
-    # 1. Öncelik: Catbox.moe (Doğrudan dosya CDN linki)
+    # 1. Öncelik: Uguu.se (Yüksek hızlı, doğrudan dosya linki, Meta & Threads tam uyumlu)
+    try:
+        with open(p, "rb") as f:
+            res = requests.post(
+                "https://uguu.se/upload",
+                files={"files[]": (p.name, f, mime)},
+                headers=ua_headers,
+                timeout=30,
+            )
+        if res.status_code == 200:
+            veri = res.json()
+            url = (veri.get("files") or [{}])[0].get("url")
+            if url and url.startswith("http"):
+                log.info(f"Medya Uguu CDN'e başarıyla yüklendi: {url}")
+                return url
+            cdn_hatalari.append(f"Uguu boş link döndü: {res.text[:100]}")
+        else:
+            cdn_hatalari.append(f"Uguu HTTP {res.status_code}")
+    except Exception as e:
+        cdn_hatalari.append(f"Uguu: {e}")
+        log.warning(f"Uguu CDN yükleme hatası: {e}, Catbox deneniyor...")
+
+    # 2. Öncelik: Catbox.moe (Doğrudan dosya CDN linki)
     try:
         with open(p, "rb") as f:
             res = requests.post(
                 "https://catbox.moe/user/api.php",
                 data={"reqtype": "fileupload"},
-                files={"fileToUpload": f},
+                files={"fileToUpload": (p.name, f, mime)},
                 headers=ua_headers,
                 timeout=45,
             )
         if res.status_code == 200 and res.text.strip().startswith("http"):
             url = res.text.strip()
-            log.info(f"Medya Catbox'a yüklendi: {url}")
+            log.info(f"Medya Catbox'a başarıyla yüklendi: {url}")
             return url
+        cdn_hatalari.append(f"Catbox HTTP {res.status_code}: {res.text[:80]}")
     except Exception as e:
+        cdn_hatalari.append(f"Catbox: {e}")
         log.warning(f"Catbox yükleme hatası: {e}, Litterbox deneniyor...")
 
-    # 2. Öncelik: Litterbox (Catbox'ın 72 saatlik doğrudan CDN servisi)
+    # 3. Öncelik: Litterbox (Catbox 72 saatlik doğrudan CDN servisi)
     try:
         with open(p, "rb") as f:
             res = requests.post(
                 "https://litterbox.catbox.moe/resources/internals/api.php",
                 data={"reqtype": "fileupload", "time": "72h"},
-                files={"fileToUpload": f},
+                files={"fileToUpload": (p.name, f, mime)},
                 headers=ua_headers,
                 timeout=45,
             )
         if res.status_code == 200 and res.text.strip().startswith("http"):
             url = res.text.strip()
-            log.info(f"Medya Litterbox'a yüklendi: {url}")
+            log.info(f"Medya Litterbox'a başarıyla yüklendi: {url}")
             return url
+        cdn_hatalari.append(f"Litterbox HTTP {res.status_code}: {res.text[:80]}")
     except Exception as e:
+        cdn_hatalari.append(f"Litterbox: {e}")
         log.warning(f"Litterbox yükleme hatası: {e}, ImgBB deneniyor...")
 
-    # 3. Öncelik: ImgBB
+    # 4. Öncelik: ImgBB (Tanımlı ise görsel dosyaları için)
     imgbb_key = get_env("IMGBB_API_KEY")
     if imgbb_key and p.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
-        try:
-            with open(p, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode("utf-8")
-            res = requests.post(
-                "https://api.imgbb.com/1/upload",
-                data={"key": imgbb_key, "image": b64},
-                headers=ua_headers,
-                timeout=30,
-            )
-            data = res.json()
-            if data.get("success"):
-                return data["data"]["url"]
-        except Exception as e:
-            log.warning(f"ImgBB yüklemesi başarısız oldu: {e}")
+        for anahtar in [k.strip() for k in imgbb_key.split(",") if k.strip()]:
+            try:
+                with open(p, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                res = requests.post(
+                    "https://api.imgbb.com/1/upload",
+                    data={"key": anahtar, "image": b64},
+                    headers=ua_headers,
+                    timeout=30,
+                )
+                data = res.json()
+                if data.get("success"):
+                    url = data["data"]["url"]
+                    log.info(f"Medya ImgBB'ye yüklendi: {url}")
+                    return url
+                cdn_hatalari.append(f"ImgBB hata: {data.get('error', {}).get('message', 'Bilinmiyor')}")
+            except Exception as e:
+                cdn_hatalari.append(f"ImgBB: {e}")
 
-    raise RuntimeError("Medya hiçbir CDN servisine yüklenemedi!")
+    hata_ozeti = "; ".join(cdn_hatalari)
+    raise RuntimeError(f"Medya hiçbir CDN servisine yüklenemedi! Ayrıntılar: {hata_ozeti}")
 
 
 def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:

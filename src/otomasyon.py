@@ -409,7 +409,17 @@ if __name__ == "__main__":
         sys.exit(0)
 
     tur = args.komut or args.tur or "reels"
-    pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format)
+    try:
+        pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format)
+    except Exception as e:
+        log.error(f"İçerik üretim hatası ({tur}): {e}")
+        from . import hata_bildir
+        hata_bildir.bildir(
+            baslik=f"{tur.upper()} Otomasyon Hatası",
+            hata=e,
+            nerede=f"otomasyon.icerik_olustur_ve_gonder({tur})"
+        )
+        sys.exit(1)
 
     if tur in ("reels", "video"):
         # Reels otomatik olarak yayınlandı; bekleme süresi boyunca 'Yayından Kaldır' butonu dinlenir
@@ -417,11 +427,21 @@ if __name__ == "__main__":
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
     elif args.otomatik:
         log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")
-        sonuclar = telegram_bot.yayinla_hepsi(pid)
         try:
-            telegram_bot.yayin_detay_karti_gonder(pid, sonuclar)
-        except Exception as e:
-            log.error(f"Paylaşım #{pid} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+            sonuclar = telegram_bot.yayinla_hepsi(pid)
+            try:
+                telegram_bot.yayin_detay_karti_gonder(pid, sonuclar)
+            except Exception as e:
+                log.error(f"Paylaşım #{pid} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+        except Exception as e_yayin:
+            log.error(f"Otomatik yayınlama hatası (#{pid}): {e_yayin}")
+            from . import hata_bildir
+            hata_bildir.bildir(
+                baslik=f"Paylaşım #{pid} Otomatik Yayınlama",
+                hata=e_yayin,
+                nerede="otomasyon.otomatik_yayin",
+                paylasim_id=pid
+            )
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
     else:
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=False)

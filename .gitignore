@@ -27,4 +27,8 @@ data/onbellek/*
 .vscode/
 *.log
 data/logs/
-
+data/hata_kayitlari.jsonl
+data/son_hata.txt
+tests/test_gorsel*.png
+assets/audio/0*.mp3
+assets/audio/1*.mp3

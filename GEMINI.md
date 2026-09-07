@@ -376,7 +376,51 @@ EzanPlusBot/
 
 ---
 
-## 9. Gelecek Geliştirme Yol Haritası (Sıradaki Adımlar)
+## 7. Hata Teşhis, Eyleme Geçirilebilir Çözüm Butonları ve CDN Güvenilirlik Mimarisi
+
+İçerik üretimi veya 6 platformlu yayın akışında herhangi bir aksaklık yaşandığında (ağ kesintisi, CDN engeli, Meta API zaman aşımı vb.) operasyonel körlüğü önlemek ve doğrudan Telegram arayüzünden müdahale edebilmek için kapsamlı bir teşhis ve telafi mimarisi uygulanmıştır:
+
+### A. Kök Sebep Teşhis Motoru (`src/hata_bildir.py`)
+* **Hata Kataloğu (`KATALOG`):** Karşılaşılan hatalar düzenli ifadelerle taranarak anında teşhis edilir:
+  - `CDN_UPLOAD_FAIL`: Geçici CDN barındırma sunucularına ulaşılamadı.
+  - `IG_TIMEOUT_MEDIA`: Instagram sunucuları medyayı çekerken zaman aşımına uğradı.
+  - `META_TOKEN_EXPIRED`: Meta API jetonunun süresi doldu veya yetki geçersiz.
+  - `META_RATE_LIMIT`: Meta API geçici istek sınırı (429) uyguladı.
+  - `TELEGRAM_TIMEOUT`: Telegram botu medyayı yüklerken zaman aşımına uğradı.
+  - `SQLITE_LOCKED`: Veritabanı anlık olarak kilitlendi.
+  - `GEMINI_QUOTA_EXCEEDED`: Gemini API günlük ücretsiz istek limiti tükendi.
+  - `RENDER_FFMPEG_FAIL`: FFmpeg video birleştirme veya ses zaman damgası enterpolasyonunda aksaklık.
+  - `PYTHON_SCOPE_ERROR` / `PYTHON_TYPE_ERROR`: Kod yürütme kapsamı veya tip uyumsuzluğu.
+* **Sade Türkçe Raporlama Standardı:** Teknik hata metinleri yerine kullanıcıya 4 net bölüm sunulur:
+  1. **🔍 NE OLDU?** (Durumun sade özeti)
+  2. **💡 NEDEN?** (Arka plandaki teknik kök sebep)
+  3. **🛠️ ÇÖZÜM / NE YAPILMALI?** (Atılması gereken somut adım)
+  4. **📄 HAM HATA İZİ:** (Geliştirici için 450 karakterlik filtrelenmiş traceback)
+* **Kalıcı Telemetri Logu:** Tüm hatalar otomatik olarak `data/hata_kayitlari.jsonl` (tarih, paylasim_id, nerede, teşhis) ve `data/son_hata.txt` dosyalarına işlenir.
+
+### B. Çok Katmanlı CDN Güvenilirlik Mimarisi (`gecici_medya_yukle`)
+Meta Graph API (Instagram & Threads) yerel dosya kabul etmeyip doğrudan genel HTTP/HTTPS URL şartı koştuğu için 4 kademeli CDN mimarisi devreye alınmıştır:
+1. **1. Öncelik — Uguu.se (`https://uguu.se/upload`):** Yüksek hızlı, doğrudan dosya linki, datacenter IP engelleri bulunmayan birincil CDN servisi.
+2. **2. Öncelik — Catbox.moe (`https://catbox.moe/user/api.php`):** Doğrudan dosya CDN servisi.
+3. **3. Öncelik — Litterbox (`https://litterbox.catbox.moe`):** 72 saatlik geçici doğrudan dosya CDN'i.
+4. **4. Öncelik — ImgBB API (`https://api.imgbb.com/1/upload`):** Çoklu anahtar desteği ile kalıcı görsel CDN yedeği.
+
+### C. Dinamik Telafi Butonları & Mükerrer Paylaşım Koruması (`telafi_butonlari_kur` & `yayinla_telafi`)
+* **Kısmi Başarı / Hata Raporlama:** Bir paylaşımda bazı platformlar başarılı olup bazıları başarısız olduğunda Telegram raporu `⚠️ [KATEGORİ] — KISMİ BAŞARI / DİKKAT` başlığıyla güncellenir.
+* **Dinamik Buton Matrisi:**
+  - `[ 🔄 Başarısız Tüm Kanalları Tekrar Dene ]` (`telafi_hepsi_<id>`): Sadece başarısız olan kanalları sırayla yeniden yayınlar.
+  - **Kanal Bazlı Tekil Butonlar:** Yalnızca başarısız olan kanallar için buton üretilir (`[ 🔄 📸 Instagram ]`, `[ 🔄 📱 Story ]`, `[ 🔄 🧵 Threads ]`, `[ 🔄 📘 Facebook ]`).
+  - `[ 🔍 Hata Teşhisi & Çözüm Rehberi ]` (`teshis_<id>`): Tek tıkla ilgili paylaşımın kök sebep teşhis kartını ve çözüm önerilerini ekrana getirir.
+  - `[ 🗑️ Yayından Kaldır ]` (`kaldir_<id>`): Yayınlanan kanallardan içeriği geri çeker.
+* **Mükerrer Paylaşım Koruması (`yayinla_telafi`):** Yeniden deneme tetiklendiğinde veritabanında (`paylasimlar`) daha önce başarılı olmuş platformlar (örn. Facebook ID'si mevcutsa) tespit edilerek atlanır; Facebook'ta çift post oluşması mimari olarak %100 engellenir. Sadece eksik platformlar tamamlanır ve DB kaydı güncellenir.
+
+### D. Telegram Teşhis Komutları
+* `/hata`: Sistemde kaydedilen en son hatanın teşhis kartını ve aksiyon butonlarını getirir.
+* `/tekrar <id>`: Belirtilen paylaşım ID'sinde başarısız kalan platformları anında yeniden dener.
+
+---
+
+## 8. Gelecek Yol Haritası ve Planlanan Geliştirmeler
 
 1. **Farklı İçerik Türlerinin Genişletilmesi:**
    * ✅ **Hadis-i Şerif Serisi:** Riyâzü's-Sâlihîn'den 1.900 sahih hadis DB entegrasyonu tamamlandı.
@@ -384,10 +428,13 @@ EzanPlusBot/
    * ✅ **Günün Kelimesi / Kavramı:** Kur'an kavramları DB entegrasyonu tamamlandı.
    * **Günün Zikri & Esmaü'l Hüsna:** Anlamı, ebced değeri ve faziletiyle 99 Esma serisi eklenebilir.
 2. **Telegram İki Yönlü Komut Menüsü:**
-   * ✅ Telegram arayüzüne `/ayet`, `/hadis`, `/dua`, `/kelime`, `/durum`, `/yardim` komut menüsü kaydedildi.
-   * ✅ Arka planda `/yayinla <id>` ve `/iptal <id>` komut desteği tamamlandı.
+   * ✅ Telegram arayüzüne `/ayet`, `/hadis`, `/dua`, `/kelime`, `/durum`, `/hata`, `/yardim` komut menüsü kaydedildi.
+   * ✅ Arka planda `/yayinla <id>`, `/tekrar <id>`, `/iptal <id>` ve `/kaldir <id>` komut desteği tamamlandı.
 3. **Yayın Öncesi Kalite & Otomatik Onarım Güvencesi:**
    * ✅ Mizanpaj çakışması, boyut hatası, yasaklı bot ifadesi ve eksik etiket taraması tamamlandı.
    * ✅ Otomatik onarım döngüsü (`otomatik_onar`) ile hataları yayından önce düzelten self-healing mimarisi tamamlandı.
-4. **TikTok Uygulama İncelemesi (App Review):**
+4. **Hata Teşhis ve Dayanıklı Dağıtım:**
+   * ✅ Çok katmanlı CDN katmanı (Uguu + Catbox + Litterbox + ImgBB) devreye alındı.
+   * ✅ Telegram interaktif teşhis ve telafi butonları devreye alındı.
+5. **TikTok Uygulama İncelemesi (App Review):**
    * TikTok Developer Portal'daki inceleme tamamlandığında tek tıkla token alınacak ve TikTok da tam otomatik yayın zincirine bağlanacaktır.

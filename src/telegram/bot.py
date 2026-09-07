@@ -18,8 +18,8 @@ from datetime import datetime
 import requests
 
 from ..ayar import AYARLAR, get_env
-from .. import db
-from .yonetici import yayinla_hepsi, yayindan_kaldir
+from .. import db, hata_bildir
+from .yonetici import yayinla_hepsi, yayindan_kaldir, yayinla_telafi
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,13 @@ def _istek(
                 raise e
 
 
-def mesaj_gonder(metin: str, chat_id: Optional[str] = None, butonlar: Optional[List[List[Dict[str, str]]]] = None) -> int:
+def mesaj_gonder(
+    metin: str,
+    chat_id: Optional[str] = None,
+    butonlar: Optional[List[List[Dict[str, str]]]] = None,
+    html: bool = True,
+    **kwargs: Any,
+) -> int:
     """Telegram grubuna metin mesajı gönderir ve mesaj ID'sini döner."""
     _, varsayilan_chat_id = get_token_ve_chat_id()
     hedef_chat = chat_id or varsayilan_chat_id
@@ -102,7 +108,7 @@ def mesaj_gonder(metin: str, chat_id: Optional[str] = None, butonlar: Optional[L
     payload: Dict[str, Any] = {
         "chat_id": hedef_chat,
         "text": metin,
-        "parse_mode": "HTML",
+        "parse_mode": "HTML" if html else None,
     }
 
     if butonlar:
@@ -296,30 +302,78 @@ def caption_ve_buton_guncelle(
         log.error(f"Mesaj güncelleme hatası: {e2}")
 
 
-def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
-    """
-    Otomatik yayınlanan (veya onaylanan) içeriğin detaylı yayın raporunu
-    ve '🗑️ Yayından Kaldır' butonunu Telegram grubuna iletir.
-    """
-    kayit = db.paylasim_getir(paylasim_id)
-    if not kayit:
-        raise ValueError(f"Paylaşım bulunamadı: ID {paylasim_id}")
+def _kanal_ok(sonuclar: Dict[str, Any], k: str) -> bool:
+    """Kanalın başarıyla yayınlanıp yayınlanmadığını kontrol eder."""
+    val = sonuclar.get(k)
+    if not val:
+        return False
+    if f"{k}_hata" in sonuclar:
+        return False
+    if isinstance(val, dict):
+        return bool(val.get("basarili") is True or val.get("id"))
+    return True
 
-    kategori = kayit["kategori"].upper()
-    format_tipi = kayit["format"]
+
+def telafi_butonlari_kur(paylasim_id: int, sonuclar: Dict[str, Any], format_tipi: str = "post_4_5") -> List[List[Dict[str, str]]]:
+    """
+    Yayın sonucuna göre eksik veya hatalı platformlar için telafi (yeniden deneme),
+    hata teşhis ve yayından kaldırma butonlarını dinamik olarak kurar.
+    """
+    eksik_butonlar: List[Dict[str, str]] = []
+    if not _kanal_ok(sonuclar, "instagram"):
+        eksik_butonlar.append({"text": "🔄 📸 Instagram", "callback_data": f"telafi_ig_{paylasim_id}"})
+    if not _kanal_ok(sonuclar, "instagram_story"):
+        eksik_butonlar.append({"text": "🔄 📱 Story", "callback_data": f"telafi_story_{paylasim_id}"})
+    if not _kanal_ok(sonuclar, "threads"):
+        eksik_butonlar.append({"text": "🔄 🧵 Threads", "callback_data": f"telafi_threads_{paylasim_id}"})
+    if not _kanal_ok(sonuclar, "facebook"):
+        eksik_butonlar.append({"text": "🔄 📘 Facebook", "callback_data": f"telafi_facebook_{paylasim_id}"})
+    if format_tipi == "reels_9_16" and not _kanal_ok(sonuclar, "youtube"):
+        eksik_butonlar.append({"text": "🔄 ▶️ Shorts", "callback_data": f"telafi_youtube_{paylasim_id}"})
+    if format_tipi == "reels_9_16" and not _kanal_ok(sonuclar, "tiktok"):
+        eksik_butonlar.append({"text": "🔄 🎵 TikTok", "callback_data": f"telafi_tiktok_{paylasim_id}"})
+
+    satirlar: List[List[Dict[str, str]]] = []
+
+    # Eğer 1'den fazla eksik/hatalı kanal varsa ana telafi butonunu en başa ekle
+    if len(eksik_butonlar) > 1:
+        satirlar.append([{"text": "🔄 Başarısız Tüm Kanalları Tekrar Dene", "callback_data": f"telafi_hepsi_{paylasim_id}"}])
+
+    # Tekil kanal butonlarını 2'şerli sıralar halinde diz
+    for i in range(0, len(eksik_butonlar), 2):
+        satirlar.append(eksik_butonlar[i:i+2])
+
+    # Hata teşhis ve rehber butonu (herhangi bir eksik kanal veya hata kaydı varsa)
+    has_error = any(k.endswith("_hata") for k in sonuclar.keys()) or len(eksik_butonlar) > 0
+    if has_error:
+        satirlar.append([{"text": "🔍 Hata Teşhisi & Çözüm Rehberi", "callback_data": f"teshis_{paylasim_id}"}])
+
+    # Yayından kaldır ve canlı link butonları
+    satirlar.append([{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{paylasim_id}"}])
+    if sonuclar.get("youtube_url"):
+        satirlar.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": sonuclar["youtube_url"]}])
+    if format_tipi == "reels_9_16" and not _kanal_ok(sonuclar, "tiktok"):
+        satirlar.append([{"text": "🎵 TikTok'u Aç (@ezanplusapp)", "url": "https://www.tiktok.com/@ezanplusapp"}])
+
+    return satirlar
+
+
+def yayin_raporu_metni_kur(kayit: Dict[str, Any], sonuclar: Dict[str, Any]) -> str:
+    """Yayın sonuçlarını şık ve anlaşılır bir HTML özet raporuna dönüştürür."""
+    kategori = (kayit.get("kategori") or "İÇERİK").upper()
+    format_tipi = kayit.get("format") or ""
     caption = kayit.get("caption") or ""
     baslik = kayit.get("baslik") or ""
     kaynak = kayit.get("kaynak") or baslik
 
     yt_durum = "—"
-    yt_url = sonuclar.get("youtube_url")
-    if "youtube" in sonuclar:
+    if _kanal_ok(sonuclar, "youtube"):
         yt_durum = "✅ Yayında"
     elif "youtube_hata" in sonuclar:
         yt_durum = "❌ Hata"
 
     tt_durum = "—"
-    if "tiktok" in sonuclar:
+    if _kanal_ok(sonuclar, "tiktok"):
         tt_durum = "✅ Yayında"
     elif "tiktok_hata" in sonuclar:
         tt_durum = "❌ Hata"
@@ -328,44 +382,93 @@ def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
 
     tsi_saat = datetime.now().strftime("%H:%M TSİ")
 
+    has_error = any(k.endswith("_hata") for k in sonuclar.keys()) or not all([
+        _kanal_ok(sonuclar, "instagram"),
+        _kanal_ok(sonuclar, "instagram_story"),
+        _kanal_ok(sonuclar, "threads"),
+        _kanal_ok(sonuclar, "facebook"),
+    ])
+
+    if has_error:
+        if kategori in ("AYET", "REELS"):
+            baslik_str = "⚠️ <b>KUR'AN-I KERİM TİLAVETİ — KISMİ BAŞARI / DİKKAT</b>"
+        elif kategori == "HADIS":
+            baslik_str = "⚠️ <b>SAHİH HADİS-İ ŞERİF — KISMİ BAŞARI / DİKKAT</b>"
+        elif kategori == "DUA":
+            baslik_str = "⚠️ <b>GÜNÜN DUASI — KISMİ BAŞARI / DİKKAT</b>"
+        elif kategori == "KELIME":
+            baslik_str = "⚠️ <b>KUR'AN SÖZLÜĞÜ — KISMİ BAŞARI / DİKKAT</b>"
+        else:
+            baslik_str = f"⚠️ <b>{kategori} — KISMİ BAŞARI / DİKKAT</b>"
+    else:
+        if kategori in ("AYET", "REELS"):
+            baslik_str = "🚀 <b>KUR'AN-I KERİM TİLAVETİ YAYINLANDI!</b>"
+        elif kategori == "HADIS":
+            baslik_str = "🚀 <b>SAHİH HADİS-İ ŞERİF YAYINLANDI!</b>"
+        elif kategori == "DUA":
+            baslik_str = "🚀 <b>GÜNÜN DUASI YAYINLANDI!</b>"
+        elif kategori == "KELIME":
+            baslik_str = "🚀 <b>KUR'AN SÖZLÜĞÜ YAYINLANDI!</b>"
+        else:
+            baslik_str = f"🚀 <b>{kategori} İÇERİĞİ YAYINLANDI!</b>"
+
     if kategori in ("AYET", "REELS"):
-        baslik_str = "🚀 <b>KUR'AN-I KERİM TİLAVETİ YAYINLANDI!</b>"
         kunye_str = f"📖 <b>Âyet:</b> {kaynak}\n🎙️ <b>Kari:</b> Mişari Râşid el-Afâsî\n⏱️ <b>Yayın Saati:</b> {tsi_saat}"
     elif kategori == "HADIS":
-        baslik_str = "🚀 <b>SAHİH HADİS-İ ŞERİF YAYINLANDI!</b>"
         kunye_str = f"📜 <b>Hadis:</b> {kaynak}\n⏱️ <b>Yayın Saati:</b> {tsi_saat}"
     elif kategori == "DUA":
-        baslik_str = "🚀 <b>GÜNÜN DUASI YAYINLANDI!</b>"
         kunye_str = f"🌿 <b>Dua:</b> {kaynak}\n⏱️ <b>Yayın Saati:</b> {tsi_saat}"
     elif kategori == "KELIME":
-        baslik_str = "🚀 <b>KUR'AN SÖZLÜĞÜ YAYINLANDI!</b>"
-        kunye_str = f"📖 <b>Kavram:</b> {kaynak}\n🎨 <b>Palet:</b> Ezan Yakut Kırmızısı\n⏱️ <b>Yayın Saati:</b> {tsi_saat}"
+        kavram_adi = baslik if baslik else kaynak
+        ayet_ref = f"\n📌 <b>Âyet:</b> {kaynak}" if (kaynak and kaynak != baslik) else ""
+        kunye_str = f"📖 <b>Kavram:</b> {kavram_adi}{ayet_ref}\n🎨 <b>Palet:</b> Ezan Yakut Kırmızısı\n⏱️ <b>Yayın Saati:</b> {tsi_saat}"
     else:
-        baslik_str = f"🚀 <b>{kategori} İÇERİĞİ YAYINLANDI!</b>"
         kunye_str = f"📌 <b>Kaynak:</b> {kaynak}\n⏱️ <b>Yayın Saati:</b> {tsi_saat}"
 
-    rapor_metin = (
+    ig_durum = "✅ Yayında" if _kanal_ok(sonuclar, "instagram") else "❌ Hata"
+    story_durum = "✅ Yayında" if _kanal_ok(sonuclar, "instagram_story") else "❌ Hata"
+    th_durum = "✅ Yayında" if _kanal_ok(sonuclar, "threads") else "❌ Hata"
+    fb_durum = "✅ Yayında" if _kanal_ok(sonuclar, "facebook") else "❌ Hata"
+
+    metin = (
         f"{baslik_str}\n\n"
         f"{kunye_str}\n\n"
         f"📱 <b>Yayın Kanalları:</b>\n"
-        f"• <b>Instagram Reels/Feed:</b> {'✅ Yayında' if 'instagram' in sonuclar else '❌ Hata'}\n"
-        f"• <b>Instagram Story:</b> {'✅ Yayında' if 'instagram_story' in sonuclar else '❌ Hata'}\n"
-        f"• <b>Threads (@ezanplusapp):</b> {'✅ Yayında' if 'threads' in sonuclar else '❌ Hata'}\n"
-        f"• <b>Facebook Sayfası:</b> {'✅ Yayında' if 'facebook' in sonuclar else '❌ Hata'}\n"
+        f"• <b>Instagram Reels/Feed:</b> {ig_durum}\n"
+        f"• <b>Instagram Story:</b> {story_durum}\n"
+        f"• <b>Threads (@ezanplusapp):</b> {th_durum}\n"
+        f"• <b>Facebook Sayfası:</b> {fb_durum}\n"
         f"• <b>YouTube Shorts:</b> {yt_durum}\n"
         f"• <b>TikTok:</b> {tt_durum}\n\n"
         f"📝 <b>Açıklama:</b>\n"
-        f"<i>{caption[:280]}...</i>\n\n"
-        f"⚠️ <i>İçerikte bir sorun varsa aşağıdaki butonla tüm platformlardan kaldırabilirsiniz:</i>"
+        f"<i>{caption[:280]}...</i>"
     )
 
-    buton_satirlari = [
-        [{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{paylasim_id}"}]
-    ]
-    if yt_url:
-        buton_satirlari.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": yt_url}])
-    if format_tipi == "reels_9_16" and "tiktok" not in sonuclar:
-        buton_satirlari.append([{"text": "🎵 TikTok'u Aç (@ezanplusapp)", "url": "https://www.tiktok.com/@ezanplusapp"}])
+    if has_error:
+        metin += (
+            "\n\n⚠️ <i>Bazı platformlara aktarım sağlanamadı! "
+            "Aşağıdaki telafi butonlarına dokunarak eksik kanalları doğrudan yeniden yayınlayabilir "
+            "veya <b>Hata Teşhisi</b> butonuna basarak kök sebebi inceleyebilirsiniz.</i>"
+        )
+    else:
+        metin += "\n\n⚠️ <i>İçerikte bir sorun varsa aşağıdaki butonla tüm platformlardan kaldırabilirsiniz:</i>"
+
+    return metin
+
+
+def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
+    """
+    Otomatik yayınlanan (veya onaylanan) içeriğin detaylı yayın raporunu,
+    eksik platformlar için telafi butonlarını ve '🗑️ Yayından Kaldır' butonunu Telegram grubuna iletir.
+    """
+    kayit = db.paylasim_getir(paylasim_id)
+    if not kayit:
+        raise ValueError(f"Paylaşım bulunamadı: ID {paylasim_id}")
+
+    format_tipi = kayit["format"]
+    caption = kayit.get("caption") or ""
+    rapor_metin = yayin_raporu_metni_kur(kayit, sonuclar)
+    buton_satirlari = telafi_butonlari_kur(paylasim_id, sonuclar, format_tipi)
 
     # Medyayı gönder (Video -> Thumbnail -> Metin Mesajı Kademeli Güvenlik Fallback'i)
     msg_id = 0
@@ -436,6 +539,8 @@ def komutlari_kaydet() -> bool:
         {"command": "hadis", "description": "Sahih Hadis-i Şerif kartı üret (4:5 + 9:16)"},
         {"command": "dua", "description": "Günün Duası kartı üret (4:5 + 9:16)"},
         {"command": "kelime", "description": "Kur'an Sözlüğü kavram kartı üret (4:5 + 9:16)"},
+        {"command": "hata", "description": "Son sistem hatasını ve teşhis raporunu göster"},
+        {"command": "tekrar", "description": "Başarısız olan platformları tekrar yayınla"},
         {"command": "kaldir", "description": "Yayınlanan içeriği tüm platformlardan sil"},
         {"command": "durum", "description": "Sistem ve yayın istatistikleri raporu"},
         {"command": "yardim", "description": "Komut kullanım rehberi ve yardım"},
@@ -513,6 +618,10 @@ def yardim_metni_olustur() -> str:
         f"Veritabanı envanteri, yayın sayıları ve bekleyen taslakları listeler.\n\n"
         f"🚀 <b>/yayinla</b> &lt;ID&gt;\n"
         f"<i>Örnek: <code>/yayinla 14</code></i> — Onay bekleyen taslağı hemen yayınlar.\n\n"
+        f"🔄 <b>/tekrar</b> &lt;ID&gt;\n"
+        f"<i>Örnek: <code>/tekrar 14</code></i> — Başarısız/eksik platformları tekrar yayınlar.\n\n"
+        f"🛠️ <b>/hata</b>\n"
+        f"Son sistem hatasını, teşhisini ve doğrudan çözüm butonlarını görüntüler.\n\n"
         f"🗑️ <b>/kaldir</b> &lt;ID&gt;\n"
         f"<i>Örnek: <code>/kaldir 14</code></i> — Yayındaki içeriği tüm platformlardan siler.\n\n"
         f"❌ <b>/iptal</b> &lt;ID&gt;\n"
@@ -676,6 +785,35 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         db.durum_guncelle(pid, yeni_durum="iptal_edildi")
         mesaj_gonder(f"❌ <b>Paylaşım #{pid} iptal edildi.</b>", chat_id=str(chat_id))
 
+    elif ana_komut == "/hata":
+        son_h = hata_bildir.son_hata_getir()
+        if son_h:
+            metin = hata_bildir.mesaji_kur(
+                baslik=son_h.get("baslik", "Sistem Hatası"),
+                teshis=son_h,
+                nerede=son_h.get("nerede", ""),
+                paylasim_id=son_h.get("paylasim_id"),
+            )
+            btns = hata_bildir.hata_butonlari(son_h.get("paylasim_id"), eylem=son_h.get("eylem", "tekrar_yayinla"))
+            mesaj_gonder(metin, chat_id=str(chat_id), butonlar=btns)
+        else:
+            mesaj_gonder("🟢 <b>Sistem Sağlıklı:</b> Kayıtlı aktif bir sistem hatası bulunmuyor. Tüm yayınlar ve servisler sorunsuz çalışıyor.", chat_id=str(chat_id))
+
+    elif ana_komut == "/tekrar":
+        if not parametre or not parametre.isdigit():
+            mesaj_gonder("⚠️ <b>Geçersiz Kullanım:</b> Lütfen tekrar yayınlamak istediğiniz paylaşım ID'sini girin.\n<i>Örnek: <code>/tekrar 1</code></i>", chat_id=str(chat_id))
+            return
+        pid = int(parametre)
+        mesaj_gonder(f"⏳ <b>Paylaşım #{pid} için telafi yayını başlatılıyor...</b>\nEksik veya hatalı platformlar taranıyor...", chat_id=str(chat_id))
+        def _gorev_tekrar_cmd():
+            try:
+                sonuclar = yayinla_telafi(pid, hedef_kanal="hepsi")
+                yayin_detay_karti_gonder(pid, sonuclar)
+            except Exception as e:
+                log.error(f"/tekrar hatası (#{pid}): {e}")
+                hata_bildir.bildir(f"Paylaşım #{pid} Telafi Hatası", e, nerede="/tekrar komutu", paylasim_id=pid)
+        _arkaplanda_calistir(_gorev_tekrar_cmd)
+
     else:
         mesaj_gonder(
             f"❓ <b>Bilinmeyen Komut:</b> <code>{html.escape(ana_komut)}</code>\n\n"
@@ -731,50 +869,113 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                     def _gorev_onay(p_id=paylasim_id, c_id=chat_id, m_id=msg_id):
                         try:
                             sonuclar = yayinla_hepsi(p_id)
-                            # Eğer kalite kontrolü veya tüm platformlar başarısızsa hata fırlat
-                            if "hata" in sonuclar and not any(k in sonuclar for k in ("instagram", "instagram_story", "threads", "facebook", "youtube", "tiktok")):
-                                raise RuntimeError(sonuclar["hata"])
-
-                            yt_durum = "—"
-                            if "youtube" in sonuclar:
-                                yt_durum = f"✅ Yayınlandı (<a href='{sonuclar.get('youtube_url', '')}'>İzle</a>)"
-                            elif "youtube_hata" in sonuclar:
-                                yt_durum = "❌ Hata"
-
-                            tt_durum = "—"
-                            if "tiktok" in sonuclar:
-                                tt_durum = "✅ Yayınlandı"
-                            elif "tiktok_hata" in sonuclar:
-                                tt_durum = "❌ Hata"
-
-                            basari_metni = (
-                                f"🎉 <b>İÇERİK BAŞARIYLA YAYINLANDI!</b>\n\n"
-                                f"• <b>Instagram Feed (4:5):</b> {'✅ Yayınlandı' if 'instagram' in sonuclar else '❌ Hata'}\n"
-                                f"• <b>Instagram Story (9:16):</b> {'✅ Yayınlandı' if 'instagram_story' in sonuclar else '❌ Hata'}\n"
-                                f"• <b>Threads (@ezanplusapp):</b> {'✅ Yayınlandı' if 'threads' in sonuclar else '❌ Hata'}\n"
-                                f"• <b>Facebook Sayfası:</b> {'✅ Yayınlandı' if 'facebook' in sonuclar else '❌ Hata'}\n"
-                                f"• <b>YouTube Shorts:</b> {yt_durum}\n"
-                                f"• <b>TikTok (@ezanplusapp):</b> {tt_durum}\n\n"
-                                f"⏰ <i>Zaman: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
-                            )
-                            yeni_butonlar = [
-                                [{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{p_id}"}]
-                            ]
-                            if sonuclar.get("youtube_url"):
-                                yeni_butonlar.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": sonuclar["youtube_url"]}])
-
+                            kayit = db.paylasim_getir(p_id)
+                            format_t = kayit.get("format") if kayit else "post_4_5"
+                            basari_metni = yayin_raporu_metni_kur(kayit, sonuclar)
+                            yeni_butonlar = telafi_butonlari_kur(p_id, sonuclar, format_t)
                             caption_ve_buton_guncelle(c_id, m_id, basari_metni, butonlar=yeni_butonlar)
+
+                            # Eğer herhangi bir platform hata aldıysa otomatik teşhis gönder
+                            has_error = any(k.endswith("_hata") for k in sonuclar.keys())
+                            if has_error:
+                                hata_metni = "; ".join(v for k, v in sonuclar.items() if k.endswith("_hata"))
+                                hata_bildir.bildir(
+                                    baslik=kayit.get("baslik") if kayit else f"Paylaşım #{p_id}",
+                                    hata=hata_metni,
+                                    nerede="Yayın Dağıtım Motoru",
+                                    paylasim_id=p_id
+                                )
                         except Exception as e:
                             log.error(f"Onay yayınlama hatası (#{p_id}): {e}")
                             db.durum_guncelle(p_id, yeni_durum="onay_bekliyor", hata_mesaji=str(e))
+                            kayit = db.paylasim_getir(p_id)
+                            hata_bildir.bildir(
+                                baslik=kayit.get("baslik") if kayit else f"Paylaşım #{p_id}",
+                                hata=e,
+                                nerede="Onay Yayınlama Hatası",
+                                paylasim_id=p_id
+                            )
                             caption_ve_buton_guncelle(
                                 c_id,
                                 m_id,
-                                f"❌ <b>YAYINLAMA HATASI!</b>\n\n<code>{html.escape(str(e))}</code>",
-                                butonlar=[[{"text": "🔄 Tekrar Dene", "callback_data": f"onay_{p_id}"}]]
+                                f"❌ <b>YAYINLAMA HATASI!</b>\n\n<code>{html.escape(str(e))}</code>\n\n<i>Ayrıntılı teşhis raporu aşağıda iletildi.</i>",
+                                butonlar=[
+                                    [{"text": "🔄 Tekrar Dene", "callback_data": f"telafi_hepsi_{p_id}"}],
+                                    [{"text": "🔍 Hata Teşhisi & Çözüm", "callback_data": f"teshis_{p_id}"}],
+                                    [{"text": "❌ İptal Et", "callback_data": f"red_{p_id}"}],
+                                ]
                             )
 
                     _arkaplanda_calistir(_gorev_onay)
+
+                elif data.startswith("telafi_"):
+                    parcalar = data.split("_")
+                    hedef_kanal = parcalar[1]
+                    p_id = int(parcalar[2])
+                    callback_cevapla(cq_id, f"⏳ {hedef_kanal.upper()} telafi yayını yapılıyor...", alert=False)
+                    caption_ve_buton_guncelle(
+                        chat_id,
+                        msg_id,
+                        f"⏳ <b>TELAFİ YAYINI YAPILIYOR ({hedef_kanal.upper()})...</b>\n\nEksik kanallar tekrar deneniyor, lütfen bekleyin...",
+                        butonlar=[]
+                    )
+
+                    def _gorev_telafi_btn(paylasim_id=p_id, c_id=chat_id, m_id=msg_id, kanal=hedef_kanal):
+                        try:
+                            sonuclar = yayinla_telafi(paylasim_id, hedef_kanal=kanal)
+                            kayit = db.paylasim_getir(paylasim_id)
+                            format_t = kayit.get("format") if kayit else "post_4_5"
+                            yeni_metin = yayin_raporu_metni_kur(kayit, sonuclar)
+                            yeni_btns = telafi_butonlari_kur(paylasim_id, sonuclar, format_t)
+                            caption_ve_buton_guncelle(c_id, m_id, yeni_metin, butonlar=yeni_btns)
+
+                            yeni_ok = sonuclar.get("yeni_basarili", [])
+                            if yeni_ok:
+                                mesaj_gonder(
+                                    f"🎉 <b>Telafi Yayını Başarılı!</b>\n\n"
+                                    f"Paylaşım #{paylasim_id} için şu kanallar başarıyla yayınlandı: "
+                                    f"<b>{', '.join(yeni_ok).upper()}</b>",
+                                    chat_id=str(c_id)
+                                )
+                            else:
+                                kalan_hata = sonuclar.get(f"{kanal}_hata") or "; ".join(v for k, v in sonuclar.items() if k.endswith("_hata")) or "Yayınlama başarısız"
+                                hata_bildir.bildir(
+                                    baslik=kayit.get("baslik") if kayit else f"Paylaşım #{paylasim_id}",
+                                    hata=kalan_hata,
+                                    nerede=f"Telafi Yayını ({kanal})",
+                                    paylasim_id=paylasim_id
+                                )
+                        except Exception as e:
+                            log.error(f"Telafi yayını hatası (#{paylasim_id}): {e}")
+                            hata_bildir.bildir(
+                                baslik=f"Paylaşım #{paylasim_id} Telafi Hatası",
+                                hata=e,
+                                nerede=f"Telafi Butonu ({kanal})",
+                                paylasim_id=paylasim_id
+                            )
+
+                    _arkaplanda_calistir(_gorev_telafi_btn)
+
+                elif data.startswith("teshis_"):
+                    p_id = int(data.split("_")[1])
+                    callback_cevapla(cq_id, "🔍 Hata analizi hazırlanıyor...", alert=False)
+                    kayit = db.paylasim_getir(p_id)
+                    if kayit:
+                        hata_metni = kayit.get("hata_mesaji") or "Platform yayınlama hatası oluştu."
+                        hata_bildir.bildir(
+                            baslik=kayit.get("baslik") or f"Paylaşım #{p_id}",
+                            hata=hata_metni,
+                            nerede="Yayın Dağıtım Motoru",
+                            paylasim_id=p_id
+                        )
+
+                elif data == "cmd_durum":
+                    callback_cevapla(cq_id, "📊 Sistem durumu getiriliyor...", alert=False)
+                    mesaj_gonder(durum_raporu_olustur(), chat_id=str(chat_id))
+
+                elif data == "cmd_yardim":
+                    callback_cevapla(cq_id, "ℹ️ Yardım rehberi getiriliyor...", alert=False)
+                    mesaj_gonder(yardim_metni_olustur(), chat_id=str(chat_id))
 
                 elif data.startswith("kaldir_"):
                     paylasim_id = int(data.split("_")[1])
