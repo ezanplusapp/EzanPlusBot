@@ -153,19 +153,25 @@ def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[int, f
     verse_key = f"{sure_no}:{ayet_no}"
     for vt in af.get("verse_timings", []):
         if vt.get("verse_key") == verse_key:
-            ayah_start = vt.get("timestamp_from", 0)
-            ayah_end = vt.get("timestamp_to", ayah_start)
             segments = vt.get("segments", [])
+            if segments and len(segments[0]) >= 2:
+                # EveryAyah bağımsız ayet ses dosyası daima ilk kelimenin telaffuzuyla başlar (segments[0][1]).
+                # timestamp_from kaba sûre imleci olduğundan segment başlangıcından 1.7 saniyeye kadar sapabilir.
+                ayah_start = segments[0][1]
+            else:
+                ayah_start = vt.get("timestamp_from", 0)
+
+            ayah_end = vt.get("timestamp_to", ayah_start)
             zamanlar = []
             for seg in segments:
                 if len(seg) >= 3:
                     w_idx = int(seg[0]) - 1  # 1-based -> 0-based
                     s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
-                    e_sec = max(0.0, (seg[2] - ayah_start) / 1000.0)
+                    e_sec = max(s_sec + 0.05, (seg[2] - ayah_start) / 1000.0)
                 elif len(seg) == 2:
                     w_idx = len(zamanlar)
                     s_sec = max(0.0, (seg[1] - ayah_start) / 1000.0)
-                    e_sec = max(s_sec, (ayah_end - ayah_start) / 1000.0)
+                    e_sec = max(s_sec + 0.05, (ayah_end - ayah_start) / 1000.0)
                 else:
                     continue
                 zamanlar.append((w_idx, round(s_sec, 3), round(e_sec, 3)))

@@ -72,6 +72,30 @@ class TestKuranDB(unittest.TestCase):
         self.assertTrue(len(ayet["meal_elmalili"]) > 0)
         self.assertTrue(len(ayet["sure_ayet_etiket"]) > 0)
 
+    def test_kelime_zamanlari_senkronu(self):
+        """
+        QuranCDN timestamp_from ile segment[0] başlangıcı arasındaki sapmanın
+        kelimeleri ezmemesini ve EveryAyah ses dosyasıyla 1:1 senkron başlamasını test eder.
+        """
+        from src.uretim.ses import ayet_kelime_zamanlari_getir
+
+        # Sebe' 13 (timestamp_from ile segment 0 arasında 1.675s fark olan ayet)
+        zamanlar_34_13 = ayet_kelime_zamanlari_getir(34, 13)
+        self.assertTrue(len(zamanlar_34_13) > 0)
+        # İlk kelime daima 0.0 saniyede başlamalı ve süresi ezilmemeli (> 1.0s)
+        self.assertEqual(zamanlar_34_13[0][1], 0.0)
+        self.assertGreater(zamanlar_34_13[0][2], 1.0)
+        # İkinci kelime ilk kelimeden sonra başlamalı
+        self.assertGreaterEqual(zamanlar_34_13[1][1], zamanlar_34_13[0][2] - 0.1)
+
+        # Diğer sapma testleri (Nisâ 5, İbrahim 2, Bakara 10)
+        for s_no, a_no in [(4, 5), (14, 2), (2, 10)]:
+            z = ayet_kelime_zamanlari_getir(s_no, a_no)
+            self.assertTrue(len(z) > 0)
+            self.assertEqual(z[0][1], 0.0)
+            self.assertGreater(z[0][2], 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()
+
