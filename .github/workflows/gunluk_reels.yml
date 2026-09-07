@@ -140,8 +140,10 @@ jobs:
         run: |
           git config user.name "Ezan Plus Bot"
           git config user.email "bot@ezanplus.com"
+          git pull --rebase origin main || true
           git add data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json || true
           if ! git diff --staged --quiet; then
             git commit -m "chore: Günlük yayın geçmişi ve külliyat güncellendi [skip ci]"
+            git pull --rebase origin main || true
             git push origin main
           fi
