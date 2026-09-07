@@ -1008,11 +1008,25 @@ class _SayfaVerisi:
             meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
         )
 
-        gap_ayrac_meal = max(32, int(self.pt_meal * 0.55))
+        gap_ayrac_meal = max(28, int(self.pt_meal * 0.50))
         meal_blok_h = len(meal_wrapped_lines) * self.meal_h
 
         kalan_orta = ay_y - tr_bottom
         self.net_serbest_meal = kalan_orta - (meal_blok_h + gap_ayrac_meal)
+
+        # Dinamik Auto-Fit: Kalan alan daraldığında meal puntosunu kademeli küçülterek çakışmayı %100 önle
+        while self.net_serbest_meal < 20 and self.pt_meal > 32:
+            self.pt_meal -= 2
+            self.meal_h = int(self.pt_meal * 1.34)
+            self.font_meal_reg = font_al(FONT_BASLIK, self.pt_meal, agirlik=400)
+            self.font_meal_bold = font_al(FONT_BASLIK, self.pt_meal, agirlik=700)
+            gap_ayrac_meal = max(22, int(self.pt_meal * 0.46))
+            meal_wrapped_lines, space_w = wrap_mixed_tokens(
+                meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
+            )
+            meal_blok_h = len(meal_wrapped_lines) * self.meal_h
+            self.net_serbest_meal = kalan_orta - (meal_blok_h + gap_ayrac_meal)
+
         serbest_meal = max(16, self.net_serbest_meal)
         self.serbest_meal = serbest_meal
         ayrac_y = tr_bottom + int(serbest_meal * 0.40)
@@ -1117,6 +1131,7 @@ def reels_videosu_uret(
     hafiz_adi: str = "Mişari Râşid el-Afâsî",
     cikti_adi: Optional[str] = None,
     kelime_zamanlari: Optional[List[Tuple[float, float]]] = None,
+    pt_ar_override: Optional[int] = None,
 ) -> Path:
     """
     Onaylanan Klasik Mushaf Düzeni & Akıcı Loading Dolum Efekti:
@@ -1152,15 +1167,15 @@ def reels_videosu_uret(
     kelime_zamanlari = kelime_zamanlarini_hizala(kelime_zamanlari, toplam_kelime, toplam_sure)
 
     # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Kıraat & Çoklu Sayfa Motoru)
-    # 16 kelimeye kadar olan âyetler tek sayfada ferahça ve kesintisiz sunulur;
-    # 16 kelimeyi aşan uzun âyetlerde metin secavend duraklarına ve hafızın nefes
+    # 14 kelimeye kadar olan âyetler (Bakara 127 gibi) tek sayfada ferahça ve kesintisiz sunulur;
+    # 15 kelime ve üzeri uzun âyetlerde metin secavend duraklarına ve hafızın nefes
     # aralıklarına göre anlam bütünlüğü korunarak 2-3 sayfaya bölünür.
-    if toplam_kelime <= 16:
+    if toplam_kelime <= 14:
         sayfa_sayisi = 1
     elif toplam_kelime <= 28:
         sayfa_sayisi = 2
     else:
-        sayfa_sayisi = math.ceil(toplam_kelime / 16)
+        sayfa_sayisi = math.ceil(toplam_kelime / 14)
 
     sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, ar_str, kelime_zamanlari, sayfa_sayisi)
     split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]
@@ -1169,7 +1184,10 @@ def reels_videosu_uret(
     # 3. Sayfa Verilerini Hazırla (Tüm sayfalar için birleşik Arapça punto ile tutarlı boyut)
     page_ar_list = [ar_kelimeler[w_s:w_e] for w_s, w_e in sayfa_araliklari]
     uygun_ptler = [_SayfaVerisi.uygun_pt_bul(words, max_text_w=840) for words in page_ar_list]
-    birlesik_pt = min(uygun_ptler) if uygun_ptler else 76
+    if pt_ar_override:
+        birlesik_pt = pt_ar_override
+    else:
+        birlesik_pt = min(uygun_ptler) if uygun_ptler else 76
 
     sayfalar: List[_SayfaVerisi] = []
     for p_idx, (w_s, w_e) in enumerate(sayfa_araliklari):

@@ -281,13 +281,13 @@ def denetle_reels_mizanpaj(
         tr_kelimeler = (arapca_okunus or "").split()
         toplam_kelime = len(ar_kelimeler)
 
-        # Sayfa bölme algoritması
-        if toplam_kelime <= 16:
+        # Sayfa bölme algoritması (14 kelimeye kadar tek sayfa, 15+ kelimede çoklu sayfa)
+        if toplam_kelime <= 14:
             sayfa_sayisi = 1
         elif toplam_kelime <= 28:
             sayfa_sayisi = 2
         else:
-            sayfa_sayisi = math.ceil(toplam_kelime / 16)
+            sayfa_sayisi = math.ceil(toplam_kelime / 14)
 
         sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, arapca_metin, None, sayfa_sayisi)
         split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]

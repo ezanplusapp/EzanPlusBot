@@ -52,7 +52,7 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
   - Okunan kelimeye odaklanılırken meal ve tefekkür bölümü kartın alt kısmında huzurlu bir şekilde eşlik eder.
 
 ### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru & Dinamik Flex Mizanpaj
-* **Otomatik Tetikleme:** 16 kelimeye kadar olan âyetler tek sayfada ferahça sunulur. 16 kelimeyi aştığında metni sıkıştırmak yerine otomatik olarak çoklu sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 16)`).
+* **Otomatik Tetikleme:** 14 kelimeye kadar olan âyetler (Bakara 127 gibi) tek sayfada ferahça sunulur. 15 kelime ve üzerini aştığında metni sıkıştırmak yerine otomatik olarak çoklu sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 14)`).
 * **Akıllı Secavend & Nefes Odaklı Sayfa Bölücü (`akilli_sayfa_araliklari`):** Metni körlemesine matematiksel ortadan (örn. 14 / 2 = 7) bölmek kesinlikle yasaktır. Kur'an secavend durak işaretleri (`ۚ ۖ ۗ ۘ ۙ ۛ ۜ`), hafızın ses dosyasındaki doğal nefes duraklama pencereleri (ses dalgası durak süresi) ve sayfa denge skoru birlikte ağırlıklandırılarak âyetin manevi ve tilavet ahengine göre en kusursuz durak noktasından bölünür.
 * **Akıllı Cümle & Meal Bölücü (`akilli_meal_parcala` / `_meal_parcala`):** 
   - Arapça sayfa oranına göre mealin karşılık gelen bölgesinde en mantıklı cümle bitişini arar.
