@@ -46,14 +46,19 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
 
 ### C. Stüdyo Sesi & Kelime Bazlı Senkron Karaoke
 * **Resmi Kelime Zaman Damgaları:** 114 sûre ve 6.236 âyetin tamamına ait Mişari Râşid el-Afâsî stüdyo tilavet zaman damgaları (80.537 kelime) yerel repoda `data/zamanlar/sure_{1..114}.json` altında saklanır. Sıfır harici API bağımlılığı ve sıfır gecikmeyle %100 offline çalışır (`ayet_kelime_zamanlari_getir`).
-* **Çift Katmanlı Karaoke:**
-  - Arapça orijinal lafız ve Türkçe Latin okunuşu 1:1 kelime bazında kusursuz hizalanır (`turkce_okunus_hizala`). Tireli birleşik lafızlar (örn. `entes-semîul` ➔ `entes`, `semîul`) dinamik açılır; ayrık bağlaçlar (`ve`, `fe`, `li`, `bi`) Arapça karşılığına göre birleştirilir. Sıfır indis kayması ve sıfır boş kelime güvencesiyle son kelime tilavetin bittiği ana kadar tam senkron kırmızı kalır.
+* **Kelime Zaman Damgası Normalizasyonu & Enterpolasyon (`kelime_zamanlarini_hizala`):** QuranCDN segment sayıları ile Kur'an metnindeki kelime sayıları farklılık gösterse dahi (örn. Nisâ 5'te hafızın nefes tekrarı nedeniyle 40 segmente karşılık 39 kelime) zaman damgaları kümülatif zaman enterpolasyonu ile 1:1 kelime sayısına eşitlenir; kelime sapması, sayacın erken durması veya indisin donması önlenir.
+* **Arapça ve Latin Okunuş 1:1 Eşleme Standardı (`turkce_okunus_hizala` & Gemini AI):**
+  - Gemini AI'nin ürettiği `latin_kelimeler` dizisindeki eleman sayısı Arapça kelime sayısıyla (`len(ar_kelimeler)`) **istisnasız 1:1 eşit** olmak zorundadır.
+  - **Şemsî/Kamerî Harf ve Hece Koruma:** `es-sufehâe`, `er-rahmân` veya `el-kitâb` gibi birleşik okunuşlarda "es" hecesinin bir durak (pause/"es vermek") zannedilip ayrılması kesinlikle yasaktır (`harfi_tarifler = {"es", "el", "al", "er", ...}`). Dizi boyutları eşit olduğunda (`len(tr_list) == len(ar_list)`) 1:1 dizilim doğrudan korunur.
+  - İki dilli dizilim ayrık bağlaçlarda (`ve`, `fe`, `bi`, `li`) ve birleşik lafızlarda (`entes-semîul`) Arapça karşılığına göre dinamik olarak dengelenir. Sıfır indis kayması ve sıfır boş kelime güvencesiyle son kelime tilavetin bittiği ana kadar tam senkron kırmızı kalır.
+* **Çift Katmanlı Karaoke & Vurgu:**
   - Okunan kelime anında kırmızıya (`#9B1B1B`) boyanır; başından sonuna doğru akan dinamik loading dolum çizgisi akar.
   - Okunan kelimeye odaklanılırken meal ve tefekkür bölümü kartın alt kısmında huzurlu bir şekilde eşlik eder.
 
 ### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru & Dinamik Flex Mizanpaj
 * **Otomatik Tetikleme:** 14 kelimeye kadar olan âyetler (Bakara 127 gibi) tek sayfada ferahça sunulur. 15 kelime ve üzerini aştığında metni sıkıştırmak yerine otomatik olarak çoklu sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 14)`).
 * **Akıllı Secavend & Nefes Odaklı Sayfa Bölücü (`akilli_sayfa_araliklari`):** Metni körlemesine matematiksel ortadan (örn. 14 / 2 = 7) bölmek kesinlikle yasaktır. Kur'an secavend durak işaretleri (`ۚ ۖ ۗ ۘ ۙ ۛ ۜ`), hafızın ses dosyasındaki doğal nefes duraklama pencereleri (ses dalgası durak süresi) ve sayfa denge skoru birlikte ağırlıklandırılarak âyetin manevi ve tilavet ahengine göre en kusursuz durak noktasından bölünür.
+* **Sayfa İndis Bütünlüğü (Arapça & Latin Eşzamanlı Dilimleme):** Çok sayfalı âyetlerde Arapça ve Latin dizileri sayfalara birebir aynı indeks aralığıyla (`ar_kelimeler[s:e]`, `tr_kelimeler[s:e]`) bölünür. Arapça bir kelimenin 1. sayfada, Türkçe okunuşunun ise 2. sayfada kalması (veya sesin görüntüden önce 2. sayfaya fırlaması) mimari olarak imkansızdır.
 * **Akıllı Cümle & Meal Bölücü (`akilli_meal_parcala` / `_meal_parcala`):** 
   - Arapça sayfa oranına göre mealin karşılık gelen bölgesinde en mantıklı cümle bitişini arar.
   - Öncelik Hiyerarşisi: Cümle sonları (`.!?`) ➔ Güçlü ayraçlar (`:;—`) ➔ Virgül ve nefes yerleri (`,`).
@@ -65,7 +70,6 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
   - *Orta Flex Alan (Meal & Ayraç):* Tilavet bitişi ile tefekkür başlangıcı arasındaki kalan serbest dikey boşluk hesaplanarak Türkçe meal ve altın ayraç dikeyde ortalanır (`pad_ust = int(serbest_bosluk * 0.42)`).
 * **Sinematik Erime (Crossfade) & Zaman Odaklı Sayfa Seçimi:** Sayfa sonlarında hafızın nefes aralığında 0.45 saniyelik pürüzsüz `Image.blend` erimesi gerçekleşir.
   - *Zaman Odaklı Kilitleme:* Kare döngüsünde aktif sayfa (`active_p`), `aktif_idx` kelime sayacına göre değil; kesin olarak `gecisler` zaman pencerelerine göre (`t_sec < t_s` / `t_sec > t_e`) belirlenir. Bu sayede hafızın nefes duraklamalarında veya ses gecikmelerinde Sayfa 2'den tekrar Sayfa 1'e geri sıçrama (ghosting/snapback/freeze) tamamen engellenmiştir.
-  - *Kelime Zaman Damgası Normalizasyonu (`kelime_zamanlarini_hizala`):* QuranCDN segment sayıları ile Kur'an metnindeki kelime sayıları farklılık gösterse dahi (örn. 40 segmente karşılık 39 kelime) zaman damgaları kümülatif zaman enterpolasyonu ile 1:1 kelime sayısına eşitlenir; kelime sapması veya sayacın erken durması önlenir.
 * **Kesintisiz Animasyon:** Ekolayzır ses dalgaları ve alt ilerleme çubuğu 30 FPS hızında kesintisiz akmaya devam eder.
 
 ### E. Dinamik Tipografi Ölçeklendirme Tavanları (V12.2 Mimarisi)
@@ -153,11 +157,20 @@ Tek bir onay ile tüm büyük sosyal medya kanallarına eş zamanlı ve formata 
 1. **Format Duyarlı Dağıtım (`src/telegram/yonetici.py`):**
    - Görsel paylaşımlarda (`gorsel_yollari = [p_4_5, p_9_16]`), Instagram Feed, Threads ve Facebook'a kareye yakın mükemmel akış formatı olan **4:5 (`gorsel_yollari[0]`)** gönderilir.
    - Instagram Story paylaşımında kırpılma olmadan kusursuz görünmesi için doğrudan **9:16 dikey kart (`gorsel_yollari[1]`)** yüklenir.
-2. **Instagram Reels & Story (`meta.py`):** Meta Graph API v22.0 üzerinden `RUPLOAD_URL` ile iki adımlı Reels ve Story yayın protokolü.
-3. **Threads Zincir Gönderi (`threads.py`):** 500 karakter sınırı `metni_parcala()` algoritması ile aşılır; 450 karakterlik mantıklı parçalar halinde ana post altına `(1/3)`, `(2/3)` zincirleme eklenir.
-4. **Facebook Sayfası (`meta.py`):** `FACEBOOK_PAGE_ACCESS_TOKEN` ile süresiz token üzerinden zengin metin ve görselle paylaşım.
-5. **YouTube Shorts (`youtube.py`):** Google YouTube Data API v3 OAuth 2.0 ile dikey video (#Shorts).
-6. **TikTok (`tiktok.py`):** TikTok Content Posting API v2 ile video paylaşımı.
+2. **Güvenilir CDN Medya Barındırma Katmanı (`gecici_medya_yukle`):**
+   - Meta Graph API doğrudan yerel dosya kabul etmediği için (`image_url` parametresi) yüksek hızlı geçici CDN katmanı kullanılır.
+   - `tmpfiles.org/dl/` doğrudan indirme yerine HTML sayfası döndürdüğü ve 100+ saniye timeout verdiği için mimariden tamamen çıkarılmıştır.
+   - **Birincil CDN:** `catbox.moe` (özel User-Agent ile doğrudan dosya yükleme).
+   - **İkincil / Yüksek Hızlı Yedek CDN:** `litterbox.catbox.moe` (72 saatlik doğrudan medya CDN'i, Meta Graph API ile 3-4 saniyede işlenir).
+   - Tüm HTTP isteklerinde standart masaüstü tarayıcı `User-Agent` başlığı kullanılarak CDN bot engellemeleri aşılmıştır.
+3. **Instagram Reels, Feed & Story (`meta.py`):**
+   - Meta Graph API v22.0 üzerinden `RUPLOAD_URL` ile iki adımlı Reels ve Story yayın protokolü.
+   - **Container Hazırlık Yoklaması (Readiness Polling):** Feed ve Story container'ları oluşturulduktan sonra `media_publish` çağrılmadan önce `status_code == 'FINISHED'` olana kadar maksimum 15 iterasyon (4'er saniye, toplam 60 saniye) yoklama yapılır; `ERROR` durumunda işlem erken durdurulur.
+   - **Story Takibi ve Yayından Kaldırma:** Story ID'si veritabanında `instagram_story_post_id` sütununda saklanır; `/kaldir` tetiklendiğinde Meta API üzerinden hem Feed hem Story silinir.
+4. **Threads Zincir Gönderi (`threads.py`):** 500 karakter sınırı `metni_parcala()` algoritması ile aşılır; 450 karakterlik mantıklı parçalar halinde ana post altına `(1/3)`, `(2/3)` zincirleme eklenir.
+5. **Facebook Sayfası (`meta.py`):** `FACEBOOK_PAGE_ACCESS_TOKEN` ile süresiz token üzerinden zengin metin ve 4:5 görselle paylaşım.
+6. **YouTube Shorts (`youtube.py`):** Google YouTube Data API v3 OAuth 2.0 ile dikey video (#Shorts).
+7. **TikTok (`tiktok.py`):** TikTok Content Posting API v2 ile video paylaşımı.
 
 ---
 
@@ -230,6 +243,8 @@ Bot başlatıldığında Telegram arayüzündeki `/` menüsüne aşağıdaki kom
 ### D. Dinleme & Yanıt Mimarisi
 * **Tek Sefer Dinleme (`dinle_ve_bekle`):** Bulut runner'ında onay butonlarını ve yayın sonrası "Yayından Kaldır" butonlarını dinler.
 * **Sürekli Dinleme Daemon (`surekli_dinle`):** Yerel veya sunucu ortamında sürekli çalışarak gelen her komuta ve buton tıklamasına 2 saniyelik yoklama aralığıyla kesintisiz yanıt verir.
+* **KATI KURAL — Çift Bot / HTTP 409 Çakışma Önleme:** Telegram Bot API tekil `getUpdates` kuralına tabidir. Yerel geliştirme ortamında `python -m src.telegram.bot` arka planda yetim (orphaned daemon) olarak çalışırsa GitHub Actions bulut runner'ı ile çakışır (HTTP 409 Conflict) veya yerel boş/eski veritabanıyla butonları yakalayıp sonsuz askıya alır. Yerel daemon geliştirme haricinde daima kapatılmalıdır; bulut runner tek yetkili onay ve yayın orkestratörüdür.
+* **Hata Yakalama & Tekrar Dene Güvencesi:** Onay butonuna basıldığında platformlardan herhangi birinde ağ/token hatası oluşursa mesaj sonsuza kadar "Yayınlanıyor..." olarak asılı kalmaz. `_gorev_onay` fonksiyonunda try/except ile yakalanıp hata detayları Telegram mesajına yazılır ve altına `[ 🔄 Tekrar Dene ]` inline butonu eklenir.
 
 ---
 
@@ -306,7 +321,7 @@ EzanPlusBot/
 │   │   └── hadisler.db            # Tescilli Riyâzü's-Sâlihîn DB (1.900 sahih hadis)
 │   ├── dualar.json                # 20 seçkin Kur'an ve Nebevî dua koleksiyonu
 │   ├── kelimeler.json             # 15 temel Kur'anî kavram ve kelime koleksiyonu
-│   ├── ezanplus.db                # SQLite içerik ve yayın kayıtları
+│   ├── ezanplus.db                # SQLite içerik ve yayın kayıtları (Story, Facebook, YouTube post ID şeması)
 │   ├── yayin_gecmisi.json         # Paylaşım ve tekrarı önleme kayıtları
 │   ├── zamanlar/                  # 114 sûrenin (6.236 âyet) resmi kelime zaman damgaları (sure_1..114.json)
 │   ├── cikti/                     # Render edilen MP4 ve PNG çıktıları
@@ -324,6 +339,7 @@ EzanPlusBot/
 │   ├── __init__.py
 │   ├── ayar.py                    # Yapılandırma, yollar, renkler ve sabitler
 │   ├── db.py                      # SQLite veritabanı yönetim modülü
+│   ├── ses_getir.py               # EveryAyah ses indirme & ses süresi yöneticisi
 │   ├── kuran_db.py                # Tescilli Kur'an DB sorgulama ve seçim motoru
 │   ├── hadis_db.py                # Tescilli Sahih Hadis DB yönetim motoru
 │   ├── dua_db.py                  # Tescilli Dualar yönetim motoru
