@@ -731,6 +731,10 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                     def _gorev_onay(p_id=paylasim_id, c_id=chat_id, m_id=msg_id):
                         try:
                             sonuclar = yayinla_hepsi(p_id)
+                            # Eğer kalite kontrolü veya tüm platformlar başarısızsa hata fırlat
+                            if "hata" in sonuclar and not any(k in sonuclar for k in ("instagram", "instagram_story", "threads", "facebook", "youtube", "tiktok")):
+                                raise RuntimeError(sonuclar["hata"])
+
                             yt_durum = "—"
                             if "youtube" in sonuclar:
                                 yt_durum = f"✅ Yayınlandı (<a href='{sonuclar.get('youtube_url', '')}'>İzle</a>)"
@@ -762,6 +766,7 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                             caption_ve_buton_guncelle(c_id, m_id, basari_metni, butonlar=yeni_butonlar)
                         except Exception as e:
                             log.error(f"Onay yayınlama hatası (#{p_id}): {e}")
+                            db.durum_guncelle(p_id, yeni_durum="onay_bekliyor", hata_mesaji=str(e))
                             caption_ve_buton_guncelle(
                                 c_id,
                                 m_id,

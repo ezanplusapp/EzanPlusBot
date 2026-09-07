@@ -39,29 +39,51 @@ def get_meta_bilgileri() -> tuple[str, str, str]:
 def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
     """
     Yerel görsel veya video dosyasını Meta'nın doğrudan erişebileceği genel bir CDN URL'sine yükler.
-    Önce Catbox.moe (hızlı, direkt, sınırsız), yedek olarak tmpfiles/ImgBB kullanılır.
+    Önce Catbox.moe / Litterbox (hızlı, doğrudan dosya linki), yedek olarak ImgBB kullanılır.
     """
     p = Path(dosya_yolu)
     if not p.exists():
         raise FileNotFoundError(f"Medya bulunamadı: {dosya_yolu}")
 
-    # 1. Öncelik: Catbox.moe (Meta tarafından sorunsuz kabul edilen doğrudan dosya linki)
+    ua_headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    # 1. Öncelik: Catbox.moe (Doğrudan dosya CDN linki)
     try:
         with open(p, "rb") as f:
             res = requests.post(
                 "https://catbox.moe/user/api.php",
                 data={"reqtype": "fileupload"},
                 files={"fileToUpload": f},
-                timeout=60,
+                headers=ua_headers,
+                timeout=45,
             )
         if res.status_code == 200 and res.text.strip().startswith("http"):
             url = res.text.strip()
             log.info(f"Medya Catbox'a yüklendi: {url}")
             return url
     except Exception as e:
-        log.warning(f"Catbox yükleme hatası: {e}, ImgBB/tmpfiles deneniyor...")
+        log.warning(f"Catbox yükleme hatası: {e}, Litterbox deneniyor...")
 
-    # 2. Öncelik: ImgBB
+    # 2. Öncelik: Litterbox (Catbox'ın 72 saatlik doğrudan CDN servisi)
+    try:
+        with open(p, "rb") as f:
+            res = requests.post(
+                "https://litterbox.catbox.moe/resources/internals/api.php",
+                data={"reqtype": "fileupload", "time": "72h"},
+                files={"fileToUpload": f},
+                headers=ua_headers,
+                timeout=45,
+            )
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            log.info(f"Medya Litterbox'a yüklendi: {url}")
+            return url
+    except Exception as e:
+        log.warning(f"Litterbox yükleme hatası: {e}, ImgBB deneniyor...")
+
+    # 3. Öncelik: ImgBB
     imgbb_key = get_env("IMGBB_API_KEY")
     if imgbb_key and p.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
         try:
@@ -70,7 +92,8 @@ def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
             res = requests.post(
                 "https://api.imgbb.com/1/upload",
                 data={"key": imgbb_key, "image": b64},
-                timeout=30
+                headers=ua_headers,
+                timeout=30,
             )
             data = res.json()
             if data.get("success"):
@@ -78,19 +101,7 @@ def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
         except Exception as e:
             log.warning(f"ImgBB yüklemesi başarısız oldu: {e}")
 
-    # 3. Öncelik: tmpfiles.org
-    with open(p, "rb") as f:
-        res = requests.post(
-            "https://tmpfiles.org/api/v1/upload",
-            files={"file": f},
-            timeout=30
-        )
-    data = res.json()
-    if data.get("status") == "success":
-        url = data["data"]["url"]
-        return url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-
-    raise RuntimeError("Medya hiçbir servise yüklenemedi!")
+    raise RuntimeError("Medya hiçbir CDN servisine yüklenemedi!")
 
 
 def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:
@@ -121,13 +132,33 @@ def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> 
             "caption": aciklama,
             "access_token": token
         },
-        timeout=30
+        timeout=60
     )
     c_data = container_res.json()
     if "id" not in c_data:
         raise RuntimeError(f"Instagram Container hatası: {c_data}")
 
     container_id = c_data["id"]
+
+    # Container hazır olana kadar bekle (azami 30 saniye)
+    for _ in range(15):
+        time.sleep(2)
+        try:
+            status_res = requests.get(
+                f"{GRAPH_API_URL}/{container_id}",
+                params={"fields": "status_code,status", "access_token": token},
+                timeout=15,
+            )
+            s_data = status_res.json()
+            status_code = s_data.get("status_code")
+            if status_code == "FINISHED":
+                break
+            elif status_code in ("ERROR", "EXPIRED"):
+                raise RuntimeError(f"Instagram görsel işleme hatası: {s_data}")
+        except Exception as e_poll:
+            if "işleme hatası" in str(e_poll):
+                raise e_poll
+            break
 
     # 2. Adım: Yayınla
     log.info(f"Container {container_id} yayınlanıyor...")
@@ -137,7 +168,7 @@ def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> 
             "creation_id": container_id,
             "access_token": token
         },
-        timeout=30
+        timeout=60
     )
     p_data = publish_res.json()
     if "id" not in p_data:
@@ -350,12 +381,32 @@ def instagram_story_paylas(
                 "image_url": image_url,
                 "access_token": token,
             },
-            timeout=30,
+            timeout=60,
         )
         c_data = c_res.json()
         if "id" not in c_data:
             raise RuntimeError(f"Story Image Container hatası: {c_data}")
         container_id = c_data["id"]
+
+        # Container hazır olana kadar bekle (azami 30 saniye)
+        for _ in range(15):
+            time.sleep(2)
+            try:
+                status_res = requests.get(
+                    f"{GRAPH_API_URL}/{container_id}",
+                    params={"fields": "status_code,status", "access_token": token},
+                    timeout=15,
+                )
+                s_data = status_res.json()
+                status_code = s_data.get("status_code")
+                if status_code == "FINISHED":
+                    break
+                elif status_code in ("ERROR", "EXPIRED"):
+                    raise RuntimeError(f"Story görsel işleme hatası: {s_data}")
+            except Exception as e_poll:
+                if "işleme hatası" in str(e_poll):
+                    raise e_poll
+                break
 
     # Son Adım: Story Yayınla
     log.info(f"Instagram Story {container_id} yayınlanıyor...")
@@ -365,7 +416,7 @@ def instagram_story_paylas(
             "creation_id": container_id,
             "access_token": token,
         },
-        timeout=30,
+        timeout=60,
     )
     p_data = publish_res.json()
     if "id" not in p_data:
