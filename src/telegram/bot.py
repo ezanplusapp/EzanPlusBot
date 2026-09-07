@@ -302,6 +302,8 @@ def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
         tt_durum = "✅ Yayında"
     elif "tiktok_hata" in sonuclar:
         tt_durum = "❌ Hata"
+    elif format_tipi == "reels_9_16":
+        tt_durum = "⏳ API Onayı Bekliyor (Metin aşağıda)"
 
     tsi_saat = datetime.now().strftime("%H:%M TSİ")
 
@@ -341,6 +343,8 @@ def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
     ]
     if yt_url:
         buton_satirlari.append([{"text": "🔗 YouTube Shorts'ta İzle", "url": yt_url}])
+    if format_tipi == "reels_9_16" and "tiktok" not in sonuclar:
+        buton_satirlari.append([{"text": "🎵 TikTok'u Aç (@ezanplusapp)", "url": "https://www.tiktok.com/@ezanplusapp"}])
 
     # Medyayı gönder (Video -> Thumbnail -> Metin Mesajı Kademeli Güvenlik Fallback'i)
     msg_id = 0
@@ -380,6 +384,18 @@ def yayin_detay_karti_gonder(paylasim_id: int, sonuclar: Dict[str, Any]) -> int:
             msg_id = mesaj_gonder(rapor_metin, butonlar=buton_satirlari)
         except Exception as e:
             log.error(f"Telegram'a metin raporu dahi gönderilemedi: {e}")
+
+    # Video yayınlandığında TikTok için tek dokunuşla kopyalanabilir tam metni ilet
+    if format_tipi == "reels_9_16" and caption:
+        try:
+            import html
+            tiktok_metin = (
+                f"📋 <b>TikTok Açıklama &amp; Etiket Metni</b> (Kopyalamak için metne 1 kez dokunun):\n\n"
+                f"<code>{html.escape(caption)}</code>"
+            )
+            mesaj_gonder(tiktok_metin)
+        except Exception as e:
+            log.warning(f"TikTok kopyalama metni gönderilemedi: {e}")
 
     if msg_id:
         db.durum_guncelle(paylasim_id, yeni_durum="yayinlandi", telegram_mesaj_id=msg_id)
