@@ -1,14 +1,16 @@
 name: Günlük Yayın Otomasyonu (6 Dağıtım Slotu)
 
 on:
-  # 1. Yerel GitHub Zamanlayıcı (Yedek: Günde 6 kez TSİ)
-  schedule:
-    - cron: '30 8 * * *'   # 11:30 TSİ — Kur'an Tilaveti Reels 1
-    - cron: '45 10 * * *'  # 13:45 TSİ — Sahih Hadis Kartı (4:5 + 9:16)
-    - cron: '30 13 * * *'  # 16:30 TSİ — Kur'an Tilaveti Reels 2
-    - cron: '45 15 * * *'  # 18:45 TSİ — Günün Duası Kartı (4:5 + 9:16)
-    - cron: '30 17 * * *'  # 20:30 TSİ — Kur'an Tilaveti Reels 3
-    - cron: '0 19 * * *'   # 22:00 TSİ — Kur'an Sözlüğü Kartı (4:5 + 9:16)
+  # 1. Cloudflare Edge Cron (Birincil ve Yetkili Zamanlayıcı: repository_dispatch)
+  # GitHub Actions'ın dahili 'schedule' mekanizması gecikmeli (15-30 dk) tetiklenip mükerrer içerik
+  # üretimine yol açtığı için devre dışı bırakılmıştır. Zamanlamayı 0 ms gecikmeyle Cloudflare Worker yönetir.
+  # schedule:
+  #   - cron: '30 8 * * *'   # 11:30 TSİ — Kur'an Tilaveti Reels 1
+  #   - cron: '45 10 * * *'  # 13:45 TSİ — Sahih Hadis Kartı (4:5 + 9:16)
+  #   - cron: '30 13 * * *'  # 16:30 TSİ — Kur'an Tilaveti Reels 2
+  #   - cron: '45 15 * * *'  # 18:45 TSİ — Günün Duası Kartı (4:5 + 9:16)
+  #   - cron: '30 17 * * *'  # 20:30 TSİ — Kur'an Tilaveti Reels 3
+  #   - cron: '0 19 * * *'   # 22:00 TSİ — Kur'an Sözlüğü Kartı (4:5 + 9:16)
 
   # 2. Manuel Web Arayüzü Tetiklemesi
   workflow_dispatch:

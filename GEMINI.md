@@ -212,7 +212,7 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
   Query parametreleri: `tur`, `tema`, `auto=true` (otomatik yayın).
 
 ### B. GitHub Actions Bulut İş Akışı (`.github/workflows/gunluk_reels.yml`)
-* 6 zamanlanmış slotu doğrudan dinler ve Worker'dan gelen webhook'ları yakalar.
+* **Tekil Yetkili Tetikleyici:** 6 zamanlanmış slot için zamanlama Cloudflare Worker (`repository_dispatch`) üzerinden 0 ms gecikmeyle yönetilir. GitHub Actions'ın dahili `schedule` cron'u, GitHub altyapısındaki 15-30 dakikalık gecikmeler nedeniyle mükerrer üretime (çift tetiklemeye) yol açtığı için devre dışı bırakılmıştır.
 * `workflow_dispatch` üzerinden GitHub UI'dan tek tıkla `tur` (reels, hadis, dua, kelime, ayet) seçilerek tetiklenebilir.
 * Üretim tamamlandıktan sonra yayın geçmişi (`data/yayin_gecmisi.json`, `data/dualar.json`, `data/kelimeler.json`) otomatik olarak depoya `git push` yapılır.
 
