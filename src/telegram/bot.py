@@ -78,6 +78,9 @@ def _istek(
                     log.warning(f"Telegram rate limit uygulandı ({retry_after}s bekleniyor): {hata}")
                     time.sleep(int(retry_after) + 1)
                     continue
+                if "message is not modified" in hata.lower():
+                    log.debug(f"Telegram API ({metot}): Mesaj zaten güncel, değişiklik yapılmadı.")
+                    return res_json.get("result", {})
                 log.error(f"Telegram API Hatası ({metot}): {hata}")
                 raise RuntimeError(f"Telegram Hatası: {hata}")
 

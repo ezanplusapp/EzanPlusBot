@@ -11,6 +11,7 @@ import logging
 import os
 import random
 import re
+import time
 from typing import Any, Dict, List, Optional
 import requests
 
@@ -109,20 +110,72 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
     return cevap.strip()
 
 
-def _json_ayikla(metin: str) -> Dict[str, Any]:
-    """Markdown kod blokları arasındaki veya çıplak JSON verisini ayrıştırır."""
-    metin = metin.strip()
-    # ```json ... ``` bloğu varsa temizle
-    if "```" in metin:
-        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", metin, re.DOTALL)
+def _json_onar(metin: str) -> str:
+    """Yaygın LLM JSON sözdizimi hatalarını (virgüller, tırnaklar) temizler."""
+    s = metin.strip()
+    # Markdown kod bloklarını ayıkla
+    if "```" in s:
+        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", s, re.DOTALL)
         if m:
-            metin = m.group(1)
+            s = m.group(1)
         else:
-            m2 = re.search(r"(\{.*\})", metin, re.DOTALL)
+            m2 = re.search(r"(\{.*\})", s, re.DOTALL)
             if m2:
-                metin = m2.group(1)
+                s = m2.group(1)
+    else:
+        m2 = re.search(r"(\{.*\})", s, re.DOTALL)
+        if m2:
+            s = m2.group(1)
 
-    return json.loads(metin)
+    # 1. Sondaki gereksiz virgülleri temizle (örn: {"a": 1,} veya [1, 2,])
+    s = re.sub(r",\s*([\]}])", r"\1", s)
+    return s
+
+
+def _json_ayikla(metin: str) -> Dict[str, Any]:
+    """Markdown kod blokları arasındaki veya çıplak JSON verisini toleranslı ayrıştırır."""
+    metin = metin.strip()
+    # İlk deneme: doğrudan veya temizlenmiş
+    try:
+        if "```" in metin:
+            m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", metin, re.DOTALL)
+            if m:
+                return json.loads(m.group(1), strict=False)
+        return json.loads(metin, strict=False)
+    except Exception:
+        pass
+
+    # İkinci deneme: onarılmış metin
+    onarilmis = _json_onar(metin)
+    try:
+        return json.loads(onarilmis, strict=False)
+    except Exception as e:
+        log.warning(f"JSON onarma başarısız oldu ({e}): {metin[:300]}")
+        raise e
+
+
+def _gemini_cagir_json(prompt: str, sistem_talimati: str = "", maks_deneme: int = 2) -> Dict[str, Any]:
+    """Gemini API'ye istek atar, JSON yanıtını doğrular ve hata durumunda otomatik düzeltme ile yeniden dener."""
+    guncel_prompt = prompt
+    son_hata: Optional[Exception] = None
+
+    for deneme in range(1, maks_deneme + 1):
+        try:
+            cevap = _gemini_cagir(guncel_prompt, sistem_talimati)
+            return _json_ayikla(cevap)
+        except Exception as e:
+            son_hata = e
+            log.warning(f"Gemini yanıtı JSON ayrıştırma hatası (deneme {deneme}/{maks_deneme}): {e}")
+            if deneme < maks_deneme:
+                time.sleep(1.5)
+                guncel_prompt = (
+                    f"{prompt}\n\n"
+                    f"⚠️ KRİTİK DÜZELTME TALİMATI: Önceki yanıtın JSON olarak okunamadı ({e}). "
+                    f"Lütfen yanıtını SADECE geçerli, RFC-8259 uyumlu, string içindeki tırnakların kaçışlı (\\\") olduğu "
+                    f"ve fazladan virgül içermeyen saf JSON nesnesi olarak ver. Markdown açıklaması yazma."
+                )
+
+    raise RuntimeError(f"Gemini {maks_deneme} denemede de geçerli bir JSON üretemedi: {son_hata}")
 
 
 def ayet_icerigi_uret(
@@ -232,8 +285,7 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
 }}
 """
 
-    cevap = _gemini_cagir(prompt, sistem_talimati)
-    veri = _json_ayikla(cevap)
+    veri = _gemini_cagir_json(prompt, sistem_talimati)
 
     # Latin kelimeler kontrolü: Eğer tam dizi geldiyse kullan
     lk = veri.get("latin_kelimeler")
@@ -322,8 +374,7 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
 }}
 """
 
-    cevap = _gemini_cagir(prompt, sistem_talimati)
-    veri = _json_ayikla(cevap)
+    veri = _gemini_cagir_json(prompt, sistem_talimati)
 
     # Tescilli doğrulanmış alanları veriye yerleştir (AI halüsinasyonu imkansız!)
     veri["hadis_id"] = hadis_id
@@ -438,8 +489,7 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
 }}
 """
 
-    cevap = _gemini_cagir(prompt, sistem_talimati)
-    veri = _json_ayikla(cevap)
+    veri = _gemini_cagir_json(prompt, sistem_talimati)
 
     # Tescilli doğrulanmış alanları yerleştir
     veri["dua_id"] = dua_id
@@ -587,8 +637,7 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
 """
 
     try:
-        cevap = _gemini_cagir(prompt, sistem_talimati)
-        veri = _json_ayikla(cevap)
+        veri = _gemini_cagir_json(prompt, sistem_talimati)
     except Exception as e:
         log.warning(f"Kelime açıklaması üretilirken Gemini hatası ({e}), varsayılan editoryal şablon kullanılıyor.")
         veri = {}

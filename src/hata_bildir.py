@@ -86,6 +86,22 @@ KATALOG: List[Dict[str, str]] = [
         "eylem": "yok",
     },
     {
+        "kod": "GEMINI_JSON_SYNTAX_ERROR",
+        "desen": r"Expecting ',' delimiter|Expecting property name|JSONDecodeError|Unterminated string",
+        "ne_oldu": "Gemini AI tarafından üretilen içerik çıktısında JSON formatlama uyuşmazlığı oluştu.",
+        "neden": "Yapay zeka modeli metin üretirken tırnak işareti, satır sonu veya virgül kaçışını unuttu.",
+        "ne_yapilir": "Kod seviyesinde self-healing devrededir; '🔄 Yeniden Üret ve Hazırla' butonuna basarak temiz bir içerik oluşturabilirsiniz.",
+        "eylem": "yeniden_uret",
+    },
+    {
+        "kod": "THREADS_MEDIA_NOT_FOUND",
+        "desen": r"Media Not Found|The media with id \d+ cannot be found|Subcode 4279009|4279009",
+        "ne_oldu": "Threads sunucuları oluşturulan yanıt container'ını henüz işleyip eşitlemedi.",
+        "neden": "Meta Graph API sunucuları arasındaki replikasyon gecikmesi nedeniyle yayınlama isteği henüz hazır olmayan bir medya ID'sine yapıldı.",
+        "ne_yapilir": "'🔄 Threads'i Tekrar Dene' butonuna basarak zinciri anında tamamlayabilirsiniz.",
+        "eylem": "tekrar_yayinla",
+    },
+    {
         "kod": "RENDER_FFMPEG_FAIL",
         "desen": r"reels_videosu_uret|ffmpeg|MoviePy|codec|audio.*sync|segment",
         "ne_oldu": "Reels videosu veya stüdyo tilavet sesi birleştirilirken render hatası oluştu.",

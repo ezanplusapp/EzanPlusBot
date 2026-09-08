@@ -389,8 +389,19 @@ EzanPlusBot/
   - `TELEGRAM_TIMEOUT`: Telegram botu medyayı yüklerken zaman aşımına uğradı.
   - `SQLITE_LOCKED`: Veritabanı anlık olarak kilitlendi.
   - `GEMINI_QUOTA_EXCEEDED`: Gemini API günlük ücretsiz istek limiti tükendi.
+  - `GEMINI_JSON_SYNTAX_ERROR`: Gemini AI modelinin Türkçe tırnak veya sözdizimi nedeniyle bozuk JSON üretmesi (otomatik self-healing ile 2. denemede RFC-8259 uyarı promptuyla telafi edilir).
+  - `THREADS_MEDIA_NOT_FOUND`: Meta Threads sunucuları arasındaki replikasyon gecikmesi nedeniyle container ID'nin anlık bulunamaması (Subcode 4279009 / Code 24 - 3 denemeli backoff ile aşılır).
   - `RENDER_FFMPEG_FAIL`: FFmpeg video birleştirme veya ses zaman damgası enterpolasyonunda aksaklık.
   - `PYTHON_SCOPE_ERROR` / `PYTHON_TYPE_ERROR`: Kod yürütme kapsamı veya tip uyumsuzluğu.
+* **LLM JSON Self-Healing & Hata Dayanıklılığı (`src/uretim/ai.py`):**
+  - `_json_onar`: Sondaki yetim virgülleri (`,\s*([\]}]) -> \1`), markdown bloklarını ve bozuk tırnakları regex ile temizler.
+  - `_json_ayikla`: `strict=False` moduyla kaçışsız kontrol karakterlerine tolerans gösterir.
+  - `_gemini_cagir_json`: JSON ayrıştırma hatasında bekleyip Gemini'ye hatayı içeren düzeltme promptu göndererek 2. denemede geçerli JSON alır; workflow çökmesini %100 önler.
+* **Threads Container Hazırlık Yoklaması & Replika Telafisi (`src/platformlar/threads.py`):**
+  - `_threads_container_yayinla`: Zincir gönderi yanıtlarında ve medya gönderilerinde container `status == 'FINISHED'` olana kadar 2 saniyede bir yoklama yapar.
+  - Meta Error 24 / Subcode 4279009 (`Media Not Found`) yakalandığında 3 saniye ve 6 saniye üssel gecikmeyle 3 defaya kadar tekrar dener; zincir yanıtlarının kesilmesini engeller.
+* **Telegram İdempotent Güncelleme (`src/telegram/bot.py`):**
+  - Telegram `message is not modified` 400 uyarısı hata fırlatmak yerine zararsız no-op (DEBUG seviyesi) olarak yutulur.
 * **Sade Türkçe Raporlama Standardı:** Teknik hata metinleri yerine kullanıcıya 4 net bölüm sunulur:
   1. **🔍 NE OLDU?** (Durumun sade özeti)
   2. **💡 NEDEN?** (Arka plandaki teknik kök sebep)

@@ -119,6 +119,71 @@ def metni_parcala(metin: str, max_karakter: int = 460) -> list[str]:
     return parcalar
 
 
+def _threads_container_yayinla(
+    user_id: str,
+    token: str,
+    container_id: str,
+    maks_yoklama: int = 12,
+) -> Dict[str, Any]:
+    """
+    Threads media container'ının Meta sunucularında işlenmesini bekler (readiness polling)
+    ve ardından yayınlama isteğini (threads_publish) güvenle yapar.
+    Meta API replica gecikmesi veya 'Media Not Found' (Code 24) durumunda üstel geri çekilmeyle yeniden dener.
+    """
+    # 1. Hazırlık Yoklaması (Readiness Polling)
+    for deneme_no in range(1, maks_yoklama + 1):
+        time.sleep(2)
+        try:
+            s_res = requests.get(
+                f"{THREADS_API_URL}/{container_id}",
+                params={"fields": "status,error_message", "access_token": token},
+                timeout=15,
+            )
+            s_data = s_res.json()
+            st = s_data.get("status")
+            if st == "FINISHED":
+                break
+            elif st == "ERROR":
+                raise RuntimeError(f"Threads container işleme hatası: {s_data}")
+        except Exception as e_poll:
+            if "container işleme hatası" in str(e_poll):
+                raise e_poll
+            log.debug(f"Threads container durum yoklama uyarısı ({deneme_no}/{maks_yoklama}): {e_poll}")
+
+    # 2. Yayınlama & Replikasyon Gecikmesi Koruması
+    p_data: Dict[str, Any] = {}
+    for pub_deneme in range(1, 4):
+        p_res = requests.post(
+            f"{THREADS_API_URL}/{user_id}/threads_publish",
+            data={
+                "creation_id": container_id,
+                "access_token": token,
+            },
+            timeout=30,
+        )
+        p_data = p_res.json()
+        if "id" in p_data:
+            return p_data
+
+        err = p_data.get("error", {})
+        err_code = err.get("code")
+        err_sub = err.get("error_subcode")
+        err_msg = str(err).lower()
+
+        # Code 24 / Subcode 4279009 veya 'cannot be found' / 'does not exist' replikasyon gecikmesidir
+        if (err_code == 24 or err_sub == 4279009 or "cannot be found" in err_msg or "does not exist" in err_msg) and pub_deneme < 3:
+            bekleme = pub_deneme * 3
+            log.warning(f"Threads Media Not Found (replika gecikmesi: {container_id}), {bekleme}s sonra tekrar deneniyor ({pub_deneme}/3)...")
+            time.sleep(bekleme)
+        else:
+            break
+
+    if "id" not in p_data:
+        raise RuntimeError(f"Threads Yayınlama hatası ({container_id}): {p_data}")
+
+    return p_data
+
+
 def threads_zincir_paylas(
     metin: str,
     gorsel_url_veya_yolu: Optional[str | Path] = None,
@@ -173,23 +238,15 @@ def threads_zincir_paylas(
             log.error(f"Threads zincir yanıt container hatası ({index}): {c_data}")
             break
 
-        # Yanıt yayınla
-        p_res = requests.post(
-            f"{THREADS_API_URL}/{user_id}/threads_publish",
-            data={
-                "creation_id": c_data["id"],
-                "access_token": token,
-            },
-            timeout=30,
-        )
-        p_data = p_res.json()
-        if "id" not in p_data:
-            log.error(f"Threads zincir yanıt yayınlama hatası ({index}): {p_data}")
+        # Yanıt container'ını kontrol ederek yayınla
+        try:
+            p_data = _threads_container_yayinla(user_id, token, c_data["id"], maks_yoklama=10)
+            yeni_id = p_data["id"]
+            reply_ids.append(yeni_id)
+            onceki_id = yeni_id
+        except Exception as e_pub:
+            log.error(f"Threads zincir yanıt yayınlama hatası ({index}): {e_pub}")
             break
-
-        yeni_id = p_data["id"]
-        reply_ids.append(yeni_id)
-        onceki_id = yeni_id
 
     log.info(f"Threads zincir paylaşımı tamamlandı! Root: {root_id}, Yanıtlar: {len(reply_ids)}")
     return {"id": root_id, "reply_ids": reply_ids, "toplam_parca": len(parcalar)}
@@ -206,9 +263,9 @@ def threads_metin_paylas(metin: str) -> Dict[str, Any]:
         data={
             "media_type": "TEXT",
             "text": kirpilmis_metin,
-            "access_token": token
+            "access_token": token,
         },
-        timeout=30
+        timeout=30,
     )
     c_data = res.json()
     if "id" not in c_data:
@@ -216,19 +273,8 @@ def threads_metin_paylas(metin: str) -> Dict[str, Any]:
 
     container_id = c_data["id"]
 
-    # 2. Yayınla
-    pub_res = requests.post(
-        f"{THREADS_API_URL}/{user_id}/threads_publish",
-        data={
-            "creation_id": container_id,
-            "access_token": token
-        },
-        timeout=30
-    )
-    p_data = pub_res.json()
-    if "id" not in p_data:
-        raise RuntimeError(f"Threads Yayınlama hatası: {p_data}")
-
+    # 2. Durum kontrolü ve Yayınlama
+    p_data = _threads_container_yayinla(user_id, token, container_id, maks_yoklama=10)
     log.info(f"Threads metin postu yayınlandı! ID: {p_data['id']}")
     return p_data
 
@@ -249,9 +295,9 @@ def threads_gorsel_paylas(gorsel_url_veya_yolu: str | Path, metin: str) -> Dict[
             "media_type": "IMAGE",
             "image_url": image_url,
             "text": _threads_metin_kirp(metin),
-            "access_token": token
+            "access_token": token,
         },
-        timeout=30
+        timeout=30,
     )
     c_data = res.json()
     if "id" not in c_data:
@@ -259,33 +305,8 @@ def threads_gorsel_paylas(gorsel_url_veya_yolu: str | Path, metin: str) -> Dict[
 
     container_id = c_data["id"]
 
-    # Durum kontrolü (Görsel işlenene kadar bekle)
-    for _ in range(10):
-        time.sleep(2)
-        s_res = requests.get(
-            f"{THREADS_API_URL}/{container_id}",
-            params={"fields": "status,error_message", "access_token": token},
-            timeout=15
-        )
-        s_data = s_res.json()
-        if s_data.get("status") == "FINISHED":
-            break
-        elif s_data.get("status") == "ERROR":
-            raise RuntimeError(f"Threads görsel işleme hatası: {s_data}")
-
-    # 2. Yayınla
-    pub_res = requests.post(
-        f"{THREADS_API_URL}/{user_id}/threads_publish",
-        data={
-            "creation_id": container_id,
-            "access_token": token
-        },
-        timeout=30
-    )
-    p_data = pub_res.json()
-    if "id" not in p_data:
-        raise RuntimeError(f"Threads Yayınlama hatası: {p_data}")
-
+    # 2. Durum kontrolü ve Yayınlama
+    p_data = _threads_container_yayinla(user_id, token, container_id, maks_yoklama=15)
     log.info(f"Threads görselli gönderi yayınlandı! ID: {p_data['id']}")
     return p_data
 
@@ -316,33 +337,8 @@ def threads_video_paylas(video_url_veya_yolu: str | Path, metin: str) -> Dict[st
 
     container_id = c_data["id"]
 
-    # Durum kontrolü (Video işlenene kadar bekle)
-    for _ in range(25):
-        time.sleep(3)
-        s_res = requests.get(
-            f"{THREADS_API_URL}/{container_id}",
-            params={"fields": "status,error_message", "access_token": token},
-            timeout=15,
-        )
-        s_data = s_res.json()
-        if s_data.get("status") == "FINISHED":
-            break
-        elif s_data.get("status") == "ERROR":
-            raise RuntimeError(f"Threads video işleme hatası: {s_data}")
-
-    # 2. Yayınla
-    pub_res = requests.post(
-        f"{THREADS_API_URL}/{user_id}/threads_publish",
-        data={
-            "creation_id": container_id,
-            "access_token": token,
-        },
-        timeout=30,
-    )
-    p_data = pub_res.json()
-    if "id" not in p_data:
-        raise RuntimeError(f"Threads Video Yayınlama hatası: {p_data}")
-
+    # 2. Durum kontrolü ve Yayınlama
+    p_data = _threads_container_yayinla(user_id, token, container_id, maks_yoklama=25)
     log.info(f"Threads video gönderisi yayınlandı! ID: {p_data['id']}")
     return p_data
 
