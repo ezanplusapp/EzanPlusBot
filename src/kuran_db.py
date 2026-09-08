@@ -18,12 +18,15 @@ from .ayar import KOK_DIZIN
 
 log = logging.getLogger(__name__)
 
+from contextlib import contextmanager
+
 KURAN_DIZINI = KOK_DIZIN / "data" / "kuran"
 DB_YOLU = KURAN_DIZINI / "kuran.db"
 
 
-def baglanti_al() -> sqlite3.Connection:
-    """Kur'an veritabanı bağlantısı oluşturur."""
+@contextmanager
+def baglanti_al():
+    """Kur'an veritabanı bağlantısı oluşturur ve işlem bitiminde kapatır."""
     if not DB_YOLU.exists():
         raise FileNotFoundError(
             f"Kur'an veritabanı bulunamadı: {DB_YOLU}. "
@@ -31,7 +34,10 @@ def baglanti_al() -> sqlite3.Connection:
         )
     con = sqlite3.connect(str(DB_YOLU))
     con.row_factory = sqlite3.Row
-    return con
+    try:
+        yield con
+    finally:
+        con.close()
 
 
 def veritabani_mevcut_mu() -> bool:

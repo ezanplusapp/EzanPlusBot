@@ -139,6 +139,72 @@ class TestTroubleshootingVeOnarimlar(unittest.TestCase):
         sonuc = telegram_bot._istek("editMessageCaption", data={"chat_id": 123, "message_id": 456})
         self.assertEqual(sonuc, {})
 
+    # -------------------------------------------------------------
+    # Senaryo 4: Çözüm Komutları Testleri (/saglik, /temizle, /hatalar)
+    # -------------------------------------------------------------
+    def test_saglik_raporu_olustur(self):
+        """Sistem sağlık kontrolü raporunun ve butonlarının başarıyla üretildiğini doğrular."""
+        rapor, btns = telegram_bot.saglik_raporu_olustur()
+        self.assertIn("EZAN PLUS SİSTEM SAĞLIK RAPORU", rapor)
+        self.assertIn("kuran.db", rapor)
+        self.assertIn("hadisler.db", rapor)
+        self.assertGreater(len(btns), 0)
+
+    def test_sistem_temizle(self):
+        """Geçici dosya temizleme ve WAL checkpoint fonksiyonunu doğrular."""
+        from src.ayar import KOK_DIZIN
+        cikti_d = KOK_DIZIN / "data" / "cikti"
+        cikti_d.mkdir(parents=True, exist_ok=True)
+        temp_f = cikti_d / "temp_test_junk.tmp"
+        temp_f.write_text("junk data", encoding="utf-8")
+        self.assertTrue(temp_f.exists())
+
+        sonuc_metni = telegram_bot.sistem_temizle()
+        self.assertIn("SİSTEM TEMİZLİĞİ TAMAMLANDI", sonuc_metni)
+        self.assertFalse(temp_f.exists())
+
+    def test_hatalar_raporu_olustur(self):
+        """Son hataların listelenip butonlarla paketlendiğini doğrular."""
+        metin, btns = telegram_bot.hatalar_raporu_olustur(adet=3)
+        self.assertIsInstance(metin, str)
+        self.assertIsInstance(btns, list)
+
+    # -------------------------------------------------------------
+    # Senaryo 5: İçerik Üretim Dayanıklılığı (Hardening & Edge Cases)
+    # -------------------------------------------------------------
+    def test_video_hook_title_auto_fit(self):
+        """Uzun kanca başlıklarının (s1, s2) taşmadan ekrana sığdırıldığını doğrular."""
+        from src.uretim.video import _statik_taban_ciz
+        from PIL import Image
+        im, _, _, _ = _statik_taban_ciz(
+            sure_ayet="Bakara 286",
+            hafiz_adi="Mişari Râşid el-Afâsî",
+            video_baslik_satir1="Bu son derece uzun bir baslik cümlesidir ve ekrandan tasmasi kesinlikle onlenmelidir:",
+            video_baslik_satir2="Hakikat ve hidayet her an kalbimizdedir unutma.",
+            tefekkur_notu="Kalpler ancak Allah'ı anmakla huzur bulur.",
+        )
+        self.assertIsInstance(im, Image.Image)
+        self.assertEqual(im.size, (1080, 1920))
+
+    def test_kelime_karti_bos_metin_toleransi(self):
+        """Boş veya yetersiz kelime kavramı verildiğinde kart çiziminin çökmeyip fallback yaptığını doğrular."""
+        from src.uretim.kart import kelime_karti_ciz
+        p = kelime_karti_ciz(
+            kelime_tr="",
+            kelime_ar="",
+            okunus="",
+            kok="",
+            lugat_anlami="Kavram açıklaması",
+            kuran_boyutu="Ayet örneği",
+            hayat_dersi="Tefekkür notu",
+            ayet_ref="Bakara 1",
+            cikti_dosya_adi="test_empty_kelime.png",
+            format_tipi="4:5"
+        )
+        self.assertTrue(p.exists())
+        p.unlink()
+
 
 if __name__ == "__main__":
     unittest.main()
+

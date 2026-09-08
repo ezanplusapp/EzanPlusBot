@@ -17,15 +17,24 @@ from .ayar import KOK_DIZIN, AYARLAR
 log = logging.getLogger(__name__)
 
 DB_REL_PATH = AYARLAR.get("genel", {}).get("db_yolu", "data/bot.db")
+from contextlib import contextmanager
 DB_YOLU = KOK_DIZIN / DB_REL_PATH
 
 
-def baglanti_al() -> sqlite3.Connection:
-    """SQLite veritabanı bağlantısı oluşturur."""
+@contextmanager
+def baglanti_al():
+    """SQLite veritabanı bağlantısı oluşturur ve işlem bitiminde güvenle kapatır."""
     DB_YOLU.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(DB_YOLU))
     con.row_factory = sqlite3.Row
-    return con
+    try:
+        yield con
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
 
 
 def tabloları_hazirla():

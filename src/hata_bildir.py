@@ -192,16 +192,22 @@ def hata_kaydet(nerede: str, baslik: str, ham_hata: str, teshis: Dict[str, Any],
 
 def son_hata_getir() -> Optional[Dict[str, Any]]:
     """En son kaydedilen hatanın bilgilerini döner."""
+    liste = son_hatalari_listele(adet=1)
+    return liste[-1] if liste else None
+
+
+def son_hatalari_listele(adet: int = 5) -> List[Dict[str, Any]]:
+    """En son kaydedilen N adet hatayı döner."""
     if not HATA_LOG_YOLU.exists():
-        return None
+        return []
     try:
         with open(HATA_LOG_YOLU, "r", encoding="utf-8") as f:
             satirlar = [s.strip() for s in f if s.strip()]
-            if satirlar:
-                return json.loads(satirlar[-1])
+            son_satirlar = satirlar[-adet:] if len(satirlar) > adet else satirlar
+            return [json.loads(s) for s in son_satirlar]
     except Exception as e:
-        log.warning(f"Son hata okunamadı: {e}")
-    return None
+        log.warning(f"Hatalar listelenemedi: {e}")
+        return []
 
 
 def mesaji_kur(baslik: str, teshis: Dict[str, Any], nerede: str = "", paylasim_id: Optional[int] = None) -> str:
@@ -255,15 +261,31 @@ def hata_butonlari(paylasim_id: Optional[int] = None, eylem: str = "tekrar_yayin
                 {"text": "📱 Story", "callback_data": f"telafi_story_{paylasim_id}"},
                 {"text": "🧵 Threads", "callback_data": f"telafi_threads_{paylasim_id}"},
             ])
-            butonlar.append([{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{paylasim_id}"}])
+            butonlar.append([
+                {"text": "🛠️ Otomatik Onar", "callback_data": f"onar_{paylasim_id}"},
+                {"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{paylasim_id}"}
+            ])
         elif eylem == "yeniden_uret":
-            butonlar.append([{"text": "🔄 Yeniden Üret ve Hazırla", "callback_data": f"onay_{paylasim_id}"}])
+            butonlar.append([
+                {"text": "🛠️ Otomatik Onar", "callback_data": f"onar_{paylasim_id}"},
+                {"text": "🔄 Sıfırdan Yeniden Üret", "callback_data": f"yeniden_uret_{paylasim_id}"},
+            ])
             butonlar.append([{"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"}])
         else:
-            butonlar.append([{"text": "🔄 Tekrar Dene", "callback_data": f"telafi_hepsi_{paylasim_id}"}])
+            butonlar.append([
+                {"text": "🔄 Tekrar Dene", "callback_data": f"telafi_hepsi_{paylasim_id}"},
+                {"text": "🛠️ Otomatik Onar", "callback_data": f"onar_{paylasim_id}"},
+            ])
+    else:
+        # paylasim_id yoksa genel sorun giderme butonları sun
+        butonlar.append([
+            {"text": "🩺 Sistem Sağlık Testi", "callback_data": "cmd_saglik"},
+            {"text": "🧹 Geçici Dosyaları Temizle", "callback_data": "cmd_temizle"},
+        ])
 
     butonlar.append([
         {"text": "📊 Sistem Durumu", "callback_data": "cmd_durum"},
+        {"text": "📜 Son Hatalar", "callback_data": "cmd_hatalar"},
         {"text": "ℹ️ Yardım", "callback_data": "cmd_yardim"},
     ])
     return butonlar

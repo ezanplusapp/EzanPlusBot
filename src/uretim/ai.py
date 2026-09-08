@@ -287,11 +287,42 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
 
     veri = _gemini_cagir_json(prompt, sistem_talimati)
 
-    # Latin kelimeler kontrolü: Eğer tam dizi geldiyse kullan
+    # Latin kelimeler kontrolü: Eğer tam dizi geldiyse kullan, eksikse/fazlaysa hizala
+    from .video import turkce_okunus_hizala
     lk = veri.get("latin_kelimeler")
     if isinstance(lk, list) and len(lk) == toplam_ar_kelime:
         veri["latin_kelimeler"] = [str(w).strip() for w in lk]
         veri["arapca_okunus"] = " ".join(veri["latin_kelimeler"])
+    else:
+        tr_ham = [str(w).strip() for w in lk] if isinstance(lk, list) and lk else str(veri.get("arapca_okunus") or "").split()
+        if not tr_ham:
+            tr_ham = [""] * toplam_ar_kelime
+        veri["latin_kelimeler"] = turkce_okunus_hizala(tr_ham, ar_kelime_listesi)
+        veri["arapca_okunus"] = " ".join(w for w in veri["latin_kelimeler"] if w)
+
+    # Başlık ve anons temizliği: Tırnaksız ve garantili fallbacks
+    s1 = str(veri.get("video_baslik_satir1") or "").strip().strip("“”\"'")
+    s2 = str(veri.get("video_baslik_satir2") or "").strip().strip("“”\"'")
+    if not s1:
+        s1 = "Günün manevi tefekkürü:"
+    elif not s1.endswith(":"):
+        s1 = f"{s1}:"
+    if not s2:
+        s2 = "Huzura doğru bir adım."
+    veri["video_baslik_satir1"] = s1
+    veri["video_baslik_satir2"] = s2
+
+    tef = str(veri.get("tefekkur_notu") or "").strip()
+    if not tef or len(tef) < 15:
+        tef = "Kalpleri mutmain kılan yegâne hakikat Allah'ı zikretmek ve O'nun rızasına sığınmaktır."
+    veri["tefekkur_notu"] = tef
+
+    cap = str(veri.get("instagram_caption") or "").strip()
+    if not cap or len(cap) < 20:
+        cap = f"“{turkce_meal}”\n\n{sure_ayet_etiket}\n\n#ezanplus #kuran #ayet #tilavet #tefekkur"
+    elif "#ezanplus" not in cap.lower():
+        cap = f"{cap}\n\n#ezanplus #kuran #ayet"
+    veri["instagram_caption"] = cap
 
     # Tescilli doğrulanmış alanları veriye yerleştir (AI halüsinasyonu kesinlikle İMKANSIZDIR)
     veri["sure_adi"] = sure_adi
@@ -410,6 +441,18 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
     okunus_ham = okunus_ham.strip("“”\"'{}[] ")
     veri["arapca_okunus"] = okunus_ham
 
+    tef = str(veri.get("tefekkur_notu") or "").strip()
+    if not tef or len(tef) < 15:
+        tef = "Resûlullah'ın sünnetine tabi olmak, hem dünya hem de ahiret saadetinin anahtarıdır."
+    veri["tefekkur_notu"] = tef
+
+    cap = str(veri.get("instagram_caption") or "").strip()
+    if not cap or len(cap) < 20:
+        cap = f"“{hadis_metni}”\n\n{kaynak_ref}\n\n#ezanplus #hadis #sunnet #tefekkur #dua"
+    elif "#ezanplus" not in cap.lower():
+        cap = f"{cap}\n\n#ezanplus #hadis #sunnet"
+    veri["instagram_caption"] = cap
+
     veri["kategori"] = "hadis"
     veri["format"] = "post_4_5"
     return veri
@@ -502,6 +545,13 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
     veri["kaynak_fazilet"] = f"{kaynak_ref} • {fazilet_notu}"
     veri["okunus_veya_fazilet"] = f"{kaynak_ref} • {fazilet_notu}"
     veri["format"] = f"post_{format_tipi.replace(':', '_')}"
+
+    cap = str(veri.get("instagram_caption") or "").strip()
+    if not cap or len(cap) < 20:
+        cap = f"“{turkce_anlam}”\n\n{dua_basligi}\n\n#ezanplus #dua #niyaz #huzur #tefekkur"
+    elif "#ezanplus" not in cap.lower():
+        cap = f"{cap}\n\n#ezanplus #dua #huzur"
+    veri["instagram_caption"] = cap
 
     return veri
 

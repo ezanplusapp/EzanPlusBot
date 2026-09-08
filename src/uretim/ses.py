@@ -35,13 +35,23 @@ def ayet_sesi_indir(sure_no: int, ayet_no: int) -> Path:
         return hedef_yol
 
     url = f"{HAFIZ_URL_TABAN}/{dosya_adi}"
-    log.info(f"Ayet sesi indiriliyor: {url}")
     headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
-    res = requests.get(url, headers=headers, timeout=30)
-    res.raise_for_status()
+    son_hata = None
+    for deneme in range(1, 3):
+        try:
+            log.info(f"Ayet sesi indiriliyor (Deneme {deneme}/2): {url}")
+            res = requests.get(url, headers=headers, timeout=25)
+            res.raise_for_status()
+            hedef_yol.write_bytes(res.content)
+            return hedef_yol
+        except Exception as e:
+            son_hata = e
+            log.warning(f"Ayet sesi indirme hatası (Deneme {deneme}/2): {e}")
+            if deneme < 2:
+                import time
+                time.sleep(2)
 
-    hedef_yol.write_bytes(res.content)
-    return hedef_yol
+    raise RuntimeError(f"Ayet sesi indirilemedi ({url}): {son_hata}")
 
 
 def ses_sure_hesapla(ses_yolu: Path) -> float:

@@ -123,20 +123,31 @@ def _statik_taban_ciz(
     tx = ust_x1 + logo_boyut + gap
     draw.text((tx, ust_y + (logo_boyut - mh) // 2 - bbox_m[1]), "Ezan Plus", font=font_marka, fill=METIN_ANA)
 
-    # 3. KANCA BAŞLIĞI (Stil 3: Editoryal Lora Serif - Seçenek 2 Boşluklu)
+    # 3. KANCA BAŞLIĞI (Stil 3: Editoryal Lora Serif - Seçenek 2 Boşluklu & Taşma Korumalı)
     b_y = 222
-    s1_temiz = video_baslik_satir1.strip().strip("“”\"'")
-    s2_temiz = video_baslik_satir2.strip().strip("“”\"'")
+    s1_temiz = (video_baslik_satir1 or "Günün manevi tefekkürü:").strip().strip("“”\"'")
+    s2_temiz = (video_baslik_satir2 or "Huzura doğru bir adım.").strip().strip("“”\"'")
+    max_hook_w = W - 100
 
-    # 1. Satır: 44pt Lora (Tırnaksız Anons/Çağrı)
-    f1 = font_al(FONT_GOVDE, 44, agirlik=500)
+    # 1. Satır: 44pt Lora (Tırnaksız Anons/Çağrı - Taşma Korumalı Auto-fit)
+    pt1 = 44
+    f1 = font_al(FONT_GOVDE, pt1, agirlik=500)
     w1 = draw.textlength(s1_temiz, font=f1)
+    while w1 > max_hook_w and pt1 > 32:
+        pt1 -= 2
+        f1 = font_al(FONT_GOVDE, pt1, agirlik=500)
+        w1 = draw.textlength(s1_temiz, font=f1)
     draw.text(((W - w1) // 2, b_y), s1_temiz, font=f1, fill=METIN_ANA)
 
-    # 2. Satır: 55pt Lora Bold (0.45px kontur tokluğu, baştaki tırnaktan sonra 1 boşluk)
-    f2 = font_al(FONT_GOVDE, 55, agirlik=700)
+    # 2. Satır: 55pt Lora Bold (0.45px kontur tokluğu, baştaki tırnaktan sonra 1 boşluk - Taşma Korumalı)
     s2_formatli = f"“ {s2_temiz}”"
+    pt2 = 55
+    f2 = font_al(FONT_GOVDE, pt2, agirlik=700)
     w2 = draw.textlength(s2_formatli, font=f2)
+    while w2 > max_hook_w and pt2 > 38:
+        pt2 -= 2
+        f2 = font_al(FONT_GOVDE, pt2, agirlik=700)
+        w2 = draw.textlength(s2_formatli, font=f2)
     draw.text(((W - w2) // 2, b_y + 56), s2_formatli, font=f2, fill=KIRMIZI, stroke_width=0.45, stroke_fill=KIRMIZI)
 
     # 4. MERKEZİ KART (Instagram Safe Zone uyumlu: y = 380 .. 1636)
@@ -1385,10 +1396,18 @@ def reels_videosu_uret(
         str(final_video),
     ]
 
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    if gecici_sessiz_video.exists():
-        gecici_sessiz_video.unlink()
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as cpe:
+        hata_detayi = cpe.stderr.decode("utf-8", errors="replace") if cpe.stderr else str(cpe)
+        log.error(f"FFmpeg render hatası: {hata_detayi[:400]}")
+        raise RuntimeError(f"FFmpeg video birleştirme hatası: {hata_detayi[:300]}")
+    finally:
+        if gecici_sessiz_video.exists():
+            try:
+                gecici_sessiz_video.unlink()
+            except Exception:
+                pass
 
     log.info(f"Reels videosu başarıyla üretildi: {final_video}")
     return final_video

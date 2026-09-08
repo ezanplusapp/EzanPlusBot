@@ -21,17 +21,27 @@ from .ayar import KOK_DIZIN
 
 log = logging.getLogger(__name__)
 
+from contextlib import contextmanager
+
 HADISLER_DIZINI = KOK_DIZIN / "data" / "hadisler"
 DB_YOLU = HADISLER_DIZINI / "hadisler.db"
 RAW_JSON_YOLU = HADISLER_DIZINI / "riyazus_salihin.json"
 
 
-def baglanti_al() -> sqlite3.Connection:
-    """Hadis veritabanı bağlantısı oluşturur."""
+@contextmanager
+def baglanti_al():
+    """Hadis veritabanı bağlantısı oluşturur ve işlem bitiminde kapatır."""
     HADISLER_DIZINI.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(DB_YOLU))
     con.row_factory = sqlite3.Row
-    return con
+    try:
+        yield con
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
 
 
 def _html_temizle_ve_ayristir(raw_tr: str) -> List[str]:

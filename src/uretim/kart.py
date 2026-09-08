@@ -1223,6 +1223,9 @@ def hadis_karti_ciz(
         tr_y += tr_line_h
 
     tr_y += gap_tr_kaynak
+    max_badge_bottom = cta_cy - (48 if format_tipi == "9:16" else 42)
+    if tr_y + 34 > max_badge_bottom:
+        tr_y = max_badge_bottom - 34
 
     # Kaynak Rozeti (Kart sınırlarına tam kilitli, asla taşmaz)
     kx = (w - kw) // 2
@@ -1629,6 +1632,9 @@ def dua_karti_ciz(
         tr_y += tr_line_h
 
     tr_y += gap_tr_kaynak
+    max_badge_bottom = cta_cy - (48 if format_tipi == "9:16" else 42)
+    if tr_y + 34 > max_badge_bottom:
+        tr_y = max_badge_bottom - 34
 
     # Kaynak Rozeti (Kart sınırlarına tam kilitli, asla taşmaz)
     kx = (w - kw) // 2
@@ -1873,12 +1879,18 @@ def kelime_karti_ciz(
     max_text_w = 880 if is_916 else 840
 
     # 2. Hero Başlıklar (BÜYÜTÜLMÜŞ & MİNİMUM SEKÎNET BOYUT TABANI)
+    kelime_tr = (kelime_tr or "Kur'an Sözlüğü").strip()
+    if not kelime_tr:
+        kelime_tr = "Kur'an Sözlüğü"
+
     target_pt = 172 if is_916 else 130
     min_pt_floor = 154 if is_916 else 118
 
     pt_latin = target_pt
     f_latin = font_al(FONT_GOVDE, pt_latin, agirlik=700)
     lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw)
+    if not lines_tr:
+        lines_tr = [kelime_tr]
 
     # Çoklu satırlı kavramlarda dikey sıkışmayı önlemek için akıllı ölçeklendirme
     if len(lines_tr) >= 3:
@@ -1886,13 +1898,13 @@ def kelime_karti_ciz(
         min_pt_floor = 96 if is_916 else 72
         pt_latin = target_pt
         f_latin = font_al(FONT_GOVDE, pt_latin, agirlik=700)
-        lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw)
+        lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw) or [kelime_tr]
     elif len(lines_tr) == 2:
         target_pt = 138 if is_916 else 104
         min_pt_floor = 114 if is_916 else 86
         pt_latin = target_pt
         f_latin = font_al(FONT_GOVDE, pt_latin, agirlik=700)
-        lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw)
+        lines_tr = kelime_basligi_satirla(kelime_tr, f_latin, max_text_w, draw) or [kelime_tr]
 
     max_line_w = max(draw.textbbox((0, 0), l, font=f_latin)[2] - draw.textbbox((0, 0), l, font=f_latin)[0] for l in lines_tr)
     while max_line_w > max_text_w and pt_latin > min_pt_floor:

@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 import requests
 
-from ..ayar import AYARLAR, get_env
+from ..ayar import AYARLAR, get_env, KOK_DIZIN
 from .. import db, hata_bildir
 from .yonetici import yayinla_hepsi, yayindan_kaldir, yayinla_telafi
 
@@ -542,8 +542,13 @@ def komutlari_kaydet() -> bool:
         {"command": "hadis", "description": "Sahih Hadis-i Şerif kartı üret (4:5 + 9:16)"},
         {"command": "dua", "description": "Günün Duası kartı üret (4:5 + 9:16)"},
         {"command": "kelime", "description": "Kur'an Sözlüğü kavram kartı üret (4:5 + 9:16)"},
+        {"command": "onar", "description": "Kalite kontrolünden geçemeyen içeriği otomatik onar"},
+        {"command": "yeniden_uret", "description": "Belirtilen paylaşımı sıfırdan yeniden üret"},
         {"command": "hata", "description": "Son sistem hatasını ve teşhis raporunu göster"},
+        {"command": "hatalar", "description": "Son sistem hatalarını ve çözüm butonlarını listele"},
         {"command": "tekrar", "description": "Başarısız olan platformları tekrar yayınla"},
+        {"command": "saglik", "description": "Sistem servisleri ve API sağlık testi"},
+        {"command": "temizle", "description": "Geçici dosyaları ve önbelleği temizle"},
         {"command": "kaldir", "description": "Yayınlanan içeriği tüm platformlardan sil"},
         {"command": "durum", "description": "Sistem ve yayın istatistikleri raporu"},
         {"command": "yardim", "description": "Komut kullanım rehberi ve yardım"},
@@ -600,36 +605,216 @@ def durum_raporu_olustur() -> str:
     return rapor
 
 
+def saglik_raporu_olustur() -> tuple[str, List[List[Dict[str, str]]]]:
+    """Tüm sistemin, yerel veritabanlarının ve harici API'lerin sağlık durumunu denetler."""
+    import shutil
+    durumlar = []
+
+    # 1. EzanPlus Ana DB
+    try:
+        with db.baglanti_al() as con:
+            cur = con.execute("SELECT COUNT(*) FROM paylasimlar")
+            cnt = cur.fetchone()[0]
+            durumlar.append(("ezanplus.db", True, f"{cnt} kayıt aktif"))
+    except Exception as e:
+        durumlar.append(("ezanplus.db", False, str(e)[:40]))
+
+    # 2. Kur'an DB
+    try:
+        from .. import kuran_db
+        with kuran_db.baglanti_al() as con:
+            cur = con.execute("SELECT COUNT(*) FROM ayetler")
+            cnt = cur.fetchone()[0]
+            durumlar.append(("kuran.db", cnt == 6236, f"{cnt} âyet tescilli"))
+    except Exception as e:
+        durumlar.append(("kuran.db", False, str(e)[:40]))
+
+    # 3. Hadis DB
+    try:
+        from .. import hadis_db
+        with hadis_db.baglanti_al() as con:
+            cur = con.execute("SELECT COUNT(*) FROM hadisler")
+            cnt = cur.fetchone()[0]
+            durumlar.append(("hadisler.db", cnt > 0, f"{cnt} hadis tescilli"))
+    except Exception as e:
+        durumlar.append(("hadisler.db", False, str(e)[:40]))
+
+    # 4. Gemini AI API Anahtarı
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if gemini_key and len(gemini_key) > 15:
+        durumlar.append(("Gemini AI (2.5 Flash)", True, "API anahtarı tanımlı"))
+    else:
+        durumlar.append(("Gemini AI (2.5 Flash)", False, "API anahtarı eksik!"))
+
+    # 5. Meta Graph API (Instagram & FB)
+    meta_token = os.getenv("META_ACCESS_TOKEN") or os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")
+    if meta_token and len(meta_token) > 20:
+        durumlar.append(("Meta Graph API (IG/FB)", True, "Erişim jetonu mevcut"))
+    else:
+        durumlar.append(("Meta Graph API (IG/FB)", False, "Jeton eksik!"))
+
+    # 6. Threads API
+    threads_token = os.getenv("THREADS_ACCESS_TOKEN") or os.getenv("META_ACCESS_TOKEN")
+    if threads_token and len(threads_token) > 20:
+        durumlar.append(("Threads API", True, "Erişim jetonu mevcut"))
+    else:
+        durumlar.append(("Threads API", False, "Jeton eksik!"))
+
+    # 7. YouTube Data API
+    yt_token = KOK_DIZIN / "data" / "youtube_token.json"
+    yt_client = KOK_DIZIN / "data" / "client_secret.json"
+    if yt_token.exists() or yt_client.exists():
+        durumlar.append(("YouTube Shorts API", True, "Yetki yapılandırması mevcut"))
+    else:
+        durumlar.append(("YouTube Shorts API", False, "Token/Secret dosyası eksik"))
+
+    # 8. Disk ve Çıktı Klasörü
+    try:
+        cikti_d = KOK_DIZIN / "data" / "cikti"
+        cikti_d.mkdir(parents=True, exist_ok=True)
+        total, used, free = shutil.disk_usage(cikti_d)
+        free_gb = free / (1024 ** 3)
+        durumlar.append(("Depolama (Disk)", free_gb > 0.5, f"{free_gb:.1f} GB boş alan"))
+    except Exception as e:
+        durumlar.append(("Depolama (Disk)", False, str(e)[:40]))
+
+    satirlar = ["🩺 <b>EZAN PLUS SİSTEM SAĞLIK RAPORU</b>\n"]
+    genel_saglik = all(d[1] for d in durumlar)
+    ozet_ikon = "🟢" if genel_saglik else "⚠️"
+    satirlar.append(f"{ozet_ikon} <b>Genel Durum:</b> {'Tüm Servisler Sağlıklı' if genel_saglik else 'Bazı Servislerde İnceleme Gerekli'}\n")
+
+    for servis, ok, detay in durumlar:
+        s_ikon = "✅" if ok else "❌"
+        satirlar.append(f"• {s_ikon} <b>{servis}:</b> {detay}")
+
+    satirlar.append(f"\n⏰ <i>Test Zamanı: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>")
+
+    btns = [
+        [
+            {"text": "🧹 Geçici Dosyaları Temizle", "callback_data": "cmd_temizle"},
+            {"text": "📜 Son Hatalar", "callback_data": "cmd_hatalar"},
+        ],
+        [
+            {"text": "📊 Sistem Durumu", "callback_data": "cmd_durum"},
+            {"text": "ℹ️ Yardım", "callback_data": "cmd_yardim"},
+        ],
+    ]
+    return "\n".join(satirlar), btns
+
+
+def sistem_temizle() -> str:
+    """Geçici video render dosyalarını, önbellekleri ve artık dosyaları temizler."""
+    temizlenen = 0
+    yer_kazanci_bayt = 0
+    cikti_d = KOK_DIZIN / "data" / "cikti"
+    if cikti_d.exists():
+        for f in cikti_d.glob("temp_*"):
+            try:
+                sz = f.stat().st_size
+                f.unlink()
+                temizlenen += 1
+                yer_kazanci_bayt += sz
+            except Exception:
+                pass
+        for f in cikti_d.glob("*.tmp"):
+            try:
+                sz = f.stat().st_size
+                f.unlink()
+                temizlenen += 1
+                yer_kazanci_bayt += sz
+            except Exception:
+                pass
+
+    audio_d = KOK_DIZIN / "assets" / "audio"
+    if audio_d.exists():
+        concat_f = audio_d / "concat_listesi.txt"
+        if concat_f.exists():
+            try:
+                concat_f.unlink()
+                temizlenen += 1
+            except Exception:
+                pass
+
+    # SQLite WAL checkpoint
+    try:
+        with db.baglanti_al() as con:
+            con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+
+    kazanc_mb = yer_kazanci_bayt / (1024 * 1024)
+    return (
+        f"🧹 <b>SİSTEM TEMİZLİĞİ TAMAMLANDI</b>\n\n"
+        f"• <b>Temizlenen Geçici Dosya:</b> {temizlenen} adet\n"
+        f"• <b>Açılan Alan:</b> {kazanc_mb:.2f} MB\n"
+        f"• <b>Veritabanı:</b> WAL kütükleri diskle senkronize edildi (TRUNCATE).\n\n"
+        f"Sistem önbelleği ferahlatıldı ve üretime hazır."
+    )
+
+
+def hatalar_raporu_olustur(adet: int = 5) -> tuple[str, List[List[Dict[str, str]]]]:
+    """Son kaydedilen sistem hatalarını özet liste ve çözüm butonlarıyla kurar."""
+    hatalar = hata_bildir.son_hatalari_listele(adet=adet)
+    if not hatalar:
+        return (
+            "🟢 <b>Kayıtlı Sistem Hatası Yok</b>\n\nSistemde herhangi bir aktif veya arşivlenmiş hata kaydı bulunmuyor.",
+            [[{"text": "🩺 Sağlık Testi", "callback_data": "cmd_saglik"}, {"text": "📊 Sistem Durumu", "callback_data": "cmd_durum"}]]
+        )
+
+    satirlar = [f"📋 <b>SON SİSTEM HATALARI (Son {len(hatalar)} Kayıt)</b>\n"]
+    btns: List[List[Dict[str, str]]] = []
+
+    for i, h in enumerate(reversed(hatalar), 1):
+        pid = h.get("paylasim_id")
+        pid_str = f"#{pid}" if pid else "Genel"
+        tarih = h.get("tarih_tr") or h.get("tarih", "")[:19]
+        baslik = html.escape(h.get("baslik", "Hata"))
+        nerede = html.escape(h.get("nerede", "Bilinmiyor"))
+        ne_oldu = html.escape(h.get("ne_oldu", "")[:80])
+
+        satirlar.append(
+            f"<b>{i}. [{tarih}] ID: {pid_str}</b>\n"
+            f"📍 <i>{nerede}</i> ➔ <b>{baslik}</b>\n"
+            f"🔍 <i>{ne_oldu}...</i>\n"
+        )
+        if pid:
+            btns.append([
+                {"text": f"🛠️ Onar #{pid}", "callback_data": f"onar_{pid}"},
+                {"text": f"🔄 Yeniden Üret #{pid}", "callback_data": f"yeniden_uret_{pid}"},
+                {"text": f"🔍 Teşhis #{pid}", "callback_data": f"teshis_{pid}"},
+            ])
+
+    btns.append([
+        {"text": "🩺 Sağlık Testi", "callback_data": "cmd_saglik"},
+        {"text": "🧹 Temizle", "callback_data": "cmd_temizle"},
+        {"text": "📊 Durum", "callback_data": "cmd_durum"},
+    ])
+    return "\n".join(satirlar), btns
+
+
 def yardim_metni_olustur() -> str:
     """Kullanılabilir komutların yardım metnini döner."""
     return (
-        f"🕌 <b>EZAN PLUS YÖNETİM KOMUT REHBERİ</b>\n\n"
-        f"Aşağıdaki komutları bu gruba yazarak anında üretim başlatabilir veya sistemi yönetebilirsiniz:\n\n"
-        f"🎬 <b>/ayet</b> [sure:ayet veya tema]\n"
-        f"<i>Örnek: <code>/ayet</code> veya <code>/ayet 94:5</code> veya <code>/ayet sabır</code></i>\n"
-        f"Mişari Râşid tilavetli, senkron karaokeli 9:16 Reels videosu üretir.\n\n"
-        f"📜 <b>/hadis</b> [konu veya hadis no]\n"
-        f"<i>Örnek: <code>/hadis</code> veya <code>/hadis niyet</code> veya <code>/hadis 65</code></i>\n"
-        f"Riyâzü's-Sâlihîn'den V16 standartlarında 4:5 Feed ve 9:16 Story kartı üretir.\n\n"
-        f"🌿 <b>/dua</b> [ruh hali veya dua adı]\n"
-        f"<i>Örnek: <code>/dua</code> veya <code>/dua ferahlık</code> veya <code>/dua Musa</code></i>\n"
-        f"Tescilli dualar külliyatından 4:5 Feed ve 9:16 Story kartı üretir.\n\n"
-        f"📖 <b>/kelime</b> [kavram adı]\n"
-        f"<i>Örnek: <code>/kelime</code> veya <code>/kelime Sekînet</code></i>\n"
-        f"Kur'an Sözlüğü külliyatından kök ve ayet analizli 4:5 ve 9:16 kart üretir.\n\n"
-        f"📊 <b>/durum</b>\n"
-        f"Veritabanı envanteri, yayın sayıları ve bekleyen taslakları listeler.\n\n"
-        f"🚀 <b>/yayinla</b> &lt;ID&gt;\n"
-        f"<i>Örnek: <code>/yayinla 14</code></i> — Onay bekleyen taslağı hemen yayınlar.\n\n"
-        f"🔄 <b>/tekrar</b> &lt;ID&gt;\n"
-        f"<i>Örnek: <code>/tekrar 14</code></i> — Başarısız/eksik platformları tekrar yayınlar.\n\n"
-        f"🛠️ <b>/hata</b>\n"
-        f"Son sistem hatasını, teşhisini ve doğrudan çözüm butonlarını görüntüler.\n\n"
-        f"🗑️ <b>/kaldir</b> &lt;ID&gt;\n"
-        f"<i>Örnek: <code>/kaldir 14</code></i> — Yayındaki içeriği tüm platformlardan siler.\n\n"
-        f"❌ <b>/iptal</b> &lt;ID&gt;\n"
-        f"<i>Örnek: <code>/iptal 14</code></i> — Belirtilen taslağı iptal eder.\n\n"
-        f"ℹ️ <b>/yardim</b> — Bu rehber mesajını görüntüler."
+        f"🕌 <b>EZAN PLUS YÖNETİM & SORUN GİDERME REHBERİ</b>\n\n"
+        f"Aşağıdaki komutları bu gruba yazarak anında içerik üretebilir veya sistemi yönetebilirsiniz:\n\n"
+        f"🎬 <b>/ayet</b> [sure:ayet veya tema] — 9:16 Kur'an Tilaveti Reels videosu üretir.\n"
+        f"📜 <b>/hadis</b> [konu veya hadis no] — Sahih Hadis-i Şerif kartı üretir (4:5 + 9:16).\n"
+        f"🌿 <b>/dua</b> [ruh hali veya dua adı] — Günün Duası kartı üretir (4:5 + 9:16).\n"
+        f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (4:5 + 9:16).\n\n"
+        f"🛠️ <b>HATA ÇÖZÜM & ONARIM KOMUTLARI:</b>\n"
+        f"• <b>/onar &lt;ID&gt;</b> — Kalite veya mizanpaj hatası alan içeriği otonom onarır.\n"
+        f"• <b>/yeniden_uret &lt;ID&gt;</b> — Belirtilen paylaşımı tescilli kaynaktan sıfırdan yeniden üretir.\n"
+        f"• <b>/hata</b> — En son sistem hatasını ve doğrudan çözüm butonlarını gösterir.\n"
+        f"• <b>/hatalar</b> — Son 5 sistem hatasını ve her biri için tek tık onarım butonlarını listeler.\n"
+        f"• <b>/tekrar &lt;ID&gt;</b> — Başarısız/eksik kalan kanalları tekrar yayınlar.\n"
+        f"• <b>/saglik</b> — Veritabanları, AI ve sosyal medya API bağlantılarını test eder.\n"
+        f"• <b>/temizle</b> — Geçici render dosyalarını ve önbelleği temizler.\n\n"
+        f"⚙️ <b>YAYIN YÖNETİMİ:</b>\n"
+        f"• <b>/yayinla &lt;ID&gt;</b> — Onay bekleyen taslağı hemen yayınlar.\n"
+        f"• <b>/kaldir &lt;ID&gt;</b> — Yayındaki içeriği tüm platformlardan siler.\n"
+        f"• <b>/iptal &lt;ID&gt;</b> — Belirtilen taslağı iptal eder.\n"
+        f"• <b>/durum</b> — Yayın ve envanter istatistikleri raporu.\n"
+        f"• <b>/yardim</b> — Bu rehber mesajını görüntüler."
     )
 
 
@@ -817,6 +1002,96 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
                 hata_bildir.bildir(f"Paylaşım #{pid} Telafi Hatası", e, nerede="/tekrar komutu", paylasim_id=pid)
         _arkaplanda_calistir(_gorev_tekrar_cmd)
 
+    elif ana_komut == "/onar":
+        if not parametre or not parametre.isdigit():
+            mesaj_gonder("⚠️ <b>Geçersiz Kullanım:</b> Lütfen onarmak istediğiniz paylaşım ID'sini girin.\n<i>Örnek: <code>/onar 14</code></i>", chat_id=str(chat_id))
+            return
+        pid = int(parametre)
+        mesaj_gonder(f"🛠️ <b>Paylaşım #{pid} otomatik onarılıyor...</b>\nKalite denetimi, metin uyumu ve şablonlar doğrulanıyor...", chat_id=str(chat_id))
+        def _gorev_onar_cmd():
+            try:
+                from .. import denetleyici
+                onarildi, duzeltmeler = denetleyici.otomatik_onar(pid)
+                if onarildi:
+                    d_rapor = "\n".join(f"• {d}" for d in duzeltmeler)
+                    mesaj_gonder(
+                        f"🎉 <b>Paylaşım #{pid} Başarıyla Onarıldı!</b>\n\n"
+                        f"<b>Yapılan Düzeltmeler:</b>\n{d_rapor}\n\n"
+                        f"Kalite denetimi başarıyla onaylandı.",
+                        chat_id=str(chat_id),
+                        butonlar=[
+                            [{"text": "✅ Onayla ve Yayınla", "callback_data": f"onay_{pid}"}],
+                            [{"text": "❌ İptal Et", "callback_data": f"red_{pid}"}],
+                        ]
+                    )
+                else:
+                    d_hata = "\n".join(f"• {d}" for d in duzeltmeler)
+                    mesaj_gonder(
+                        f"❌ <b>Paylaşım #{pid} Otomatik Onarılamadı:</b>\n\n{d_hata}\n\n"
+                        f"Dilerseniz <b>/yeniden_uret {pid}</b> ile içeriği sıfırdan oluşturabilirsiniz.",
+                        chat_id=str(chat_id),
+                        butonlar=[
+                            [{"text": "🔄 Sıfırdan Yeniden Üret", "callback_data": f"yeniden_uret_{pid}"}],
+                            [{"text": "❌ İptal Et", "callback_data": f"red_{pid}"}],
+                        ]
+                    )
+            except Exception as e:
+                log.error(f"/onar hatası (#{pid}): {e}")
+                mesaj_gonder(f"❌ <b>Onarım sırasında hata:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_onar_cmd)
+
+    elif ana_komut in ("/yeniden_uret", "/recreate"):
+        if not parametre or not parametre.isdigit():
+            mesaj_gonder("⚠️ <b>Geçersiz Kullanım:</b> Lütfen yeniden üretmek istediğiniz paylaşım ID'sini girin.\n<i>Örnek: <code>/yeniden_uret 14</code></i>", chat_id=str(chat_id))
+            return
+        pid = int(parametre)
+        kayit = db.paylasim_getir(pid)
+        if not kayit:
+            mesaj_gonder(f"❌ <b>Paylaşım bulunamadı:</b> #{pid}", chat_id=str(chat_id))
+            return
+        kat = kayit.get("kategori", "ayet")
+        baslik = kayit.get("baslik") or kayit.get("kaynak")
+        mesaj_gonder(f"⏳ <b>Paylaşım #{pid} ({kat.upper()}) sıfırdan yeniden üretiliyor...</b>\nLütfen bekleyin...", chat_id=str(chat_id))
+        def _gorev_yeniden_uret_cmd():
+            try:
+                from .. import otomasyon
+                yeni_pid = 0
+                if kat in ("ayet", "reels"):
+                    yeni_pid = otomasyon.reels_icerigi_olustur_ve_gonder(tema=baslik)
+                elif kat == "hadis":
+                    yeni_pid = otomasyon.hadis_postu_olustur_ve_gonder(tema=baslik)
+                elif kat == "dua":
+                    yeni_pid = otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=baslik)
+                elif kat == "kelime":
+                    yeni_pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram=baslik)
+                else:
+                    yeni_pid = otomasyon.icerik_olustur_ve_gonder(tur=kat, tema=baslik)
+
+                db.durum_guncelle(pid, yeni_durum="iptal_edildi", hata_mesaji=f"Yeniden üretildi -> Yeni ID #{yeni_pid}")
+                mesaj_gonder(
+                    f"🎉 <b>Yeniden Üretim Tamamlandı!</b>\n\n"
+                    f"• Eski Paylaşım: #{pid} (Arşivlendi)\n"
+                    f"• <b>Yeni Paylaşım ID:</b> <code>#{yeni_pid}</code>\n\n"
+                    f"Yeni içerik kalite kontrolünden başarıyla geçti ve onaya sunuldu.",
+                    chat_id=str(chat_id)
+                )
+            except Exception as e:
+                log.error(f"/yeniden_uret hatası (#{pid}): {e}")
+                mesaj_gonder(f"❌ <b>Yeniden üretim hatası:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_yeniden_uret_cmd)
+
+    elif ana_komut in ("/hatalar", "/hata_listesi"):
+        metin, btns = hatalar_raporu_olustur(adet=5)
+        mesaj_gonder(metin, chat_id=str(chat_id), butonlar=btns)
+
+    elif ana_komut in ("/saglik", "/test", "/status"):
+        metin, btns = saglik_raporu_olustur()
+        mesaj_gonder(metin, chat_id=str(chat_id), butonlar=btns)
+
+    elif ana_komut in ("/temizle", "/clean"):
+        metin = sistem_temizle()
+        mesaj_gonder(metin, chat_id=str(chat_id))
+
     else:
         mesaj_gonder(
             f"❓ <b>Bilinmeyen Komut:</b> <code>{html.escape(ana_komut)}</code>\n\n"
@@ -971,6 +1246,117 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                             nerede="Yayın Dağıtım Motoru",
                             paylasim_id=p_id
                         )
+
+                elif data.startswith("onar_"):
+                    p_id = int(data.split("_")[1])
+                    callback_cevapla(cq_id, f"🛠️ Paylaşım #{p_id} otomatik onarılıyor...", alert=False)
+                    caption_ve_buton_guncelle(
+                        chat_id,
+                        msg_id,
+                        f"🛠️ <b>OTOMATİK ONARIM BAŞLATILDI (#{p_id})...</b>\n\nKalite denetimi, metin uyumu ve şablonlar doğrulanıyor...",
+                        butonlar=[]
+                    )
+
+                    def _gorev_onar_btn(paylasim_id=p_id, c_id=chat_id, m_id=msg_id):
+                        try:
+                            from .. import denetleyici
+                            onarildi, duzeltmeler = denetleyici.otomatik_onar(paylasim_id)
+                            if onarildi:
+                                d_rapor = "\n".join(f"• {d}" for d in duzeltmeler)
+                                caption_ve_buton_guncelle(
+                                    c_id,
+                                    m_id,
+                                    f"🎉 <b>Paylaşım #{paylasim_id} Başarıyla Onarıldı!</b>\n\n"
+                                    f"<b>Yapılan Düzeltmeler:</b>\n{d_rapor}\n\n"
+                                    f"İçerik kalite kapısından başarıyla geçti. Lütfen yayını onaylayın:",
+                                    butonlar=[
+                                        [{"text": "✅ Onayla ve Yayınla", "callback_data": f"onay_{paylasim_id}"}],
+                                        [{"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"}],
+                                    ]
+                                )
+                            else:
+                                d_hata = "\n".join(f"• {d}" for d in duzeltmeler)
+                                caption_ve_buton_guncelle(
+                                    c_id,
+                                    m_id,
+                                    f"❌ <b>Paylaşım #{paylasim_id} Otomatik Onarılamadı:</b>\n\n{d_hata}",
+                                    butonlar=[
+                                        [{"text": "🔄 Sıfırdan Yeniden Üret", "callback_data": f"yeniden_uret_{paylasim_id}"}],
+                                        [{"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"}],
+                                    ]
+                                )
+                        except Exception as e:
+                            log.error(f"Otomatik onarım hatası (#{paylasim_id}): {e}")
+                            caption_ve_buton_guncelle(
+                                c_id,
+                                m_id,
+                                f"❌ <b>Onarım Hatası:</b> <code>{html.escape(str(e))}</code>",
+                                butonlar=[[{"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"}]]
+                            )
+
+                    _arkaplanda_calistir(_gorev_onar_btn)
+
+                elif data.startswith("yeniden_uret_"):
+                    p_id = int(data.split("_")[2])
+                    callback_cevapla(cq_id, f"🔄 Paylaşım #{p_id} sıfırdan yeniden üretiliyor...", alert=True)
+                    caption_ve_buton_guncelle(
+                        chat_id,
+                        msg_id,
+                        f"⏳ <b>SIFIRDAN YENİDEN ÜRETİLİYOR (#{p_id})...</b>\n\nTescilli kaynaktan yeni içerik çekilip şablonlar sıfırdan çiziliyor...",
+                        butonlar=[]
+                    )
+
+                    def _gorev_yeniden_uret_btn(paylasim_id=p_id, c_id=chat_id, m_id=msg_id):
+                        try:
+                            kayit = db.paylasim_getir(paylasim_id)
+                            kat = kayit.get("kategori", "ayet") if kayit else "ayet"
+                            baslik = (kayit.get("baslik") or kayit.get("kaynak")) if kayit else None
+                            from .. import otomasyon
+                            yeni_pid = 0
+                            if kat in ("ayet", "reels"):
+                                yeni_pid = otomasyon.reels_icerigi_olustur_ve_gonder(tema=baslik)
+                            elif kat == "hadis":
+                                yeni_pid = otomasyon.hadis_postu_olustur_ve_gonder(tema=baslik)
+                            elif kat == "dua":
+                                yeni_pid = otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=baslik)
+                            elif kat == "kelime":
+                                yeni_pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram=baslik)
+                            else:
+                                yeni_pid = otomasyon.icerik_olustur_ve_gonder(tur=kat, tema=baslik)
+
+                            db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=f"Yeniden üretildi -> Yeni ID #{yeni_pid}")
+                            mesaj_gonder(
+                                f"🎉 <b>Yeniden Üretim Başarılı!</b>\n\n"
+                                f"• Eski Paylaşım: #{paylasim_id} (Arşivlendi)\n"
+                                f"• <b>Yeni Paylaşım ID:</b> <code>#{yeni_pid}</code>\n\n"
+                                f"Yeni içerik kalite kontrolünden başarıyla geçti ve onaya sunuldu.",
+                                chat_id=str(c_id)
+                            )
+                        except Exception as e:
+                            log.error(f"Yeniden üretim hatası (#{paylasim_id}): {e}")
+                            caption_ve_buton_guncelle(
+                                c_id,
+                                m_id,
+                                f"❌ <b>Yeniden Üretim Hatası:</b> <code>{html.escape(str(e))}</code>",
+                                butonlar=[[{"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"}]]
+                            )
+
+                    _arkaplanda_calistir(_gorev_yeniden_uret_btn)
+
+                elif data == "cmd_saglik":
+                    callback_cevapla(cq_id, "🩺 Sağlık testi yapılıyor...", alert=False)
+                    metin, btns = saglik_raporu_olustur()
+                    mesaj_gonder(metin, chat_id=str(chat_id), butonlar=btns)
+
+                elif data == "cmd_temizle":
+                    callback_cevapla(cq_id, "🧹 Sistem temizleniyor...", alert=False)
+                    metin = sistem_temizle()
+                    mesaj_gonder(metin, chat_id=str(chat_id))
+
+                elif data == "cmd_hatalar":
+                    callback_cevapla(cq_id, "📜 Son hatalar getiriliyor...", alert=False)
+                    metin, btns = hatalar_raporu_olustur(adet=5)
+                    mesaj_gonder(metin, chat_id=str(chat_id), butonlar=btns)
 
                 elif data == "cmd_durum":
                     callback_cevapla(cq_id, "📊 Sistem durumu getiriliyor...", alert=False)

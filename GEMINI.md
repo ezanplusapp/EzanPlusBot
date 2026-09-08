@@ -425,9 +425,23 @@ Meta Graph API (Instagram & Threads) yerel dosya kabul etmeyip doğrudan genel H
   - `[ 🗑️ Yayından Kaldır ]` (`kaldir_<id>`): Yayınlanan kanallardan içeriği geri çeker.
 * **Mükerrer Paylaşım Koruması (`yayinla_telafi`):** Yeniden deneme tetiklendiğinde veritabanında (`paylasimlar`) daha önce başarılı olmuş platformlar (örn. Facebook ID'si mevcutsa) tespit edilerek atlanır; Facebook'ta çift post oluşması mimari olarak %100 engellenir. Sadece eksik platformlar tamamlanır ve DB kaydı güncellenir.
 
-### D. Telegram Teşhis Komutları
+### D. Telegram Teşhis ve Çözüm Komutları
 * `/hata`: Sistemde kaydedilen en son hatanın teşhis kartını ve aksiyon butonlarını getirir.
+* `/hatalar`: Son 5 sistem hatasını özet liste olarak gösterir ve her biri için tek tık onarım butonları sunar.
+* `/onar <id>`: Kalite kontrolünden veya mizanpaj denetiminden geçemeyen içeriği `otomatik_onar` motoruyla otonom tamir eder.
+* `/yeniden_uret <id>`: Belirtilen paylaşımı tescilli külliyatından sıfırdan yeniden üretir (AI promptu ve medya render'ı yenilenir, eski kayıt arşivlenir).
 * `/tekrar <id>`: Belirtilen paylaşım ID'sinde başarısız kalan platformları anında yeniden dener.
+* `/saglik` (veya `/test`): Yerel SQLite veritabanları (`kuran.db`, `hadisler.db`, `ezanplus.db`), Gemini AI API, Meta Graph API, Threads API, YouTube API ve depolama durumunu denetler; renk kodlu sağlık karnesi sunar.
+* `/temizle`: `data/cikti/` altındaki geçici render artıklarını (`temp_*`, `*.tmp`), yetim ses listelerini temizler ve SQLite WAL checkpoint'ini diskle senkronize eder.
+
+### E. İçerik Üretim Dayanıklılık ve Troubleshooting Standartları
+* **AI Latin Okunuş 1:1 Hizalama Güvencesi (`src/uretim/ai.py`):** Gemini AI modelinin ürettiği token sayısı Arapça kelime sayısından farklı olsa dahi `turkce_okunus_hizala` fonksiyonu ile otomatik dengelenir; eksik token veya dizi taşması mimari olarak imkansızdır.
+* **Video Kanca Başlıkları Taşma Emniyeti (`src/uretim/video.py`):** Reels video üst başlıkları (`video_baslik_satir1` ve `video_baslik_satir2`) $1080$px ekran genişliğini aşmayacak şekilde dinamik auto-fit algoritmasıyla ölçeklenir; ekrandan taşma veya kesilme önlenmiştir.
+* **Kart Şablonları CTA Çarpışma Kilidi (`src/uretim/kart.py`):** Hadis, Dua ve Kelime kartlarında ultra uzun metinlerde dahi kaynak rozeti alt App Store/Play Store CTA indirme butonunun üst sınırına (`max_badge_bottom`) kilitlenir; buton üzerine binme engellenmiştir.
+* **Boş Metin Toleransı (`src/uretim/kart.py`):** Kavram veya hadis metinlerinde boş/hatalı değer gelmesi durumunda `ValueError: max() arg is an empty sequence` hatası vermez; kurumsal editoryal fallback devreye girer.
+* **SQLite Kaynak ve Kilit Güvenliği (`src/db.py`, `src/kuran_db.py`, `src/hadis_db.py`):** Tüm veritabanı bağlantıları `@contextmanager` ile sarmalanarak işlem bitiminde `finally: con.close()` garantisi verilmiştir. SQLite bağlantı sızıntıları ve kilitlenme riskleri (`SQLITE_LOCKED`) %100 ortadan kaldırılmıştır.
+* **FFmpeg Güvenli Render & Çöp Toplama (`src/uretim/video.py`):** Video birleştirme aşamasında olası hatalarda `subprocess.CalledProcessError` stderr çıktısı Türkçe anlaşılır mesajla yükseltilir ve `finally:` bloğuyla geçici sessiz MP4 dosyaları diskten temizlenir.
+* **EveryAyah Ses İndirme Toleransı (`src/uretim/ses.py`):** Ağ gecikmelerine karşı 2 denemeli üssel bekleme ile EveryAyah ses dosyaları güvenle indirilir.
 
 ---
 
