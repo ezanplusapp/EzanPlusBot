@@ -21,6 +21,23 @@ log = logging.getLogger(__name__)
 GRAPH_API_URL = "https://graph.facebook.com/v22.0"
 RUPLOAD_URL = "https://rupload.facebook.com/ig-reels-upload/v22.0"
 
+# Daily Brief Ders 171 & 540: Meta'nın geçici CDN indirme zaman aşımı kodları
+GECICI_MEDYA_HATA_KODLARI = {2207003, 2207052}
+
+
+def _cdn_adlandir(url: str) -> str:
+    """Verilen URL'den barındırıcı CDN servisini belirler."""
+    u = str(url).lower()
+    if "uguu" in u:
+        return "uguu"
+    if "litterbox" in u:
+        return "litterbox"
+    if "catbox" in u:
+        return "catbox"
+    if "ibb" in u or "imgbb" in u:
+        return "imgbb"
+    return "diger"
+
 
 def get_meta_bilgileri() -> tuple[str, str, str]:
     """
@@ -36,14 +53,16 @@ def get_meta_bilgileri() -> tuple[str, str, str]:
     return ig_id, page_id, token
 
 
-def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
+def gecici_medya_yukle(dosya_yolu: str | Path, haric_cdnler: Optional[set[str]] = None) -> str:
     """
     Yerel görsel veya video dosyasını Meta'nın doğrudan erişebileceği genel bir CDN URL'sine yükler.
-    Önce Catbox.moe / Litterbox (hızlı, doğrudan dosya linki), yedek olarak ImgBB kullanılır.
+    haric_cdnler listesindeki servisler atlanır; Uguu ➔ Catbox ➔ Litterbox ➔ ImgBB sırasıyla denenir.
     """
     p = Path(dosya_yolu)
     if not p.exists():
         raise FileNotFoundError(f"Medya bulunamadı: {dosya_yolu}")
+
+    haric = haric_cdnler or set()
 
     import mimetypes
     mime = mimetypes.guess_type(str(p))[0] or ("video/mp4" if p.suffix.lower() == ".mp4" else "image/png")
@@ -54,163 +73,199 @@ def gecici_medya_yukle(dosya_yolu: str | Path) -> str:
     cdn_hatalari: List[str] = []
 
     # 1. Öncelik: Uguu.se (Yüksek hızlı, doğrudan dosya linki, Meta & Threads tam uyumlu)
-    try:
-        with open(p, "rb") as f:
-            res = requests.post(
-                "https://uguu.se/upload",
-                files={"files[]": (p.name, f, mime)},
-                headers=ua_headers,
-                timeout=30,
-            )
-        if res.status_code == 200:
-            veri = res.json()
-            url = (veri.get("files") or [{}])[0].get("url")
-            if url and url.startswith("http"):
-                log.info(f"Medya Uguu CDN'e başarıyla yüklendi: {url}")
-                return url
-            cdn_hatalari.append(f"Uguu boş link döndü: {res.text[:100]}")
-        else:
-            cdn_hatalari.append(f"Uguu HTTP {res.status_code}")
-    except Exception as e:
-        cdn_hatalari.append(f"Uguu: {e}")
-        log.warning(f"Uguu CDN yükleme hatası: {e}, Catbox deneniyor...")
-
-    # 2. Öncelik: Catbox.moe (Doğrudan dosya CDN linki)
-    try:
-        with open(p, "rb") as f:
-            res = requests.post(
-                "https://catbox.moe/user/api.php",
-                data={"reqtype": "fileupload"},
-                files={"fileToUpload": (p.name, f, mime)},
-                headers=ua_headers,
-                timeout=45,
-            )
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            log.info(f"Medya Catbox'a başarıyla yüklendi: {url}")
-            return url
-        cdn_hatalari.append(f"Catbox HTTP {res.status_code}: {res.text[:80]}")
-    except Exception as e:
-        cdn_hatalari.append(f"Catbox: {e}")
-        log.warning(f"Catbox yükleme hatası: {e}, Litterbox deneniyor...")
-
-    # 3. Öncelik: Litterbox (Catbox 72 saatlik doğrudan CDN servisi)
-    try:
-        with open(p, "rb") as f:
-            res = requests.post(
-                "https://litterbox.catbox.moe/resources/internals/api.php",
-                data={"reqtype": "fileupload", "time": "72h"},
-                files={"fileToUpload": (p.name, f, mime)},
-                headers=ua_headers,
-                timeout=45,
-            )
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            log.info(f"Medya Litterbox'a başarıyla yüklendi: {url}")
-            return url
-        cdn_hatalari.append(f"Litterbox HTTP {res.status_code}: {res.text[:80]}")
-    except Exception as e:
-        cdn_hatalari.append(f"Litterbox: {e}")
-        log.warning(f"Litterbox yükleme hatası: {e}, ImgBB deneniyor...")
-
-    # 4. Öncelik: ImgBB (Tanımlı ise görsel dosyaları için)
-    imgbb_key = get_env("IMGBB_API_KEY")
-    if imgbb_key and p.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
-        for anahtar in [k.strip() for k in imgbb_key.split(",") if k.strip()]:
-            try:
-                with open(p, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode("utf-8")
+    if "uguu" not in haric:
+        try:
+            with open(p, "rb") as f:
                 res = requests.post(
-                    "https://api.imgbb.com/1/upload",
-                    data={"key": anahtar, "image": b64},
+                    "https://uguu.se/upload",
+                    files={"files[]": (p.name, f, mime)},
                     headers=ua_headers,
                     timeout=30,
                 )
-                data = res.json()
-                if data.get("success"):
-                    url = data["data"]["url"]
-                    log.info(f"Medya ImgBB'ye yüklendi: {url}")
+            if res.status_code == 200:
+                veri = res.json()
+                url = (veri.get("files") or [{}])[0].get("url")
+                if url and url.startswith("http"):
+                    log.info(f"Medya Uguu CDN'e başarıyla yüklendi: {url}")
                     return url
-                cdn_hatalari.append(f"ImgBB hata: {data.get('error', {}).get('message', 'Bilinmiyor')}")
-            except Exception as e:
-                cdn_hatalari.append(f"ImgBB: {e}")
+                cdn_hatalari.append(f"Uguu boş link döndü: {res.text[:100]}")
+            else:
+                cdn_hatalari.append(f"Uguu HTTP {res.status_code}")
+        except Exception as e:
+            cdn_hatalari.append(f"Uguu: {e}")
+            log.warning(f"Uguu CDN yükleme hatası: {e}, sonraki CDN deneniyor...")
+
+    # 2. Öncelik: Catbox.moe (Doğrudan dosya CDN linki)
+    if "catbox" not in haric:
+        try:
+            with open(p, "rb") as f:
+                res = requests.post(
+                    "https://catbox.moe/user/api.php",
+                    data={"reqtype": "fileupload"},
+                    files={"fileToUpload": (p.name, f, mime)},
+                    headers=ua_headers,
+                    timeout=45,
+                )
+            if res.status_code == 200 and res.text.strip().startswith("http"):
+                url = res.text.strip()
+                log.info(f"Medya Catbox'a başarıyla yüklendi: {url}")
+                return url
+            cdn_hatalari.append(f"Catbox HTTP {res.status_code}: {res.text[:80]}")
+        except Exception as e:
+            cdn_hatalari.append(f"Catbox: {e}")
+            log.warning(f"Catbox yükleme hatası: {e}, sonraki CDN deneniyor...")
+
+    # 3. Öncelik: Litterbox (Catbox 72 saatlik doğrudan CDN servisi)
+    if "litterbox" not in haric:
+        try:
+            with open(p, "rb") as f:
+                res = requests.post(
+                    "https://litterbox.catbox.moe/resources/internals/api.php",
+                    data={"reqtype": "fileupload", "time": "72h"},
+                    files={"fileToUpload": (p.name, f, mime)},
+                    headers=ua_headers,
+                    timeout=45,
+                )
+            if res.status_code == 200 and res.text.strip().startswith("http"):
+                url = res.text.strip()
+                log.info(f"Medya Litterbox'a başarıyla yüklendi: {url}")
+                return url
+            cdn_hatalari.append(f"Litterbox HTTP {res.status_code}: {res.text[:80]}")
+        except Exception as e:
+            cdn_hatalari.append(f"Litterbox: {e}")
+            log.warning(f"Litterbox yükleme hatası: {e}, sonraki CDN deneniyor...")
+
+    # 4. Öncelik: ImgBB (Tanımlı ise görsel dosyaları için)
+    if "imgbb" not in haric:
+        imgbb_key = get_env("IMGBB_API_KEY")
+        if imgbb_key and p.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
+            for anahtar in [k.strip() for k in imgbb_key.split(",") if k.strip()]:
+                try:
+                    with open(p, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("utf-8")
+                    res = requests.post(
+                        "https://api.imgbb.com/1/upload",
+                        data={"key": anahtar, "image": b64},
+                        headers=ua_headers,
+                        timeout=30,
+                    )
+                    data = res.json()
+                    if data.get("success"):
+                        url = data["data"]["url"]
+                        log.info(f"Medya ImgBB'ye yüklendi: {url}")
+                        return url
+                    cdn_hatalari.append(f"ImgBB hata: {data.get('error', {}).get('message', 'Bilinmiyor')}")
+                except Exception as e:
+                    cdn_hatalari.append(f"ImgBB: {e}")
 
     hata_ozeti = "; ".join(cdn_hatalari)
     raise RuntimeError(f"Medya hiçbir CDN servisine yüklenemedi! Ayrıntılar: {hata_ozeti}")
 
 
-def gecici_gorsel_yukle(dosya_yolu: str | Path) -> str:
+def gecici_gorsel_yukle(dosya_yolu: str | Path, haric_cdnler: Optional[set[str]] = None) -> str:
     """Geriye dönük uyumluluk için takma ad."""
-    return gecici_medya_yukle(dosya_yolu)
+    return gecici_medya_yukle(dosya_yolu, haric_cdnler=haric_cdnler)
 
 
 def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> Dict[str, Any]:
     """
     Instagram'da tekil görsel paylaşır.
     Yerel dosya yolu verilirse önce genel URL'ye yükler, ardından Meta Container açıp yayınlar.
+    Daily Brief Ders 171 & 1aa: Meta CDN indirme hatası (2207003/2207052) durumunda alternatif CDN ile otomatik tekrar dener.
     """
     ig_id, _, token = get_meta_bilgileri()
+    is_yerel_dosya = not (str(gorsel_url_veya_yolu).startswith("http://") or str(gorsel_url_veya_yolu).startswith("https://"))
 
-    # Dosya yolu mu yoksa doğrudan URL mi?
-    if str(gorsel_url_veya_yolu).startswith("http://") or str(gorsel_url_veya_yolu).startswith("https://"):
-        image_url = str(gorsel_url_veya_yolu)
-    else:
-        log.info("Görsel genel URL'ye aktarılıyor...")
-        image_url = gecici_gorsel_yukle(gorsel_url_veya_yolu)
+    denenen_cdnler: set[str] = set()
+    son_hata: Optional[Exception] = None
 
-    # 1. Adım: Media Container Oluştur
-    log.info("Instagram Media Container oluşturuluyor...")
-    container_res = requests.post(
-        f"{GRAPH_API_URL}/{ig_id}/media",
-        data={
-            "image_url": image_url,
-            "caption": aciklama,
-            "access_token": token
-        },
-        timeout=60
-    )
-    c_data = container_res.json()
-    if "id" not in c_data:
-        raise RuntimeError(f"Instagram Container hatası: {c_data}")
+    maks_deneme = 3 if is_yerel_dosya else 1
+    for deneme_no in range(1, maks_deneme + 1):
+        if is_yerel_dosya:
+            image_url = gecici_gorsel_yukle(gorsel_url_veya_yolu, haric_cdnler=denenen_cdnler)
+            denenen_cdnler.add(_cdn_adlandir(image_url))
+        else:
+            image_url = str(gorsel_url_veya_yolu)
 
-    container_id = c_data["id"]
-
-    # Container hazır olana kadar bekle (azami 30 saniye)
-    for _ in range(15):
-        time.sleep(2)
         try:
-            status_res = requests.get(
-                f"{GRAPH_API_URL}/{container_id}",
-                params={"fields": "status_code,status", "access_token": token},
-                timeout=15,
+            # 1. Adım: Media Container Oluştur
+            log.info(f"Instagram Media Container oluşturuluyor (Deneme {deneme_no}/{maks_deneme}, CDN: {_cdn_adlandir(image_url)})...")
+            container_res = requests.post(
+                f"{GRAPH_API_URL}/{ig_id}/media",
+                data={
+                    "image_url": image_url,
+                    "caption": aciklama,
+                    "access_token": token
+                },
+                timeout=60
             )
-            s_data = status_res.json()
-            status_code = s_data.get("status_code")
-            if status_code == "FINISHED":
-                break
-            elif status_code in ("ERROR", "EXPIRED"):
-                raise RuntimeError(f"Instagram görsel işleme hatası: {s_data}")
-        except Exception as e_poll:
-            if "işleme hatası" in str(e_poll):
-                raise e_poll
-            break
+            c_data = container_res.json()
+            if "id" not in c_data:
+                err_dict = c_data.get("error", {})
+                subcode = err_dict.get("error_subcode")
+                code = err_dict.get("code")
+                if (subcode in GECICI_MEDYA_HATA_KODLARI or code in GECICI_MEDYA_HATA_KODLARI) and is_yerel_dosya and deneme_no < maks_deneme:
+                    log.warning(f"Meta geçici indirme hatası aldı ({err_dict}). Alternatif CDN ile tekrar deneniyor...")
+                    time.sleep(3)
+                    continue
+                raise RuntimeError(f"Instagram Container hatası: {c_data}")
 
-    # 2. Adım: Yayınla
-    log.info(f"Container {container_id} yayınlanıyor...")
-    publish_res = requests.post(
-        f"{GRAPH_API_URL}/{ig_id}/media_publish",
-        data={
-            "creation_id": container_id,
-            "access_token": token
-        },
-        timeout=60
-    )
-    p_data = publish_res.json()
-    if "id" not in p_data:
-        raise RuntimeError(f"Instagram Yayınlama hatası: {p_data}")
+            container_id = c_data["id"]
 
-    log.info(f"Instagram gönderisi başarıyla yayınlandı! ID: {p_data['id']}")
-    return p_data
+            # Container hazır olana kadar bekle (azami 30 saniye)
+            gecerli = False
+            for _ in range(15):
+                time.sleep(2)
+                try:
+                    status_res = requests.get(
+                        f"{GRAPH_API_URL}/{container_id}",
+                        params={"fields": "status_code,status,error_subcode", "access_token": token},
+                        timeout=15,
+                    )
+                    s_data = status_res.json()
+                    status_code = s_data.get("status_code")
+                    if status_code == "FINISHED":
+                        gecerli = True
+                        break
+                    elif status_code in ("ERROR", "EXPIRED"):
+                        s_sub = s_data.get("error_subcode")
+                        if (s_sub in GECICI_MEDYA_HATA_KODLARI or "media" in str(s_data).lower()) and is_yerel_dosya and deneme_no < maks_deneme:
+                            log.warning(f"Container işleme hatası ({s_data}). Alternatif CDN ile tekrar deneniyor...")
+                            break
+                        raise RuntimeError(f"Instagram görsel işleme hatası: {s_data}")
+                except Exception as e_poll:
+                    if "işleme hatası" in str(e_poll):
+                        raise e_poll
+                    break
+
+            if not gecerli and is_yerel_dosya and deneme_no < maks_deneme:
+                time.sleep(3)
+                continue
+
+            # 2. Adım: Yayınla
+            log.info(f"Container {container_id} yayınlanıyor...")
+            publish_res = requests.post(
+                f"{GRAPH_API_URL}/{ig_id}/media_publish",
+                data={
+                    "creation_id": container_id,
+                    "access_token": token
+                },
+                timeout=60
+            )
+            p_data = publish_res.json()
+            if "id" not in p_data:
+                raise RuntimeError(f"Instagram Yayınlama hatası: {p_data}")
+
+            log.info(f"Instagram gönderisi başarıyla yayınlandı! ID: {p_data['id']}")
+            return p_data
+
+        except Exception as e:
+            son_hata = e
+            if is_yerel_dosya and deneme_no < maks_deneme:
+                log.warning(f"Instagram paylaşım denemesi ({deneme_no}/{maks_deneme}) başarısız oldu ({e}). Alternatif CDN deneniyor...")
+                time.sleep(3)
+                continue
+            raise son_hata
 
 
 def instagram_reels_paylas(video_dosya_yolu: str | Path, aciklama: str) -> Dict[str, Any]:
@@ -401,47 +456,84 @@ def instagram_story_paylas(
             raise TimeoutError("Story videosu işleme zaman aşımına uğradı!")
 
     else:
-        # Görsel Story
-        if str(medya_yolu_veya_url).startswith("http://") or str(medya_yolu_veya_url).startswith("https://"):
-            image_url = str(medya_yolu_veya_url)
-        else:
-            log.info("Story görseli genel URL'ye aktarılıyor...")
-            image_url = gecici_gorsel_yukle(medya_yolu_veya_url)
+        # Görsel Story (Daily Brief Ders 171: CDN indirme hatasında alternatif CDN ile tekrar deneme)
+        is_yerel = not (str(medya_yolu_veya_url).startswith("http://") or str(medya_yolu_veya_url).startswith("https://"))
+        denenen_cdnler: set[str] = set()
+        maks_deneme = 3 if is_yerel else 1
+        container_id = None
 
-        log.info("Instagram Story Image Container oluşturuluyor...")
-        c_res = requests.post(
-            f"{GRAPH_API_URL}/{ig_id}/media",
-            data={
-                "media_type": "STORIES",
-                "image_url": image_url,
-                "access_token": token,
-            },
-            timeout=60,
-        )
-        c_data = c_res.json()
-        if "id" not in c_data:
-            raise RuntimeError(f"Story Image Container hatası: {c_data}")
-        container_id = c_data["id"]
+        for deneme_no in range(1, maks_deneme + 1):
+            if is_yerel:
+                image_url = gecici_gorsel_yukle(medya_yolu_veya_url, haric_cdnler=denenen_cdnler)
+                denenen_cdnler.add(_cdn_adlandir(image_url))
+            else:
+                image_url = str(medya_yolu_veya_url)
 
-        # Container hazır olana kadar bekle (azami 30 saniye)
-        for _ in range(15):
-            time.sleep(2)
             try:
-                status_res = requests.get(
-                    f"{GRAPH_API_URL}/{container_id}",
-                    params={"fields": "status_code,status", "access_token": token},
-                    timeout=15,
+                log.info(f"Instagram Story Image Container oluşturuluyor (Deneme {deneme_no}/{maks_deneme}, CDN: {_cdn_adlandir(image_url)})...")
+                c_res = requests.post(
+                    f"{GRAPH_API_URL}/{ig_id}/media",
+                    data={
+                        "media_type": "STORIES",
+                        "image_url": image_url,
+                        "access_token": token,
+                    },
+                    timeout=60,
                 )
-                s_data = status_res.json()
-                status_code = s_data.get("status_code")
-                if status_code == "FINISHED":
+                c_data = c_res.json()
+                if "id" not in c_data:
+                    err_dict = c_data.get("error", {})
+                    subcode = err_dict.get("error_subcode")
+                    code = err_dict.get("code")
+                    if (subcode in GECICI_MEDYA_HATA_KODLARI or code in GECICI_MEDYA_HATA_KODLARI) and is_yerel and deneme_no < maks_deneme:
+                        log.warning(f"Meta geçici Story görsel indirme hatası ({err_dict}). Alternatif CDN deneniyor...")
+                        time.sleep(3)
+                        continue
+                    raise RuntimeError(f"Story Image Container hatası: {c_data}")
+
+                container_id = c_data["id"]
+
+                # Container hazır olana kadar bekle (azami 30 saniye)
+                gecerli = False
+                for _ in range(15):
+                    time.sleep(2)
+                    try:
+                        status_res = requests.get(
+                            f"{GRAPH_API_URL}/{container_id}",
+                            params={"fields": "status_code,status,error_subcode", "access_token": token},
+                            timeout=15,
+                        )
+                        s_data = status_res.json()
+                        status_code = s_data.get("status_code")
+                        if status_code == "FINISHED":
+                            gecerli = True
+                            break
+                        elif status_code in ("ERROR", "EXPIRED"):
+                            s_sub = s_data.get("error_subcode")
+                            if (s_sub in GECICI_MEDYA_HATA_KODLARI or "media" in str(s_data).lower()) and is_yerel and deneme_no < maks_deneme:
+                                log.warning(f"Story container işleme hatası ({s_data}). Alternatif CDN deneniyor...")
+                                break
+                            raise RuntimeError(f"Story görsel işleme hatası: {s_data}")
+                    except Exception as e_poll:
+                        if "işleme hatası" in str(e_poll):
+                            raise e_poll
+                        break
+
+                if gecerli:
                     break
-                elif status_code in ("ERROR", "EXPIRED"):
-                    raise RuntimeError(f"Story görsel işleme hatası: {s_data}")
-            except Exception as e_poll:
-                if "işleme hatası" in str(e_poll):
-                    raise e_poll
-                break
+                elif is_yerel and deneme_no < maks_deneme:
+                    time.sleep(3)
+                    continue
+
+            except Exception as e_story:
+                if is_yerel and deneme_no < maks_deneme:
+                    log.warning(f"Story görsel denemesi ({deneme_no}/{maks_deneme}) başarısız ({e_story}). Alternatif CDN deneniyor...")
+                    time.sleep(3)
+                    continue
+                raise e_story
+
+        if not container_id:
+            raise RuntimeError("Story container oluşturulamadı!")
 
     # Son Adım: Story Yayınla
     log.info(f"Instagram Story {container_id} yayınlanıyor...")

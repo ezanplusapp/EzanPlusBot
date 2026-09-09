@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -33,6 +34,10 @@ def yetki_al() -> Optional[Credentials]:
     Kullanıcının YouTube hesabına erişim için OAuth 2.0 kimlik doğrulamasını sağlar.
     token.json varsa oradan okur, süresi bittiyse yeniler.
     İlk kurulumda tarayıcı açarak kullanıcıdan izin ister.
+    
+    Daily Brief Ders 108: Google Cloud Console 'Testing' modunda iken refresh token 7 günde
+    bir iptal edilir. Kalıcı çözüm konsolda 'In production / Publish App' yapmaktır.
+    Headless CI ortamlarında (GitHub Actions) tarayıcı açılamayacağı için güvenle hata fırlatılır.
     """
     creds = None
 
@@ -46,10 +51,30 @@ def yetki_al() -> Optional[Credentials]:
 
     # 2. Token geçersizse veya yoksa
     if not creds or not creds.valid:
+        yenilendi = False
         if creds and creds.expired and creds.refresh_token:
             log.info("YouTube erişim belirteci yenileniyor...")
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+                yenilendi = True
+            except Exception as e:
+                log.critical(
+                    f"⚠️ YouTube erişim belirteci yenilenemedi ({e})! "
+                    "Kök Sebep (Daily Brief #108): Google Cloud Console OAuth consent screen "
+                    "'Testing' modunda ise Google refresh token'ı 7 günde bir iptal eder. "
+                    "Kalıcı çözüm için OAuth ekranını 'In production' (Publish App) yapın."
+                )
+                creds = None
+
+        if not yenilendi:
+            # Headless CI ortamında (GitHub Actions, cron vb.) tarayıcı açılamaz
+            if not sys.stdin.isatty():
+                raise RuntimeError(
+                    "YouTube kimlik doğrulaması süresi dolmuş ve terminal etkileşimli değil (Headless CI)! "
+                    "Lütfen yerel ortamda 'python -m src.platformlar.youtube' çalıştırarak yetkiyi yenileyin "
+                    "ve oluşan data/youtube_token.json içeriğini GitHub Secrets (YOUTUBE_TOKEN_JSON) içine aktarın."
+                )
+
             if not CLIENT_SECRET_DOSYASI.exists():
                 log.error(
                     f"'{CLIENT_SECRET_DOSYASI}' bulunamadı! "
@@ -62,14 +87,14 @@ def yetki_al() -> Optional[Credentials]:
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(CLIENT_SECRET_DOSYASI), SCOPES
             )
-            # Yerel sunucu başlatıp tarayıcıda izin ekranını aç
             creds = flow.run_local_server(port=0, prompt="consent")
 
         # Yeni token'ı kaydet
-        TOKEN_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
-        with open(TOKEN_DOSYASI, "w", encoding="utf-8") as token_file:
-            token_file.write(creds.to_json())
-        log.info(f"YouTube yetki belirteci başarıyla kaydedildi: {TOKEN_DOSYASI}")
+        if creds:
+            TOKEN_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
+            with open(TOKEN_DOSYASI, "w", encoding="utf-8") as token_file:
+                token_file.write(creds.to_json())
+            log.info(f"YouTube yetki belirteci başarıyla kaydedildi: {TOKEN_DOSYASI}")
 
     return creds
 

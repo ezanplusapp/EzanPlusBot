@@ -282,8 +282,13 @@ def durum_guncelle(
             k = paylasim_getir(paylasim_id)
             if k:
                 yayin_gecmisi_kaydet(k)
+                kat = k.get("kategori")
+                if kat == "kelime":
+                    from . import kelime_db
+                    kavram = k.get("baslik", "").replace("Kur'an Sözlüğü •", "").strip()
+                    kelime_db.kelimeyi_paylasildi_isaretle_kavram(kavram)
         except Exception as e:
-            log.warning(f"JSON yayın geçmişi kaydedilemedi: {e}")
+            log.warning(f"JSON yayın geçmişi veya külliyat kaydedilemedi: {e}")
     elif yeni_durum == "yayindan_kaldirildi":
         try:
             yayin_gecmisinden_sil(paylasim_id)

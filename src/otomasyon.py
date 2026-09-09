@@ -119,10 +119,12 @@ def gorsel_icerik_olustur_ve_gonder(
     kategori: str = "ayet",
     tema: Optional[str] = None,
     format_tipi: str = "4:5",
+    auto_publish: bool = False,
 ) -> int:
     """
     4:5 (Feed) ve 9:16 (Story) formatlarında tescilli görsel post üretip Telegram grubuna onay için gönderir.
     Hadis, Dua ve Kelime kartlarında hem 4:5 hem de 9:16 çıktıları eş zamanlı üretilir.
+    auto_publish=True olduğunda onay beklemeden doğrudan tüm platformlara yayınlar.
     """
     dosya_eki = int(time.time())
     format_etiketi = format_tipi.replace(":", "_")
@@ -221,10 +223,6 @@ def gorsel_icerik_olustur_ve_gonder(
         )
         gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
 
-        if icerik.get("dua_id"):
-            from . import dua_db
-            dua_db.duayi_paylasildi_isaretle(icerik["dua_id"])
-
     elif kategori == "kelime":
         icerik = icerik_uret.kelime_icerigi_uret(kelime_tr=tema)
         kavram_adi = icerik.get("kelime_tr", "Kur'an Sözlüğü")
@@ -268,10 +266,6 @@ def gorsel_icerik_olustur_ve_gonder(
         )
         gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
 
-        if icerik.get("kelime_id"):
-            from . import kelime_db
-            kelime_db.kelimeyi_paylasildi_isaretle(icerik["kelime_id"])
-
     else:
         raise ValueError(f"Bilinmeyen içerik kategorisi: {kategori}")
 
@@ -306,8 +300,17 @@ def gorsel_icerik_olustur_ve_gonder(
 
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
-    telegram_bot.onay_istegi_gonder(paylasim_id)
-    log.info(f"Görsel post ({kategori.upper()} Çift Format 4:5 + 9:16) hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")
+    if auto_publish or kategori == "kelime":
+        log.info(f"Görsel post ({kategori.upper()}) doğrudan tüm platformlara otomatik yayınlanıyor...")
+        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
+        try:
+            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
+        except Exception as e:
+            log.error(f"{kategori.upper()} #{paylasim_id} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+        log.info(f"{kategori.upper()} postu başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
+    else:
+        telegram_bot.onay_istegi_gonder(paylasim_id)
+        log.info(f"Görsel post ({kategori.upper()} Çift Format 4:5 + 9:16) hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")
     return paylasim_id
 
 
@@ -321,9 +324,9 @@ def dua_postu_olustur_ve_gonder(ruh_hali: Optional[str] = None, format_tipi: str
     return gorsel_icerik_olustur_ve_gonder(kategori="dua", tema=ruh_hali, format_tipi=format_tipi)
 
 
-def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5") -> int:
-    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip Telegram grubuna onay için iletir."""
-    return gorsel_icerik_olustur_ve_gonder(kategori="kelime", tema=kavram, format_tipi=format_tipi)
+def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5", auto_publish: bool = True) -> int:
+    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip doğrudan tüm kanallara otomatik yayınlar."""
+    return gorsel_icerik_olustur_ve_gonder(kategori="kelime", tema=kavram, format_tipi=format_tipi, auto_publish=auto_publish)
 
 
 def icerik_olustur_ve_gonder(tur: str = "reels", tema: Optional[str] = None, format_tipi: str = "4:5") -> int:
@@ -338,7 +341,7 @@ def icerik_olustur_ve_gonder(tur: str = "reels", tema: Optional[str] = None, for
     elif tur_temiz == "dua":
         return dua_postu_olustur_ve_gonder(ruh_hali=tema, format_tipi=format_tipi)
     elif tur_temiz == "kelime":
-        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi)
+        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi, auto_publish=True)
     elif tur_temiz in ("ayet", "gorsel"):
         return gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=tema, format_tipi=format_tipi)
     else:
@@ -381,6 +384,24 @@ def dinle_ve_bekle(sure_saniye: int = 1800, paylasim_id: Optional[int] = None, y
         return True
     else:
         log.warning(f"Zaman aşımı: {sure_saniye} saniye içinde onay/ret gelmedi.")
+        if paylasim_id:
+            try:
+                kayit = db.paylasim_getir(paylasim_id)
+                msg_id = kayit.get("telegram_mesaj_id") if kayit else None
+                token, chat_id = telegram_bot.get_token_ve_chat_id()
+                if msg_id and chat_id:
+                    telegram_bot.caption_ve_buton_guncelle(
+                        chat_id=chat_id,
+                        mesaj_id=msg_id,
+                        yeni_caption=(
+                            f"⏰ <b>ONAY SÜRESİ DOLDU ({dakika} Dakika)</b>\n\n"
+                            f"Bu içerik için tanınan onay süresi dolduğu için bulut oturumu kapatılmıştır.\n"
+                            f"İçeriği sıfırdan yeniden üretip onaya sunmak için aşağıdaki butona basabilirsiniz:"
+                        ),
+                        butonlar=[[{"text": "🔄 Sıfırdan Yeniden Üret", "callback_data": f"yeniden_uret_{paylasim_id}"}]]
+                    )
+            except Exception as e:
+                log.warning(f"Zaman aşımı Telegram mesajı güncellenemedi: {e}")
         return False
 
 
@@ -421,9 +442,9 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    if tur in ("reels", "video"):
-        # Reels otomatik olarak yayınlandı; bekleme süresi boyunca 'Yayından Kaldır' butonu dinlenir
-        log.info(f"Kur'an Reels #{pid} otomatik yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor (Maks: {args.bekleme//60} dk)...")
+    if tur in ("reels", "video", "kelime"):
+        # Reels ve Kelime otomatik olarak yayınlandı; bekleme süresi boyunca 'Yayından Kaldır' butonu dinlenir
+        log.info(f"{tur.upper()} #{pid} otomatik yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor (Maks: {args.bekleme//60} dk)...")
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
     elif args.otomatik:
         log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")

@@ -25,6 +25,24 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
     if not kayit:
         raise ValueError(f"Paylaşım ID bulunamadı: {paylasim_id}")
 
+    # Daily Brief Ders 1u: Mükerrer Yayın Kilidi (Botun yayınladığını unutmasını önleme)
+    # Eğer bu içerik zaten 'yayinlandi' durumundaysa ve en az bir platform kimliği varsa,
+    # sıfırdan tüm ağlara yeniden basmak yerine yalnızca eksik/başarısız platformları telafi et.
+    if kayit.get("durum") == "yayinlandi":
+        mevcut_idler = [
+            kayit.get("instagram_post_id"),
+            kayit.get("threads_post_id"),
+            kayit.get("facebook_post_id"),
+            kayit.get("youtube_post_id"),
+            kayit.get("tiktok_post_id"),
+        ]
+        if any(mevcut_idler):
+            log.warning(
+                f"⚠️ Paylaşım #{paylasim_id} zaten 'yayinlandi' durumunda! "
+                "Mükerrer yayını önlemek için doğrudan telafi kontrolüne yönlendiriliyor..."
+            )
+            return yayinla_telafi(paylasim_id, hedef_kanal="hepsi")
+
     # Yayın Öncesi Son Güvenlik & Kalite Kapısı
     from .. import denetleyici
     denetim = denetleyici.denetle_paylasim(paylasim_id)

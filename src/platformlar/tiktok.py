@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -47,6 +48,7 @@ def yetki_al(manuel_kod: Optional[str] = None) -> Dict[str, Any]:
     TikTok OAuth 2.0 erişim belirtecini yönetir.
     Token dosyası varsa okur, gerekirse yeniler.
     Yoksa kullanıcıdan yetkilendirme alır.
+    Headless CI ortamında input() çağrısını engelleyerek runner kilitlenmesini önler.
     """
     key, secret = get_tiktok_api_anahtarlari()
 
@@ -81,9 +83,17 @@ def yetki_al(manuel_kod: Optional[str] = None) -> Dict[str, Any]:
             else:
                 return token_data
         except Exception as e:
-            log.warning(f"TikTok token yenileme hatası: {e}, yeniden giriş yapılıyor...")
+            log.warning(f"TikTok token yenileme hatası: {e}, yeniden giriş deneniyor...")
 
     # 2. Yeni giriş akışı
+    # Headless CI ortamında (GitHub Actions, cron vb.) tarayıcı açılamaz ve input() çağrılamaz
+    if not manuel_kod and not sys.stdin.isatty():
+        raise RuntimeError(
+            "TikTok yetkilendirme belirteci bulunamadı veya süresi doldu (Headless CI)! "
+            "Lütfen yerel ortamda 'python -m src.platformlar.tiktok' çalıştırarak yeni belirteç alın "
+            "ve oluşan data/tiktok_token.json içeriğini GitHub Secrets (TIKTOK_TOKEN_JSON) içine kaydedin."
+        )
+
     params = {
         "client_key": key,
         "scope": SCOPES,
@@ -138,6 +148,53 @@ def yetki_al(manuel_kod: Optional[str] = None) -> Dict[str, Any]:
     return res_data
 
 
+def baslik_ve_etiketleri_birlestir(
+    baslik: str,
+    aciklama: Optional[str] = None,
+    maks_karakter: int = 2000,
+) -> str:
+    """
+    TikTok için başlık ve açıklama/etiketleri birleştirir.
+    Daily Brief Ders 113: TikTok'ta ayrı açıklama alanı yoktur, tüm metin 'title' alanına yazılır.
+    Metin sınırı aşılırsa manşet ve ana gövde KORUNUR, fazla hashtag'ler sondan düşürülür.
+    """
+    if not aciklama:
+        return baslik[:maks_karakter]
+
+    tam_metin = f"{baslik}\n\n{aciklama}".strip()
+    if len(tam_metin) <= maks_karakter:
+        return tam_metin
+
+    # Eğer aşıyorsa, açıklamadaki hashtag'leri ve gövdeyi ayır
+    import re
+    parcalar = aciklama.split("\n\n")
+    govde = []
+    etiketler = []
+    for p in parcalar:
+        if any(token.startswith("#") for token in p.split()):
+            etiketler.extend([t for t in p.split() if t.startswith("#")])
+        else:
+            govde.append(p)
+
+    govde_metni = f"{baslik}\n\n" + "\n\n".join(govde) if govde else baslik
+    if len(govde_metni) > maks_karakter - 20:
+        return govde_metni[:maks_karakter - 3].rstrip() + "..."
+
+    kalan_alan = maks_karakter - len(govde_metni) - 2
+    kullanilacak_etiketler = []
+    toplam_uzunluk = 0
+    for tag in etiketler:
+        if toplam_uzunluk + len(tag) + 1 <= kalan_alan:
+            kullanilacak_etiketler.append(tag)
+            toplam_uzunluk += len(tag) + 1
+        else:
+            break
+
+    if kullanilacak_etiketler:
+        return f"{govde_metni}\n\n{' '.join(kullanilacak_etiketler)}"
+    return govde_metni
+
+
 def tiktok_video_yukle(
     video_yolu: str | Path,
     baslik: str,
@@ -154,9 +211,8 @@ def tiktok_video_yukle(
     access_token = token_data["access_token"]
     dosya_boyutu = v_path.stat().st_size
 
-    tam_metin = f"{baslik}\n\n{aciklama}" if aciklama else baslik
-    # TikTok başlık limiti ~2200 karakterdir
-    caption_fmt = tam_metin[:2000]
+    # TikTok başlık ve etiketlerini manşeti koruyarak birleştir
+    caption_fmt = baslik_ve_etiketleri_birlestir(baslik, aciklama, maks_karakter=2000)
 
     # 1. Adım: Video Yükleme Başlat
     log.info(f"TikTok video yükleme başlatılıyor ({dosya_boyutu / (1024*1024):.2f} MB)...")

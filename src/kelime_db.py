@@ -111,6 +111,23 @@ def kelimeyi_paylasildi_isaretle(kelime_id: int):
         log.warning(f"Kelime paylaşıldı işaretlenemedi: {e}")
 
 
+def kelimeyi_paylasildi_isaretle_kavram(kavram: str):
+    """Kelime adıyla (örn. 'Vakar') JSON üzerinde paylaşıldı olarak işaretler."""
+    if not kavram:
+        return
+    kelimeler = kelimeleri_yukle()
+    hedef = kavram.strip().lower()
+    for k in kelimeler:
+        if k.get("kelime_tr", "").strip().lower() == hedef:
+            k["paylasildi_mi"] = True
+            break
+    try:
+        with open(KELIMELER_DOSYASI, "w", encoding="utf-8") as f:
+            json.dump(kelimeler, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log.warning(f"Kelime ({kavram}) paylaşıldı işaretlenemedi: {e}")
+
+
 def gunun_kelimesini_sec(
     haric_tutulanlar: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:

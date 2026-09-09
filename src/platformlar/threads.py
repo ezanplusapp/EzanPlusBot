@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 import requests
 
-from ..ayar import get_env
+from ..ayar import get_env, KOK_DIZIN
 from .meta import gecici_gorsel_yukle
 
 log = logging.getLogger(__name__)
@@ -364,4 +364,51 @@ def gonderiyi_sil(media_id: str) -> bool:
     except Exception as e:
         log.warning(f"Threads silme hatası ({media_id}): {e}")
     return False
+
+
+def jetonu_yenile() -> tuple[str, int]:
+    """
+    Daily Brief Ders 217: Threads Jetonu 60 Günlüktür.
+    Mevcut uzun ömürlü Threads jetonunu 60 gün daha uzatır.
+    
+    Threads API kuralı: Jeton en az 24 saatlik olmalıdır.
+    Uç nokta: https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=...
+    
+    Dönüş:
+        (yeni_jeton, kalan_gun)
+    """
+    _, token = get_threads_bilgileri()
+    cevap = requests.get(
+        "https://graph.threads.net/refresh_access_token",
+        params={"grant_type": "th_refresh_token", "access_token": token},
+        timeout=30,
+    )
+    if cevap.status_code != 200:
+        raise RuntimeError(
+            f"Threads jetonu yenilenemedi (HTTP {cevap.status_code}): "
+            f"{cevap.text[:300]}"
+        )
+    d = cevap.json()
+    yeni = d.get("access_token", "")
+    if not yeni:
+        raise RuntimeError(f"Threads yanıtında access_token bulunamadı: {d}")
+    kalan_gun = int(d.get("expires_in", 0)) // 86400
+
+    # .env dosyasını güncelle (mevcutsa)
+    env_dosyasi = KOK_DIZIN / ".env"
+    if env_dosyasi.exists():
+        try:
+            import re
+            metin = env_dosyasi.read_text(encoding="utf-8")
+            if "THREADS_ACCESS_TOKEN=" in metin:
+                yeni_metin = re.sub(r"THREADS_ACCESS_TOKEN=.*", f"THREADS_ACCESS_TOKEN={yeni}", metin)
+                env_dosyasi.write_text(yeni_metin, encoding="utf-8")
+                log.info("Threads jetonu başarıyla yenilendi ve .env dosyasına yazıldı.")
+        except Exception as e:
+            log.warning(f".env dosyasına yeni Threads jetonu yazılamadı: {e}")
+
+    os.environ["THREADS_ACCESS_TOKEN"] = yeni
+    log.info(f"Threads jetonu 60 gün uzatıldı (Kalan süre: ~{kalan_gun} gün).")
+    return yeni, kalan_gun
+
 

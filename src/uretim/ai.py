@@ -178,6 +178,74 @@ def _gemini_cagir_json(prompt: str, sistem_talimati: str = "", maks_deneme: int 
     raise RuntimeError(f"Gemini {maks_deneme} denemede de geçerli bir JSON üretemedi: {son_hata}")
 
 
+def _etiket_anahtari(etiket: str) -> str:
+    """
+    Etiket karşılaştırması için Türkçe ve şapkalı karakterleri sadeleştirir.
+    casefold() tek başına yetmez — #şükür ile #sukur veya #dua ile #duâ aynı etiket sayılır.
+    Bu yalnızca karşılaştırma anahtarıdır; basılan etiket orijinal yazımını korur.
+    """
+    cevrim = str.maketrans("çğıöşüâîû", "cgiosuaiu")
+    e = etiket.lstrip("#").strip().casefold().translate(cevrim)
+    return re.sub(r'[^0-9a-z_]', '', e)
+
+
+def hashtaglari_normallestir(
+    etiketler: List[str],
+    maks: int = 5,
+    zorunlu_ilk: str = "ezanplus"
+) -> List[str]:
+    """
+    Hashtag listesini tekilleştirir, Türkçe karakter/şapka benzerliklerini ayıklar,
+    ilk sıraya zorunlu etiketi (#ezanplus) yerleştirir ve azami `maks` adetle sınırlar.
+    """
+    zorunlu_temiz = zorunlu_ilk.lstrip("#").strip()
+    goruldu = {_etiket_anahtari(zorunlu_temiz)}
+    sonuc = [f"#{zorunlu_temiz}"]
+
+    for etiket in etiketler:
+        ham = etiket.lstrip("#").strip()
+        temiz = re.sub(r'[^0-9A-Za-zÇĞİÖŞÜçğıöşüâîûÂÎÛ_]', '', ham)
+        if not temiz:
+            continue
+        anahtar = _etiket_anahtari(temiz)
+        if not anahtar or anahtar in goruldu:
+            continue
+        goruldu.add(anahtar)
+        sonuc.append(f"#{temiz}")
+        if len(sonuc) >= maks:
+            break
+
+    return sonuc
+
+
+def caption_hashtaglari_guncelle(
+    caption: str,
+    varsayilan_etiketler: Optional[List[str]] = None,
+    maks: int = 5,
+    zorunlu_ilk: str = "ezanplus",
+) -> str:
+    """
+    Caption içindeki hashtagleri ayıklar, normalize eder ve caption sonuna garantili
+    azami `maks` adet tekilleştirilmiş hashtag olarak ekler.
+    """
+    mevcut_etiketler = re.findall(r'#\w+', caption)
+
+    tum_adaylar = list(mevcut_etiketler)
+    if varsayilan_etiketler:
+        tum_adaylar.extend(varsayilan_etiketler)
+
+    normallesmis = hashtaglari_normallestir(tum_adaylar, maks=maks, zorunlu_ilk=zorunlu_ilk)
+
+    # Caption gövdesindeki tüm etiketleri ve fazla satır başlarını ayıkla
+    metin_govdesi = re.sub(r'#\w+', '', caption).strip()
+    metin_govdesi = re.sub(r'\n{3,}', '\n\n', metin_govdesi).strip()
+
+    if not metin_govdesi:
+        return " ".join(normallesmis)
+
+    return f"{metin_govdesi}\n\n{' '.join(normallesmis)}"
+
+
 def ayet_icerigi_uret(
     tema: Optional[str] = None,
     meal_tercihi: str = "elmalili",
@@ -319,10 +387,9 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
 
     cap = str(veri.get("instagram_caption") or "").strip()
     if not cap or len(cap) < 20:
-        cap = f"“{turkce_meal}”\n\n{sure_ayet_etiket}\n\n#ezanplus #kuran #ayet #tilavet #tefekkur"
-    elif "#ezanplus" not in cap.lower():
-        cap = f"{cap}\n\n#ezanplus #kuran #ayet"
-    veri["instagram_caption"] = cap
+        cap = f"“{turkce_meal}”\n\n{sure_ayet_etiket}"
+    varsayilan = ["ezanplus", "kuran", "ayet", "tilavet", "tefekkur"]
+    veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     # Tescilli doğrulanmış alanları veriye yerleştir (AI halüsinasyonu kesinlikle İMKANSIZDIR)
     veri["sure_adi"] = sure_adi
@@ -448,10 +515,9 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
 
     cap = str(veri.get("instagram_caption") or "").strip()
     if not cap or len(cap) < 20:
-        cap = f"“{hadis_metni}”\n\n{kaynak_ref}\n\n#ezanplus #hadis #sunnet #tefekkur #dua"
-    elif "#ezanplus" not in cap.lower():
-        cap = f"{cap}\n\n#ezanplus #hadis #sunnet"
-    veri["instagram_caption"] = cap
+        cap = f"“{hadis_metni}”\n\n{kaynak_ref}"
+    varsayilan = ["ezanplus", "hadis", "sunnet", "tefekkur", "dua"]
+    veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     veri["kategori"] = "hadis"
     veri["format"] = "post_4_5"
@@ -548,10 +614,9 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
 
     cap = str(veri.get("instagram_caption") or "").strip()
     if not cap or len(cap) < 20:
-        cap = f"“{turkce_anlam}”\n\n{dua_basligi}\n\n#ezanplus #dua #niyaz #huzur #tefekkur"
-    elif "#ezanplus" not in cap.lower():
-        cap = f"{cap}\n\n#ezanplus #dua #huzur"
-    veri["instagram_caption"] = cap
+        cap = f"“{turkce_anlam}”\n\n{dua_basligi}"
+    varsayilan = ["ezanplus", "dua", "niyaz", "huzur", "tefekkur"]
+    veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     return veri
 
@@ -705,17 +770,8 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
             ayet_ref=ayet_ref,
             ayet_ar=ayet_ar,
         )
-    else:
-        # Hashtag denetimi: en fazla 5 hashtag ve #ezanplus zorunluluğu
-        tags = re.findall(r'#\w+', caption)
-        if len(tags) > 5:
-            gecerli_tags = tags[:5]
-            if "#ezanplus" not in [t.lower() for t in gecerli_tags]:
-                gecerli_tags[0] = "#ezanplus"
-            caption_no_tags = re.sub(r'#\w+\s*', '', caption).strip()
-            caption = f"{caption_no_tags}\n\n{' '.join(gecerli_tags)}"
-
-    veri["instagram_caption"] = caption
+    varsayilan = ["ezanplus", "kuran", "kavram", "kelime", "tefekkur"]
+    veri["instagram_caption"] = caption_hashtaglari_guncelle(caption, varsayilan_etiketler=varsayilan)
     veri["kelime_id"] = kelime_id
     veri["kelime_tr"] = k_tr
     veri["kelime_ar"] = k_ar

@@ -1411,6 +1411,11 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                         "❌ <b>BU İÇERİK İPTAL EDİLDİ</b>\n\nYayınlanmadan arşivlendi.",
                         butonlar=[]
                     )
+                else:
+                    # Daily Brief Ders 127: Tanınmayan veya süresi dolmuş buton tıklamalarında
+                    # Telegram istemcisinde sonsuz dönen yükleme simgesini (spinner) engelle
+                    log.warning(f"Tanınmayan veya süresi dolmuş Telegram butonu tıklandı: data='{data}', msg_id={msg_id}")
+                    callback_cevapla(cq_id, "⚠️ Bu buton artık geçerli değil veya süresi doldu.", alert=False)
                 continue
 
             # 2. Gelen Metin Mesajları / Komutlar

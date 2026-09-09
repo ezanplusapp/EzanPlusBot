@@ -187,7 +187,7 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
 | **3** | **16:30** | 13:30 | **Kur'an Tilaveti** | 1080x1920 Reels | İkindi sonrası Kur'an tilaveti |
 | **4** | **18:45** | 15:45 | **Günün Duası** | 4:5 Feed + 9:16 Story | Akşam vakti manevi niyaz ve münacat |
 | **5** | **20:30** | 17:30 | **Kur'an Tilaveti** | 1080x1920 Reels | Yatsı vakti tefekkür tilaveti |
-| **6** | **22:00** | 19:00 | **İslamî Kavram / Kelime** | 4:5 Feed + 9:16 Story | Gece tefekkürü, Kur'an kavramı |
+| **6** | **22:00** | 19:00 | **İslamî Kavram / Kelime** | 4:5 Feed + 9:16 Story | Gece tefekkürü, Kur'an kavramı. Otomatik yayınlanır (onay beklemez, Telegram'a detay kartı ve 'Yayından Kaldır' iletilir). |
 
 ```
 [Cloudflare Edge Cron] (11:30, 13:45, 16:30, 18:45, 20:30, 22:00 TSİ)
@@ -198,9 +198,11 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
 [Ubuntu Bulut Runner]
        ├─► 1. İlgili DB'den (Kur'an, Hadis, Dua, Kelime) tescilli metni çek
        ├─► 2. Medyayı render et (Reels için MP4 video, Kartlar için 4:5 + 9:16 PNG)
-       ├─► 3. Telegram onay grubuna medyayı ve "Onayla / İptal" butonlarını gönder
-       ├─► 4. (45 Dakika Dinleme) Doğukan onayladığında 6 platforma yayınla!
-       └─► 5. Yayın geçmişini ve sayaçları git push ile depoya kaydet
+       ├─► 3. Kalite Kontrolü & Self-Healing Doğrulaması (src/denetleyici.py)
+       ├─► 4. Yayınlama & Onay Ayrımı:
+       │     • Kur'an Reels (1, 3, 5) & Kelime (6): Onaysız DOĞRUDAN YAYINLA! ➔ Telegram'a 'Yayından Kaldır' kartı at.
+       │     • Hadis (2) & Dua (4): Telegram'a "✅ Onayla / ❌ İptal Et" butonlarıyla ilet (45 dk bekleme).
+       └─► 5. Yayın geçmişini ve külliyatı git push ile depoya kaydet
 ```
 
 ### A. Cloudflare Worker Zamanlayıcı (`worker/`)
@@ -214,7 +216,7 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
 ### B. GitHub Actions Bulut İş Akışı (`.github/workflows/gunluk_reels.yml`)
 * **Tekil Yetkili Tetikleyici:** 6 zamanlanmış slot için zamanlama Cloudflare Worker (`repository_dispatch`) üzerinden 0 ms gecikmeyle yönetilir. GitHub Actions'ın dahili `schedule` cron'u, GitHub altyapısındaki 15-30 dakikalık gecikmeler nedeniyle mükerrer üretime (çift tetiklemeye) yol açtığı için devre dışı bırakılmıştır.
 * `workflow_dispatch` üzerinden GitHub UI'dan tek tıkla `tur` (reels, hadis, dua, kelime, ayet) seçilerek tetiklenebilir.
-* Üretim tamamlandıktan sonra yayın geçmişi (`data/yayin_gecmisi.json`, `data/dualar.json`, `data/kelimeler.json`) otomatik olarak depoya `git push` yapılır.
+* Üretim tamamlandıktan sonra yayın geçmişi (`data/yayin_gecmisi.json`, `data/dualar/dualar.json`, `data/kelimeler/kelimeler.json`) otomatik olarak depoya `git push` yapılır.
 
 ---
 
@@ -227,7 +229,7 @@ Bot başlatıldığında Telegram arayüzündeki `/` menüsüne aşağıdaki kom
 * `/ayet` — Yeni Kur'an tilaveti veya ayet kartı taslağı oluşturur.
 * `/hadis` — Riyâzü's-Sâlihîn külliyatından yeni bir sahih hadis kartı üretir.
 * `/dua` — 8 farklı manevi kategoriden günün duası kartını üretir.
-* `/kelime` — Kur'an'dan önemli bir İslami kavram / kelime kartı üretir.
+* `/kelime` — Kur'an'dan önemli bir İslami kavram / kelime kartı üretir (otomatik yayınlanır).
 * `/durum` — Veritabanı ve yayın istatistiklerini gösterir.
 * `/yardim` — Tüm komutları ve kullanım detaylarını listeler.
 
@@ -235,18 +237,25 @@ Bot başlatıldığında Telegram arayüzündeki `/` menüsüne aşağıdaki kom
 * `/yayinla <PAYLASIM_ID>` — Beklemede olan bir taslağı tüm platformlara anında yayınlar.
 * `/kaldir <PAYLASIM_ID>` — Yayınlanmış olan bir içeriği Meta (Instagram/Facebook), Threads ve YouTube'dan anında siler ve veritabanı/yayın geçmişinden temizler.
 * `/iptal <PAYLASIM_ID>` — İlgili taslağı yayından kaldırır ve iptal eder.
+* `/onar <PAYLASIM_ID>` — Kusurlu veya hata almış bir paylaşımı `src/denetleyici.py` motoru ile otonom onarır.
+* `/yeniden_uret <PAYLASIM_ID>` — İlgili içeriği sıfırdan yeniden render eder ve onaya/yayına sunar.
+* `/saglik` — Tüm sosyal medya API token'larını (Instagram, Facebook, Threads, YouTube, TikTok) ve bağlantılarını test ederek sağlık durumunu raporlar.
+* `/hatalar` — Son paylaşımlarda yaşanan platform veya render hatalarını ayrıntılı listeler.
+* `/temizle` — Geçici medya ve önbellek dosyalarını temizler.
 
-### C. Kur'an Tilaveti Otomatik Yayın & Yayından Kaldırma Güvencesi
-* **Otomatik Yayınlama:** Kur'an tilavetleri (11:30, 16:30, 20:30 TSİ) render tamamlandığı anda onay beklemeden doğrudan tüm kanallara (Instagram Reels & Story, Threads, Facebook, YouTube Shorts) yayınlanır.
-* **Telegram Yayın Detay Kartı (`yayin_detay_karti_gonder`):** Yayınlanan video, platform yayın başarı raporu ve izleme linkleriyle birlikte Telegram grubuna iletilir.
-* **"🗑️ Yayından Kaldır" Butonu:** Telegram'a iletilen yayın raporunun altında `[ 🗑️ Yayından Kaldır ]` butonu yer alır. Olası bir hata durumunda tek tıkla içerik tüm platformlardan API aracılığıyla silinir.
-* **Görsel Kartlar:** Hadis, Dua ve Kelime kartları ise önceden "✅ Onayla / ❌ İptal Et" butonlarıyla onaya sunulur; onaylandıklarında butonları otomatik olarak "🗑️ Yayından Kaldır"a dönüşür.
+### C. Kur'an Tilaveti & Kur'an Sözlüğü Otomatik Yayın & Yayından Kaldırma Güvencesi
+* **Otomatik Yayınlama:** Kur'an tilavetleri (11:30, 16:30, 20:30 TSİ) ve Kur'an Sözlüğü (22:00 TSİ) render tamamlandığı anda onay beklemeden doğrudan ilgili kanallara (Reels için Reels+Story+Threads+Facebook+Shorts; Kelime için Feed+Story+Threads+Facebook) otomatik yayınlanır.
+* **Telegram Yayın Detay Kartı (`yayin_detay_karti_gonder`):** Yayınlanan medya, platform yayın başarı raporu ve izleme linkleriyle birlikte Telegram grubuna iletilir.
+* **"🗑️ Yayından Kaldır" Butonu:** Telegram'a iletilen yayın raporunun altında `[ 🗑️ Yayından Kaldır ]` butonu yer alır. Olası bir durumda tek tıkla içerik tüm platformlardan API aracılığıyla silinir.
+* **Onaylı Kartlar:** Hadis (13:45 TSİ) ve Dua (18:45 TSİ) kartları ise "✅ Onayla / ❌ İptal Et" butonlarıyla onaya sunulur; onaylandıklarında butonları otomatik olarak "🗑️ Yayından Kaldır"a dönüşür.
 
 ### D. Dinleme & Yanıt Mimarisi
 * **Tek Sefer Dinleme (`dinle_ve_bekle`):** Bulut runner'ında onay butonlarını ve yayın sonrası "Yayından Kaldır" butonlarını dinler.
+* **Zaman Aşımı Güvenli Kapanış:** Hadis veya Dua taslaklarında 45 dakika boyunca onay/ret verilmediğinde, Telegram mesajı `⏰ ONAY SÜRESİ DOLDU (45 Dakika)` olarak güncellenir ve onay butonları kaldırılarak yerine `[ 🔄 Sıfırdan Yeniden Üret ]` butonu yerleştirilir. Böylece süresi geçmiş/kapanmış bulut oturumuna basılıp sonsuz spinner hatası alınması engellenir.
 * **Sürekli Dinleme Daemon (`surekli_dinle`):** Yerel veya sunucu ortamında sürekli çalışarak gelen her komuta ve buton tıklamasına 2 saniyelik yoklama aralığıyla kesintisiz yanıt verir.
 * **KATI KURAL — Çift Bot / HTTP 409 Çakışma Önleme:** Telegram Bot API tekil `getUpdates` kuralına tabidir. Yerel geliştirme ortamında `python -m src.telegram.bot` arka planda yetim (orphaned daemon) olarak çalışırsa GitHub Actions bulut runner'ı ile çakışır (HTTP 409 Conflict) veya yerel boş/eski veritabanıyla butonları yakalayıp sonsuz askıya alır. Yerel daemon geliştirme haricinde daima kapatılmalıdır; bulut runner tek yetkili onay ve yayın orkestratörüdür.
 * **Hata Yakalama & Tekrar Dene Güvencesi:** Onay butonuna basıldığında platformlardan herhangi birinde ağ/token hatası oluşursa mesaj sonsuza kadar "Yayınlanıyor..." olarak asılı kalmaz. `_gorev_onay` fonksiyonunda try/except ile yakalanıp hata detayları Telegram mesajına yazılır ve altına `[ 🔄 Tekrar Dene ]` inline butonu eklenir.
+
 
 ---
 
@@ -442,6 +451,24 @@ Meta Graph API (Instagram & Threads) yerel dosya kabul etmeyip doğrudan genel H
 * **SQLite Kaynak ve Kilit Güvenliği (`src/db.py`, `src/kuran_db.py`, `src/hadis_db.py`):** Tüm veritabanı bağlantıları `@contextmanager` ile sarmalanarak işlem bitiminde `finally: con.close()` garantisi verilmiştir. SQLite bağlantı sızıntıları ve kilitlenme riskleri (`SQLITE_LOCKED`) %100 ortadan kaldırılmıştır.
 * **FFmpeg Güvenli Render & Çöp Toplama (`src/uretim/video.py`):** Video birleştirme aşamasında olası hatalarda `subprocess.CalledProcessError` stderr çıktısı Türkçe anlaşılır mesajla yükseltilir ve `finally:` bloğuyla geçici sessiz MP4 dosyaları diskten temizlenir.
 * **EveryAyah Ses İndirme Toleransı (`src/uretim/ses.py`):** Ağ gecikmelerine karşı 2 denemeli üssel bekleme ile EveryAyah ses dosyaları güvenle indirilir.
+
+### F. Daily Brief Mimarisinden Aktarılan Güvenilirlik ve Dayanıklılık Standartları
+1. **Mükerrer Yayın Kilidi (`src/telegram/yonetici.py` — Ders 1u):**
+   `yayinla_hepsi()` çağrıldığında kaydın durumu `"yayinlandi"` ise ve platform post ID'leri mevcutsa körlemesine tekrar paylaşım yapılmaz; doğrudan `yayinla_telafi(paylasim_id, hedef_kanal="hepsi")` süzgecine aktarılarak sadece eksik kanallar tamamlanır.
+2. **Cevapsız Telegram Callback Koruması (`src/telegram/bot.py` — Ders 127):**
+   Tanınmayan, süresi dolmuş veya eski buton tıklamalarında Telegram istemcisinde sonsuz dönen spinner (yükleme simgesi) oluşmasını engellemek için `callback_cevapla` ile kullanıcıya anında bilgilendirme yapılır.
+3. **Threads 60 Günlük Jeton Yenileme (`src/platformlar/threads.py` — Ders 217):**
+   `jetonu_yenile()` fonksiyonu ile `https://graph.threads.net/refresh_access_token` uç noktası üzerinden 60 günlük süresi dolmadan önce uzun ömürlü token otomatik yenilenir.
+4. **Meta Multi-CDN Fallback & Alt Kod Ayrıştırma (`src/platformlar/meta.py` — Ders 171, 1e, 1aa):**
+   Meta Graph API geçici medya işleme hatalarında subcode `2207003` ve `2207052` tespit edilerek başarısız olan CDN dışlanır (`haric_cdnler`); Catbox, Litterbox ve Uguu arasında 3 turlu otomatik geçiş yapılır.
+5. **Headless CI Koruması (YouTube & TikTok — Ders 108, 110, 112):**
+   GitHub Actions bulut ortamında terminal etkileşimli olmadığı için (`sys.stdin.isatty() == False`), runner'ı sonsuz `input()` veya `run_local_server()` döngüsüne sokmak yerine açık `RuntimeError` yükseltilir. YouTube OAuth konsolunda "Testing" (7 günlük token ömrü) ile "In production" ayrımı hata günlüğünde net teşhis edilir.
+6. **TikTok Başlık ve Etiket Formatlayıcı (`src/platformlar/tiktok.py` — Ders 113):**
+   `baslik_ve_etiketleri_birlestir()` fonksiyonu ile TikTok'un tekil `title` alanında manşet metni korunur; 2000 karakter sınırı aşılırsa hashtagler sondan dinamik düşürülür.
+7. **Türkçe Karakter Destekli Hashtag Normalizasyonu (`src/uretim/ai.py` & `src/denetleyici.py` — Ders 114, 115):**
+   `_etiket_anahtari()` fonksiyonu `çğıöşüâîû` harflerini sadeleştirerek `#şükür` ile `#sukur` veya `#duâ` ile `#dua` etiketlerinin mükerrer basılmasını önler; `#ezanplus` daima 1. sıraya kilitlenir ve toplam etiket sayısı katı 5 ile sınırlandırılır.
+8. **GitHub Actions CI/CD Dayanıklılığı (`.github/workflows/gunluk_reels.yml` — Ders 1m, 1q):**
+   `git pull --rebase origin main || (git rebase --abort || true)` koruması, detached HEAD durumunda doğrudan branch referansı için `git push origin HEAD:main` ve iptal edilen iş akışlarında anlık Telegram uyarısı (`if: cancelled()`).
 
 ---
 

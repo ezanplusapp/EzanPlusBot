@@ -503,13 +503,23 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
     if not caption or len(caption) < 20:
         baslik = kayit.get("baslik", "Ezan Plus")
         metin = kayit.get("turkce_metin", "")
-        caption = f"“{metin}”\n\n{baslik}\n\n#ezanplus #ayet #kuran #dua #huzur"
+        caption = f"“{metin}”\n\n{baslik}"
         caption_degisti = True
         duzeltmeler.append("Eksik açıklama metni tescilli külliyat içeriğinden otomatik oluşturuldu.")
-    elif "#ezanplus" not in caption.lower():
-        caption = caption + "\n\n#ezanplus #ayet #kuran #dua #huzur"
+
+    from .uretim.ai import caption_hashtaglari_guncelle
+    kategori_varsayilan = {
+        "ayet": ["ezanplus", "kuran", "ayet", "tilavet", "tefekkur"],
+        "hadis": ["ezanplus", "hadis", "sunnet", "tefekkur", "dua"],
+        "dua": ["ezanplus", "dua", "niyaz", "huzur", "tefekkur"],
+        "kelime": ["ezanplus", "kuran", "kavram", "kelime", "tefekkur"],
+    }
+    varsayilan_tags = kategori_varsayilan.get(kategori, ["ezanplus", "ayet", "kuran", "dua", "huzur"])
+    yeni_caption = caption_hashtaglari_guncelle(caption, varsayilan_etiketler=varsayilan_tags)
+    if yeni_caption != caption:
+        caption = yeni_caption
         caption_degisti = True
-        duzeltmeler.append("Açıklama metnine zorunlu '#ezanplus' ve konu etiketleri eklendi.")
+        duzeltmeler.append("Açıklama metni etiketleri normalize edildi (tekilleştirildi, #ezanplus garantilendi).")
 
     if caption_degisti:
         guncellemeler["caption"] = caption
