@@ -98,15 +98,19 @@ def kelime_bul(sorgu: str) -> Optional[Dict[str, Any]]:
 
 
 def kelimeyi_paylasildi_isaretle(kelime_id: int):
-    """Kelimeyi JSON üzerinde paylaşıldı olarak işaretler."""
+    """Kelimeyi JSON üzerinde paylaşıldı olarak işaretler ve sayacı artırır."""
+    import datetime
     kelimeler = kelimeleri_yukle()
     for k in kelimeler:
         if k.get("id") == kelime_id:
             k["paylasildi_mi"] = True
+            k["paylasim_sayisi"] = k.get("paylasim_sayisi", 0) + 1
+            k["son_paylasim"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             break
     try:
         with open(KELIMELER_DOSYASI, "w", encoding="utf-8") as f:
             json.dump(kelimeler, f, ensure_ascii=False, indent=2)
+        log.info(f"Kelime #{kelime_id} paylaşıldı olarak işaretlendi.")
     except Exception as e:
         log.warning(f"Kelime paylaşıldı işaretlenemedi: {e}")
 
@@ -115,17 +119,25 @@ def kelimeyi_paylasildi_isaretle_kavram(kavram: str):
     """Kelime adıyla (örn. 'Vakar') JSON üzerinde paylaşıldı olarak işaretler."""
     if not kavram:
         return
+    import datetime
     kelimeler = kelimeleri_yukle()
-    hedef = kavram.strip().lower()
+    hedef = kavram.strip().lower().replace("kur'an sözlüğü •", "").strip()
+    degisti = False
     for k in kelimeler:
-        if k.get("kelime_tr", "").strip().lower() == hedef:
+        k_adi = k.get("kelime_tr", "").strip().lower()
+        if k_adi == hedef or hedef in k_adi or k_adi in hedef:
             k["paylasildi_mi"] = True
+            k["paylasim_sayisi"] = k.get("paylasim_sayisi", 0) + 1
+            k["son_paylasim"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            degisti = True
             break
-    try:
-        with open(KELIMELER_DOSYASI, "w", encoding="utf-8") as f:
-            json.dump(kelimeler, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.warning(f"Kelime ({kavram}) paylaşıldı işaretlenemedi: {e}")
+    if degisti:
+        try:
+            with open(KELIMELER_DOSYASI, "w", encoding="utf-8") as f:
+                json.dump(kelimeler, f, ensure_ascii=False, indent=2)
+            log.info(f"Kelime ({kavram}) paylaşıldı olarak işaretlendi.")
+        except Exception as e:
+            log.warning(f"Kelime ({kavram}) paylaşıldı işaretlenemedi: {e}")
 
 
 def gunun_kelimesini_sec(
@@ -133,14 +145,29 @@ def gunun_kelimesini_sec(
 ) -> Optional[Dict[str, Any]]:
     """
     Paylaşılmamış veya en az paylaşılmış tescilli bir kavram seçer.
+    Son paylaşılanları (haric_tutulanlar) eler.
     """
     kelimeler = kelimeleri_yukle()
     if not kelimeler:
         return None
 
-    haric_set = set(haric_tutulanlar or [])
-    adaylar = [k for k in kelimeler if k.get("kelime_tr") not in haric_set and not k.get("paylasildi_mi", False)]
-    if not adaylar:
-        adaylar = list(kelimeler)
+    haric_set = {h.strip().lower() for h in (haric_tutulanlar or []) if h}
 
-    return random.choice(adaylar)
+    # 1. Hariç tutulanları filtrele
+    temiz_kelimeler = [
+        k for k in kelimeler
+        if k.get("kelime_tr", "").strip().lower() not in haric_set
+        and f"kur'an sözlüğü • {k.get('kelime_tr', '').strip().lower()}" not in haric_set
+    ]
+    if not temiz_kelimeler:
+        temiz_kelimeler = list(kelimeler)
+
+    # 2. Paylaşılmamış olanlara öncelik ver
+    henuz_paylasilmamis = [k for k in temiz_kelimeler if not k.get("paylasildi_mi", False)]
+    if henuz_paylasilmamis:
+        return random.choice(henuz_paylasilmamis)
+
+    # 3. Hepsi paylaşılmışsa en az paylaşılanlar arasından seç
+    min_paylasim = min(k.get("paylasim_sayisi", 1) for k in temiz_kelimeler)
+    en_az_paylasilanlar = [k for k in temiz_kelimeler if k.get("paylasim_sayisi", 1) == min_paylasim]
+    return random.choice(en_az_paylasilanlar)

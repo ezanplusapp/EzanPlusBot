@@ -138,25 +138,38 @@ def yayin_gecmisinden_sil(paylasim_id: int) -> bool:
 
 
 
-def son_paylasilan_kaynaklar(limit: int = 60) -> List[str]:
-    """Son paylaşılan ayet/hadis kaynaklarını döner (hem SQLite hem JSON geçmişinden)."""
+def son_paylasilan_kaynaklar(limit: int = 90, kategori: Optional[str] = None) -> List[str]:
+    """Son paylaşılan ayet/hadis/dua/kelime kaynaklarını döner (hem SQLite hem JSON geçmişinden)."""
     kaynaklar = set()
     # 1. JSON geçmişinden al
     for item in yayin_gecmisi_yukle():
+        if kategori and item.get("kategori") != kategori:
+            continue
         k = item.get("kaynak") or item.get("baslik")
         if k:
             kaynaklar.add(k.strip())
+        b = item.get("baslik")
+        if b:
+            kaynaklar.add(b.strip())
 
     # 2. SQLite'tan al
     try:
         with baglanti_al() as con:
-            cur = con.execute(
-                "SELECT DISTINCT kaynak FROM paylasimlar WHERE durum = 'yayinlandi' ORDER BY id DESC LIMIT ?",
-                (limit,),
-            )
+            if kategori:
+                cur = con.execute(
+                    "SELECT DISTINCT kaynak, baslik FROM paylasimlar WHERE durum = 'yayinlandi' AND kategori = ? ORDER BY id DESC LIMIT ?",
+                    (kategori, limit),
+                )
+            else:
+                cur = con.execute(
+                    "SELECT DISTINCT kaynak, baslik FROM paylasimlar WHERE durum = 'yayinlandi' ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                )
             for row in cur.fetchall():
                 if row[0]:
                     kaynaklar.add(row[0].strip())
+                if len(row) > 1 and row[1]:
+                    kaynaklar.add(row[1].strip())
     except Exception:
         pass
 
@@ -283,7 +296,23 @@ def durum_guncelle(
             if k:
                 yayin_gecmisi_kaydet(k)
                 kat = k.get("kategori")
-                if kat == "kelime":
+                if kat == "ayet":
+                    from . import kuran_db
+                    kaynak_str = k.get("kaynak") or k.get("baslik") or ""
+                    cozum = kuran_db.ayet_anahtari_cozumle(kaynak_str)
+                    if cozum:
+                        kuran_db.ayeti_paylasildi_isaretle(cozum[0], cozum[1])
+                elif kat == "hadis":
+                    from . import hadis_db
+                    hadis_db.hadisi_paylasildi_isaretle_metin(
+                        baslik=k.get("baslik"),
+                        kaynak=k.get("kaynak"),
+                        metin=k.get("turkce_metin"),
+                    )
+                elif kat == "dua":
+                    from . import dua_db
+                    dua_db.duayi_paylasildi_isaretle_baslik(k.get("baslik") or k.get("kaynak") or "")
+                elif kat == "kelime":
                     from . import kelime_db
                     kavram = k.get("baslik", "").replace("Kur'an Sözlüğü •", "").strip()
                     kelime_db.kelimeyi_paylasildi_isaretle_kavram(kavram)

@@ -9,9 +9,10 @@ Başkanlığı tescilli Türkçe mealleri ile %100 sıfır yapay zeka halüsinas
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 
 from .ayar import KOK_DIZIN
@@ -169,6 +170,40 @@ def ayet_ara(arama_terimi: str, limit: int = 20) -> List[Dict[str, Any]]:
             return [dict(r) for r in cur.fetchall()]
 
 
+def ayet_anahtari_cozumle(metin: str) -> Optional[Tuple[int, int]]:
+    """
+    Her türlü ayet metin formatını (örn. '9:53', 'Tevbe Sûresi • 53. Âyet',
+    'Bakara 127', 'Ankebût Sûresi • 64. Âyet • Elmalılı Meali') çözerek
+    (sure_no, ayet_no) tuple'ı döner.
+    """
+    if not metin or not isinstance(metin, str):
+        return None
+
+    # 1. sure:ayet formatı (örn: "9:53", "2:127")
+    m = re.search(r"(\d+):(\d+)", metin)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+
+    # 2. X. Âyet formatı ve sûre adı eşleştirmesi
+    def _tr_norm(s: str) -> str:
+        mapping = {"Â": "A", "â": "a", "Î": "I", "î": "i", "Û": "U", "û": "u", "İ": "i", "I": "i", "ı": "i"}
+        for k, v in mapping.items():
+            s = s.replace(k, v)
+        return s.lower()
+
+    norm_metin = _tr_norm(metin)
+    m_a = re.search(r"(\d+)\s*\.?\s*ayet", norm_metin)
+    if m_a:
+        a_no = int(m_a.group(1))
+        # Sûre adını eşleştir
+        for s in sure_listesi_getir():
+            s_norm = _tr_norm(s["sure_adi_tr"])
+            if s_norm in norm_metin:
+                return int(s["sure_no"]), a_no
+
+    return None
+
+
 def gunun_ayetini_sec(
     tema: Optional[str] = None,
     sadece_video_uygun: bool = True,
@@ -179,25 +214,44 @@ def gunun_ayetini_sec(
     
     1. Tema verilmişse FTS üzerinden o temaya (sabır, huzur, şükür, tevbe vb.) uyan âyetleri tarar.
     2. Video/Reels formatı için ideal uzunluktaki (4-25 kelime, <= 200 karakter meal) âyetlere öncelik verir.
-    3. Geçmişte paylaşılan âyetleri (haric_tutulanlar) kesinlikle eler.
+    3. Geçmişte paylaşılan âyetleri (haric_tutulanlar) kesinlikle eler (etiket, key ve (sure, ayet) bazında).
     4. En az paylaşılmış olanlar arasından rastgele birini seçerek mükerrerliği %100 engeller.
     """
     with baglanti_al() as con:
-        haric_set = set(haric_tutulanlar or [])
+        # Hariç tutulanları normalize et:
+        # Hem ham stringler, hem çözümlenmiş sure_ayet_key ("9:53") hem de (sure_no, ayet_no) çiftleri
+        haric_keys: Set[str] = set()
+        haric_etiketler: Set[str] = set()
+        haric_ciftler: Set[Tuple[int, int]] = set()
+
+        for item in (haric_tutulanlar or []):
+            if not item:
+                continue
+            item_str = str(item).strip()
+            haric_etiketler.add(item_str)
+            cozum = ayet_anahtari_cozumle(item_str)
+            if cozum:
+                s_no, a_no = cozum
+                haric_ciftler.add((s_no, a_no))
+                haric_keys.add(f"{s_no}:{a_no}")
+                haric_keys.add(f"{s_no:03d}{a_no:03d}")
 
         # 1. Tema araması
         if tema:
-            # Temanın anahtar kelimelerini ayıkla
             tema_kelimeleri = [k.strip() for k in tema.replace("(", " ").replace(")", " ").replace(",", " ").split() if len(k.strip()) >= 3]
             for kelime in tema_kelimeleri:
                 adaylar = ayet_ara(kelime, limit=40)
                 if sadece_video_uygun:
                     adaylar = [a for a in adaylar if a.get("video_icin_uygun") == 1]
-                if haric_set:
-                    adaylar = [a for a in adaylar if a.get("sure_ayet_key") not in haric_set and a.get("sure_ayet_etiket") not in haric_set]
+                if haric_keys or haric_etiketler or haric_ciftler:
+                    adaylar = [
+                        a for a in adaylar
+                        if a.get("sure_ayet_key") not in haric_keys
+                        and a.get("sure_ayet_etiket") not in haric_etiketler
+                        and (a.get("sure_no"), a.get("ayet_no")) not in haric_ciftler
+                    ]
 
                 if adaylar:
-                    # En düşük paylaşım sayısına sahip olanlardan rastgele seç
                     min_paylasim = min(a.get("paylasim_sayisi", 0) for a in adaylar)
                     en_iyi_adaylar = [a for a in adaylar if a.get("paylasim_sayisi", 0) == min_paylasim]
                     import random
@@ -210,10 +264,19 @@ def gunun_ayetini_sec(
         if sadece_video_uygun:
             filtreler.append("a.video_icin_uygun = 1")
 
-        if haric_set:
-            placeholders = ",".join("?" for _ in haric_set)
+        if haric_keys:
+            placeholders = ",".join("?" for _ in haric_keys)
             filtreler.append(f"a.sure_ayet_key NOT IN ({placeholders})")
-            params.extend(list(haric_set))
+            params.extend(list(haric_keys))
+
+        if haric_etiketler:
+            placeholders = ",".join("?" for _ in haric_etiketler)
+            filtreler.append(f"a.sure_ayet_etiket NOT IN ({placeholders})")
+            params.extend(list(haric_etiketler))
+
+        for s_no, a_no in haric_ciftler:
+            filtreler.append("NOT (a.sure_no = ? AND a.ayet_no = ?)")
+            params.extend([s_no, a_no])
 
         where_str = " AND ".join(filtreler) if filtreler else "1=1"
 

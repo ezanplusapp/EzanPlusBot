@@ -344,6 +344,60 @@ class TestDailyBriefIyilestirmeleri(unittest.TestCase):
         self.assertEqual(zamanlar[0][0], 0)
         self.assertEqual(zamanlar[0][1], 0.0)
 
+    def test_ayet_anahtari_cozumle_ve_haric_tutma(self):
+        """
+        Farklı formatlardaki ayet etiketlerinin doğru çözümlenip
+        gunun_ayetini_sec tarafından kesinlikle elendiğini doğrular.
+        """
+        from src import kuran_db
+
+        cozum1 = kuran_db.ayet_anahtari_cozumle("Tevbe Sûresi • 53. Âyet")
+        self.assertEqual(cozum1, (9, 53))
+
+        cozum2 = kuran_db.ayet_anahtari_cozumle("Ankebût Sûresi • 64. Âyet • Elmalılı Meali")
+        self.assertEqual(cozum2, (29, 64))
+
+        cozum3 = kuran_db.ayet_anahtari_cozumle("2:127")
+        self.assertEqual(cozum3, (2, 127))
+
+        # Tevbe 53 ve Bakara 127 hariç tutulduğunda seçilmediğini doğrula
+        haric = ["Tevbe Sûresi • 53. Âyet", "Bakara Sûresi • 127. Âyet"]
+        for _ in range(10):
+            secilen = kuran_db.gunun_ayetini_sec(haric_tutulanlar=haric)
+            self.assertIsNotNone(secilen)
+            self.assertNotIn(secilen["sure_ayet_key"], ["9:53", "2:127"])
+
+    def test_hadis_haric_tutma(self):
+        """
+        gunun_hadisini_sec'in haric_tutulanlar parametresiyle geçmiş hadisleri
+        elediğini doğrular.
+        """
+        from src import hadis_db
+
+        h1 = hadis_db.gunun_hadisini_sec()
+        self.assertIsNotNone(h1)
+        kaynak_ref = h1["kaynak_ref"]
+
+        # kaynak_ref hariç tutulduğunda h1 tekrar seçilmemeli
+        for _ in range(10):
+            h2 = hadis_db.gunun_hadisini_sec(haric_tutulanlar=[kaynak_ref])
+            if h2:
+                self.assertNotEqual(h2["id"], h1["id"])
+
+    def test_dua_ve_kelime_haric_tutma(self):
+        """
+        Dua ve Kelime seçimlerinde geçmiş kayıtların elendiğini doğrular.
+        """
+        from src import dua_db, kelime_db
+
+        d = dua_db.gunun_duasini_sec(haric_tutulanlar=["İç Sıkıntısı ve Kalp Ferahlığı Duası"])
+        if d:
+            self.assertNotEqual(d.get("dua_basligi"), "İç Sıkıntısı ve Kalp Ferahlığı Duası")
+
+        k = kelime_db.gunun_kelimesini_sec(haric_tutulanlar=["Bereket", "Vakar"])
+        if k:
+            self.assertNotIn(k.get("kelime_tr"), ["Bereket", "Vakar"])
+
 
 if __name__ == "__main__":
     unittest.main()

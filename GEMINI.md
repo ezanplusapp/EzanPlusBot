@@ -224,7 +224,28 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
 ### B. GitHub Actions Bulut İş Akışı (`.github/workflows/gunluk_reels.yml`)
 * **Tekil Yetkili Tetikleyici:** 6 zamanlanmış slot için zamanlama Cloudflare Worker (`repository_dispatch`) üzerinden 0 ms gecikmeyle yönetilir. GitHub Actions'ın dahili `schedule` cron'u, GitHub altyapısındaki 15-30 dakikalık gecikmeler nedeniyle mükerrer üretime (çift tetiklemeye) yol açtığı için devre dışı bırakılmıştır.
 * `workflow_dispatch` üzerinden GitHub UI'dan tek tıkla `tur` (reels, hadis, dua, kelime, ayet) seçilerek tetiklenebilir.
-* Üretim tamamlandıktan sonra yayın geçmişi (`data/yayin_gecmisi.json`, `data/dualar/dualar.json`, `data/kelimeler/kelimeler.json`) otomatik olarak depoya `git push` yapılır.
+* Üretim tamamlandıktan sonra yayın geçmişi ve güncellenen veritabanları (`data/yayin_gecmisi.json`, `data/dualar/dualar.json`, `data/kelimeler/kelimeler.json`, `data/kuran/kuran.db`, `data/hadisler/hadisler.db`) otomatik olarak depoya `git push` yapılır.
+
+### C. 4 Kategoride Birleşik Mükerrerlik Önleme & Külliyat Arşiv Mimarisi
+Ezan Plus sosyal medya yayınlarında içeriklerin (Âyet, Hadis, Dua, Kelime) kısa aralıklarla tekrar etmesi mimari olarak kesin biçimde engellenmiştir:
+
+1. **Âyet Mükerrerlik Çözümü (`ayet_anahtari_cozumle` & `gunun_ayetini_sec`):**
+   - Geçmiş kayıtlarda yer alan `"9:53"` anahtarları veya `"Tevbe Sûresi • 53. Âyet"` / `"Bakara 127"` gibi insan-okunur etiketler `ayet_anahtari_cozumle` ile sûre ve âyet numaralarına `(sure_no, ayet_no)` ayrıştırılır.
+   - SQL sorgusu dışlama listesindeki sûre/âyet ikililerini doğrudan `(sure_no = ? AND ayet_no = ?)` şartıyla eler.
+   - Seçim motoru öncelikle `paylasim_sayisi = 0` olan hiç paylaşılmamış âyetleri rastgele getirir. Tüm havuz tükenmeden daha önce paylaşılmış bir âyet asla seçilemez.
+2. **Yayın Anında Otomatik Külliyat İşaretleme (`durum_guncelle`):**
+   Bir paylaşımın durumu `"yayinlandi"` olduğunda tüm 4 kategorinin birincil veri kaynaklarında sayaçlar anında artırılır:
+   - **Âyet:** `kuran_db.ayeti_paylasildi_isaretle(sure_no, ayet_no)` ➔ `kuran.db`'de `paylasim_sayisi += 1` ve `son_paylasim_tarihi` işlenir.
+   - **Hadis:** `hadis_db.hadisi_paylasildi_isaretle_metin(turkce_metin)` ➔ `hadisler.db`'de `paylasim_sayisi += 1` ve `son_paylasim_tarihi` işlenir.
+   - **Dua:** `dua_db.duayi_paylasildi_isaretle_baslik(baslik)` ➔ `dualar.json`'da `paylasildi_mi: true`, `paylasim_sayisi += 1` ve `son_paylasim_tarihi` kaydedilir.
+   - **Kelime:** `kelime_db.kelimeyi_paylasildi_isaretle(kelime)` ➔ `kelimeler.json`'da `paylasildi_mi: true` ve `paylasim_sayisi += 1` güncellenir.
+3. **CI/CD Ephemeral Runner Kalıcılık Senkronizasyonu (`gunluk_reels.yml`):**
+   GitHub Actions bulut ortamında çalışan sanal makineler geçicidir (ephemeral). Veritabanı sayaçlarının sıfırlanmasını önlemek için iş akışı sonunda `data/kuran/kuran.db` ve `data/hadisler/hadisler.db` dosyaları `git add` ile commit edilip depoya geri push edilir.
+4. **Külliyat ve Arşiv Kapasitesi:**
+   - **Kur'an Âyetleri (`data/kuran/kuran.db`):** 6.236 âyet (Reels formatına uygun 4-25 kelimelik 4.476 âyet; günde 3 tilavet slotuyla ~4 yıl sıfır tekrar).
+   - **Sahih Hadisler (`data/hadisler/hadisler.db`):** 1.900 hadis (Riyâzü's-Sâlihîn; günde 1 hadis slotuyla ~5.2 yıl sıfır tekrar).
+   - **Günün Duası (`data/dualar/dualar.json`):** 20 özel dua (8 manevi ruh haline göre; paylaşılmamışlar önceliklidir).
+   - **Kur'an Sözlüğü / Kelime (`data/kelimeler/kelimeler.json`):** 15 temel kavram (el-Müfredât külliyatı; paylaşılmamışlar önceliklidir).
 
 ---
 

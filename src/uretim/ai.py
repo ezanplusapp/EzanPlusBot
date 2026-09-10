@@ -274,7 +274,7 @@ def ayet_icerigi_uret(
         secilen_ayet = kuran_db.ayet_getir(s_no, a_no)
 
     if not secilen_ayet:
-        gecmis_ayetler = db.son_paylasilan_kaynaklar(limit=60)
+        gecmis_ayetler = db.son_paylasilan_kaynaklar(limit=90, kategori="ayet")
         secilen_ayet = kuran_db.gunun_ayetini_sec(
             tema=tema,
             sadece_video_uygun=True,
@@ -282,8 +282,9 @@ def ayet_icerigi_uret(
         )
 
     if not secilen_ayet:
-        # Tema kısıtını kaldırarak video için uygun herhangi bir ayeti seç
-        secilen_ayet = kuran_db.gunun_ayetini_sec(tema=None, sadece_video_uygun=True)
+        # Tema kısıtını kaldırarak video için uygun herhangi bir ayeti seç (hariç tutulanlar korunur)
+        gecmis_ayetler = db.son_paylasilan_kaynaklar(limit=90, kategori="ayet")
+        secilen_ayet = kuran_db.gunun_ayetini_sec(tema=None, sadece_video_uygun=True, haric_tutulanlar=gecmis_ayetler)
 
     if not secilen_ayet:
         raise RuntimeError("Kur'an veritabanından geçerli bir ayet seçilemedi!")
@@ -425,9 +426,10 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
         tema = random.choice(TEMALAR)
 
     # 1. Doğrulanmış tescilli veritabanından hadis seç
-    secilen_hadis = hadis_db.gunun_hadisini_sec(tema=tema)
+    gecmis_hadisler = db.son_paylasilan_kaynaklar(limit=90, kategori="hadis")
+    secilen_hadis = hadis_db.gunun_hadisini_sec(tema=tema, haric_tutulanlar=gecmis_hadisler)
     if not secilen_hadis:
-        secilen_hadis = hadis_db.gunun_hadisini_sec(tema=None)
+        secilen_hadis = hadis_db.gunun_hadisini_sec(tema=None, haric_tutulanlar=gecmis_hadisler)
 
     if not secilen_hadis:
         raise RuntimeError("Hadis veritabanından geçerli hadis seçilemedi!")
@@ -547,10 +549,10 @@ def dua_icerigi_uret(
         ruh_hali = random.choice(haller)
 
     # Mükerrer kontrolü
-    gecmis_kaynaklar = db.son_paylasilan_kaynaklar(limit=60)
+    gecmis_kaynaklar = db.son_paylasilan_kaynaklar(limit=90, kategori="dua")
     secilen_dua = dua_db.gunun_duasini_sec(ruh_hali=ruh_hali, haric_tutulanlar=gecmis_kaynaklar)
     if not secilen_dua:
-        secilen_dua = dua_db.gunun_duasini_sec(ruh_hali=None)
+        secilen_dua = dua_db.gunun_duasini_sec(ruh_hali=None, haric_tutulanlar=gecmis_kaynaklar)
 
     if not secilen_dua:
         raise RuntimeError("Dualar külliyatından geçerli bir dua seçilemedi!")
@@ -676,7 +678,7 @@ def kelime_icerigi_uret(
     Kur'an ve İslam kavramı seçer ve Gemini AI ile 6 aşamalı yüksek etkileşimli Instagram açıklaması üretir.
     Kök, ayet ve lügat manası %100 tescillidir; halüsinasyon riski sıfırdır.
     """
-    gecmis_kaynaklar = db.son_paylasilan_kaynaklar(limit=60)
+    gecmis_kaynaklar = db.son_paylasilan_kaynaklar(limit=90, kategori="kelime")
     secilen_kelime = None
     if kelime_tr:
         for k in kelime_db.kelimeleri_yukle():
@@ -688,7 +690,7 @@ def kelime_icerigi_uret(
         secilen_kelime = kelime_db.gunun_kelimesini_sec(haric_tutulanlar=gecmis_kaynaklar)
 
     if not secilen_kelime:
-        secilen_kelime = kelime_db.gunun_kelimesini_sec(haric_tutulanlar=None)
+        secilen_kelime = kelime_db.gunun_kelimesini_sec(haric_tutulanlar=gecmis_kaynaklar)
 
     if not secilen_kelime:
         raise RuntimeError("Kelimeler külliyatından kavram seçilemedi!")

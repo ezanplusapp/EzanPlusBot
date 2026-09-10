@@ -214,10 +214,15 @@ def veritabanini_hazirla():
         log.info(f"Riyâzü's-Sâlihîn külliyatı başarıyla aktarıldı: {eklenen} hadis.")
 
 
-def gunun_hadisini_sec(tema: Optional[str] = None, sadece_kart_uygun: bool = True) -> Optional[Dict[str, Any]]:
+def gunun_hadisini_sec(
+    tema: Optional[str] = None,
+    sadece_kart_uygun: bool = True,
+    haric_tutulanlar: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Paylaşılmamış veya en az paylaşılmış sahih bir hadis seçer.
     Kart mizanpajına tam oturan uzunluktaki hadislere öncelik verir.
+    Geçmişte paylaşılanları (haric_tutulanlar) kesinlikle eler.
     """
     veritabanini_hazirla()
     with baglanti_al() as con:
@@ -233,6 +238,13 @@ def gunun_hadisini_sec(tema: Optional[str] = None, sadece_kart_uygun: bool = Tru
             filtreler.append("(turkce_tam LIKE ? OR hadis_metni LIKE ?)")
             parametreler.extend([f"%{tema}%", f"%{tema}%"])
 
+        if haric_tutulanlar:
+            haric_temiz = [h.strip() for h in haric_tutulanlar if h and isinstance(h, str)]
+            if haric_temiz:
+                placeholders = ",".join("?" for _ in haric_temiz)
+                filtreler.append(f"kaynak_ref NOT IN ({placeholders})")
+                parametreler.extend(haric_temiz)
+
         where_clause = " AND ".join(filtreler) if filtreler else "1=1"
 
         sorgu = f"""
@@ -245,7 +257,7 @@ def gunun_hadisini_sec(tema: Optional[str] = None, sadece_kart_uygun: bool = Tru
         row = cur.fetchone()
 
         if not row and tema:
-            return gunun_hadisini_sec(tema=None, sadece_kart_uygun=sadece_kart_uygun)
+            return gunun_hadisini_sec(tema=None, sadece_kart_uygun=sadece_kart_uygun, haric_tutulanlar=haric_tutulanlar)
 
         if row:
             return dict(row)
@@ -263,6 +275,29 @@ def hadisi_paylasildi_isaretle(hadis_id: int):
         """, (hadis_id,))
         con.commit()
         log.info(f"Hadis #{hadis_id} paylaşıldı olarak işaretlendi.")
+
+
+def hadisi_paylasildi_isaretle_metin(baslik: Optional[str] = None, kaynak: Optional[str] = None, metin: Optional[str] = None):
+    """Metin veya kaynak referansından hadisi bularak paylaşıldı sayısını artırır."""
+    veritabanini_hazirla()
+    with baglanti_al() as con:
+        bulunan_id = None
+        for sorgu_val in (kaynak, baslik):
+            if not sorgu_val:
+                continue
+            cur = con.execute("SELECT id FROM hadisler WHERE kaynak_ref = ? LIMIT 1", (sorgu_val.strip(),))
+            r = cur.fetchone()
+            if r:
+                bulunan_id = r[0]
+                break
+        if not bulunan_id and metin:
+            kismi = metin.strip()[:40]
+            cur = con.execute("SELECT id FROM hadisler WHERE turkce_tam LIKE ? OR hadis_metni LIKE ? LIMIT 1", (f"%{kismi}%", f"%{kismi}%"))
+            r = cur.fetchone()
+            if r:
+                bulunan_id = r[0]
+        if bulunan_id:
+            hadisi_paylasildi_isaretle(bulunan_id)
 
 
 def toplam_hadis_sayisi() -> int:
