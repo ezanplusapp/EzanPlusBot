@@ -53,8 +53,12 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
   - Gemini AI'nin ürettiği `latin_kelimeler` dizisindeki eleman sayısı Arapça kelime sayısıyla (`len(ar_kelimeler)`) **istisnasız 1:1 eşit** olmak zorundadır.
   - **Şemsî/Kamerî Harf ve Hece Koruma:** `es-sufehâe`, `er-rahmân` veya `el-kitâb` gibi birleşik okunuşlarda "es" hecesinin bir durak (pause/"es vermek") zannedilip ayrılması kesinlikle yasaktır (`harfi_tarifler = {"es", "el", "al", "er", ...}`). Dizi boyutları eşit olduğunda (`len(tr_list) == len(ar_list)`) 1:1 dizilim doğrudan korunur.
   - İki dilli dizilim ayrık bağlaçlarda (`ve`, `fe`, `bi`, `li`) ve birleşik lafızlarda (`entes-semîul`) Arapça karşılığına göre dinamik olarak dengelenir. Sıfır indis kayması ve sıfır boş kelime güvencesiyle son kelime tilavetin bittiği ana kadar tam senkron kırmızı kalır.
-* **Çift Katmanlı Karaoke & Vurgu:**
-  - Okunan kelime anında kırmızıya (`#9B1B1B`) boyanır; başından sonuna doğru akan dinamik loading dolum çizgisi akar.
+* **Çift Katmanlı Karaoke & Kontrast Hiyerarşisi (V12.3 Mimarisi):**
+  - **Simetrik 3 Durumlu Renk Mimarisi (Arapça & Latin Bütünlüğü):**
+    * *1. Henüz Okunmamış (Bekleyen) Kelimeler:* Zarif Açık Arduvaz Grisi (`#94A3B8`). Arka planda sırasını bekler; ekranda yeşil/koyu renk karmaşası oluşturmaz, aktif kelimenin öne çıkması için zemin hazırlar.
+    * *2. Şu An Okunan (Aktif) Kelime:* Amiri 700 Bold / Manrope 800 Bold + Canlı Kırmızı (`#C0392B`). Arapça'da sağdan sola, Latin okunuşta soldan sağa akan dinamik kırmızı dolum (loading) efekti. Çevresi silik tonda olduğu için ekranda anında spot ışığı gibi parlar.
+    * *3. Okunmuş (Biten) Kelimeler:* Asil Antik Koyu Mürekkep (`#182230`). Okunup tamamlanan kelimeler tokluk kazanarak kalıcı bir sükunetle eşlik eder.
+  - **Latin Okunuş Ferah Tipografi Standardı:** Latin okunuş puntosu `pt_okunus = max(32, int(pt_ar * 0.44))` formülü ile heybetli, okunaklı ve Arapça hatla dengeli boyuta çekilmiştir. Satır genişliğini denetleyen otomatik auto-fit mekanizması sayesinde uzun kelimelerde satırdan taşma veya çakışma %100 engellenir.
   - Okunan kelimeye odaklanılırken meal ve tefekkür bölümü kartın alt kısmında huzurlu bir şekilde eşlik eder.
 
 ### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru & Dinamik Flex Mizanpaj

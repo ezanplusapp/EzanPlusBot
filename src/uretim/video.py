@@ -855,9 +855,29 @@ class _SayfaVerisi:
         chosen_lines = _SayfaVerisi.satirlari_dengeli_bol(page_ar, chosen_pt, MAX_TEXT_W)
 
         self.pt_ar = chosen_pt
-        self.pt_okunus = max(26, int(self.pt_ar * 0.36))
+
+        # Latin okunuş puntosu (okunaklı, heybetli ve orantılı: ~%44 tavan, en az 32pt)
+        self.pt_okunus = max(32, int(self.pt_ar * 0.44))
+
+        # Auto-fit kontrolü: Latin satırları MAX_TEXT_W sınırını aşarsa kademeli küçült
+        im_temp = Image.new("RGB", (100, 100))
+        d_temp = ImageDraw.Draw(im_temp)
+        while self.pt_okunus > 26:
+            f_temp = font_al(FONT_UI, self.pt_okunus, agirlik=500)
+            max_line_w = 0
+            for line_indices in chosen_lines:
+                sub_tr = [page_tr[i] if i < len(page_tr) else "" for i in line_indices]
+                w_sum = sum(d_temp.textbbox((0, 0), w, font=f_temp)[2] - d_temp.textbbox((0, 0), w, font=f_temp)[0] for w in sub_tr)
+                g = max(10, (MAX_TEXT_W - w_sum) // (len(sub_tr) - 1)) if len(sub_tr) > 1 else 16
+                line_w = w_sum + (len(sub_tr) - 1) * g
+                if line_w > max_line_w:
+                    max_line_w = line_w
+            if max_line_w <= MAX_TEXT_W:
+                break
+            self.pt_okunus -= 2
+
         self.ar_h = int(self.pt_ar * 1.44)
-        self.tr_h = int(self.pt_okunus * 1.32)
+        self.tr_h = int(self.pt_okunus * 1.34)
 
         # 2. Türkçe Meal Ölçeği (Hero Element: Okunaklı, tok ve asil editoryal punto)
         temiz_meal = page_meal.strip("“”\"' ")
@@ -1096,7 +1116,7 @@ class _SayfaVerisi:
         kare = self.taban_img.copy()
         draw_k = ImageDraw.Draw(kare)
 
-        # Arapça Kelimeler (Sağdan sola loading akışı)
+        # Arapça Kelimeler (Sağdan sola loading akışı & Klasik Mushaf Mürekkep Kontrast Hiyerarşisi)
         for s_idx, satir in enumerate(self.ar_satir_bilgileri):
             cur_y = self.ar_satir_y_list[s_idx]
             for w, w_idx, mid_x in satir:
@@ -1104,16 +1124,16 @@ class _SayfaVerisi:
                 x_start = mid_x - wt // 2
 
                 if w_idx == aktif_idx and aktif_progress < 1.0:
-                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_bold, fill=YESIL_INACTIVE)
+                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_bold, fill=METIN_LIGHT)
                     dolum_w = int(wt * aktif_progress)
                     if dolum_w > 0:
                         crop_x1 = max(0, wt - dolum_w)
                         cropped = im_w.crop((crop_x1, 0, im_w.width, im_w.height))
                         kare.paste(cropped, (x_start + crop_x1, cur_y), cropped)
                 elif w_idx < aktif_idx or (w_idx == aktif_idx and aktif_progress >= 1.0):
-                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=ISLAM_YESILI)
+                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=METIN_ANA)
                 else:
-                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=YESIL_INACTIVE)
+                    draw_k.text((x_start, cur_y), gw, font=self.font_ar_norm, fill=METIN_LIGHT)
 
         # Türkçe Okunuş Kelimeler (Ayracın hemen üstünde, self.tr_y_start'tan başlar)
         cur_y = self.tr_y_start
@@ -1270,12 +1290,20 @@ def reels_videosu_uret(
 
             gecisler.append((t_trans_s, t_trans_e, p, p + 1))
 
-    if not cikti_adi:
+    if cikti_adi:
+        c_path = Path(cikti_adi)
+        if c_path.is_absolute() or len(c_path.parts) > 1:
+            final_video = c_path
+            gecici_sessiz_video = c_path.parent / f"temp_{c_path.name}"
+        else:
+            final_video = CIKTI_DIZINI / cikti_adi
+            gecici_sessiz_video = CIKTI_DIZINI / f"temp_{cikti_adi}"
+    else:
         sure_kod = sure_ayet.replace(" ", "_").replace("•", "_").replace(".", "_").lower()
         cikti_adi = f"reels_{sure_kod}.mp4"
+        gecici_sessiz_video = CIKTI_DIZINI / f"temp_{cikti_adi}"
+        final_video = CIKTI_DIZINI / cikti_adi
 
-    gecici_sessiz_video = CIKTI_DIZINI / f"temp_{cikti_adi}"
-    final_video = CIKTI_DIZINI / cikti_adi
 
     bar_x1 = 64
     bar_x2 = GENISLIK_9_16 - 64
