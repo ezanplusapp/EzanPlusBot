@@ -106,46 +106,39 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
   - *Alt:* Merkezinde altın nokta bulunan zarif ayraç çizgisi.
 - **Video Başlık Tutarlılığı (Hook Standardı):** V12 video motorunda video hook başlığı **Lora 44pt/55pt (Serif)** olarak tırnak işaretleriyle (`“ ... ”`) sabitlenmiştir. Eski prototiplerdeki Manrope Sans-serif başlıklar tamamen terk edilmiştir.
 
-### B. V18 Sahih Hadis Kartı (`hadis_karti_ciz`) — Hibrit Parşömen Mimarisi
-1. **Kutusuz Ferah Parşömen & Asil Mushaf Akışı:**
-   - Hantal dikdörtgen serlevha çerçeveleri ve "kutu-içi-kutu" sıkışıklığı tamamen terk edilmiş; `#FBF9F4` klasik Mushaf & fildişi kağıt dokusu üzerinde serbest nefes alan, asil ve ferah bir editoryal duruş benimsenmiştir.
-   - **Peygamberî Giriş Tacı:** `“ Resûlullah sallallahu aleyhi ve sellem şöyle buyurdu: ”` ifadesi Lora Bold Italic ve asil bordo (`#8B1D24`) tonunda, üst ve altındaki narin altın noktalarla (`#C29B38`) taçlandırılmıştır. Varsa râvi künyesi (`Abdullah b. Amr (r.a.)`) zarif parantez içinde eşlik eder.
-2. **Asil Bordo Uthmani Hat & Sıfır Çarpışma Standardı:**
-   - Arapça hadis metni derin bordo (`#8B1D24`) Uthmani/Amiri hatla çizilir.
-   - **Dinamik Ink Clearance (`MIN_VERTICAL_GAP = 28px` 9:16 / `24px` 4:5):** Harflerin ve tam hareke işaretlerinin (fetha, kesra, şedde) dikey mürekkep sınırları (`draw.textbbox`) milimetrik hesaplanarak satırlar arasında garantili net mürekkep boşluğu bırakılır; kasraların alttaki harflere veya şeddelere değmesi kesinlikle imkansızdır.
-   - Dengeli 2-3 satır hedefleme, yetim kelime önleme ve secavend temizliği tam aktiftir.
-   - Arapça okunuş satırı fildişi zeminle uyumlu açık arduvaz (`#64748B`) tonundadır.
-3. **Türkçe Hadis Meali (Hero Element & Mixed Bold Tipografi):**
-   - Kısa hadislerde meal **60pt - 66pt (9:16)** / **56pt - 62pt (4:5)** asil puntoya çıkar; orta hadislerde **48pt - 54pt**, uzun hadislerde **41pt - 42pt**.
-   - **Mixed Bold Tipografi (`wrap_mixed_tokens`):** `**bold**` kelimeler Ibarra Real Nova Bold (700 weight, `#111827`) ile, diğer kısımlar Regular (400 weight, `#1C1917`) ile çizilir.
-   - **Asil Parşömen Tırnak Filigranı:** `#EFE8DA` sıcak krem/fildişi tonunda, metin üzerine binmeyen ferah ve narin tırnak alıntısı uygulanmıştır.
-4. **Açık Nebevî Öğüt / Tefekkür Bloğu:**
-   - Kalın gri/bej kutular yerine, solunda dikey zarif altın vurgu çizgisi (`#C29B38`) bulunan açık, modern ve nefes alan tefekkür bloğu yer alır.
-5. **Muteber Kaynak Rozeti ve Taban CTA:**
-   - Muteber kaynak künyesi (Buhârî, Müslim vb.) merkezinde altın ayraç bulunan rozetle sunulur. Altında kurumsal Ezan Plus indirme CTA butonu yer alır.
+### B. V19 Sahih Hadis Kartı (`hadis_karti_ciz`) — Sabit Sisli Adaçayı Zümrüdü Mimarisi
+1. **Sabit Soft Pastel Zemin (Sisli Adaçayı Zümrüdü):**
+   - Merkez `(30, 64, 54)` (`#1E4036`) ➔ Dış kenar `(14, 34, 28)` (`#0E221C`) organik radyal gradyan parşömen dokusu.
+   - Kelime kartındaki gibi asil, mat, soft kadife bir derinlik; gözü yormayan kurumsal pastel İslam zümrüdü.
+2. **Devasa Uthmani Hat & Dinamik Ölçekleme:**
+   - 6 kelime ve altı ultra kısa hadislerde **145pt (9:16) / 118pt (4:5)** devasa hat.
+   - İpeksi Beyaz (`#FFF8EE`) Uthmani hat, tam hareke koruması (`MIN_VERTICAL_GAP = 28px` 9:16 / `24px` 4:5).
+   - Latin okunuş satırı Şampanya Altın (`#FDE6BA`) tonunda zarif akış.
+3. **Hero Türkçe Hadis Metni & Mixed Bold Tipografi:**
+   - Kısa hadislerde **82pt (9:16) / 68pt (4:5)** devasa hero punto.
+   - Mixed Bold: `**bold**` kelimeler Saf Beyaz (`#FFFFFF`) Ibarra Real Nova Bold, diğer kısımlar Açık Adaçayı (`#DCEFE7`) Regular.
+4. **Sıfır Çakışma Garantili Tırnak Filigranı:**
+   - Filigran `“` metnin üzerine bindirilmez; metnin ilk satırının solundaki negatif alana (`fili_x = first_x - 75/60`, `fili_y = cur_y - 140/115`) yerleştirilir.
+   - `alpha = 15` narin fildişi/altın gölgesi ile harfleri asla örtmez ve sıfır harf çarpışması sağlar.
+5. **Akıllı Auto-Fit & Beyaz Ezan Plus CTA:**
+   - Metin uzadıkça dinamik auto-fit döngüsü devreye girerek fontları dengeli küçültür; alttaki beyaz gölgeli Ezan Plus indirme butonuna (`_kelime_cta_butonu_ciz`) çarpma kesinlikle imkansızdır.
+   - Nebevî öğüt ve tescilli kaynak referansı altın ayraçlarla tabana bağlanır.
 
-### C. V18 Günün Duası Kartı (`dua_karti_ciz`) — Dinamik 8 Renkli Niyaz Mimarisi
-1. **8 Manevi Ruh Haline Özel Tam Ekran Radyal Gradyan:**
-   - Instagram Feed ve Story'de parlayan atmosferik derinlik için 8 tescilli renk paleti (`src/dua_db.py` & `DUA_RENK_PALETLERI`):
-     * *İç Sıkıntısı & Daralma:* `gece_safiri` (`#0F172A` ➔ `#090D16`)
-     * *Gelecek Endişesi & Kaygı:* `okyanus_huzuru` (`#0E2A3A` ➔ `#07151E`)
-     * *Hastalık & Şifa:* `mescid_zumrudu` (`#064E3B` ➔ `#02221A`)
-     * *Şükür & Sevinç:* `sicak_kehribar` (`#78350F` ➔ `#3B1A07`)
-     * *Geçim Darlığı & Rızık:* `derin_kahve` (`#451A03` ➔ `#220D01`)
-     * *Öfke & Kararsızlık:* `asil_murdum` (`#4A044E` ➔ `#240226`)
-     * *Tevekkül & Teslimiyet:* `yakut_kirmizi` (`#881337` ➔ `#43091B`)
-     * *Tevbe & Arınma:* `huzur_mavisi` (`#1E293B` ➔ `#0F172A`)
-2. **Niyaz Sahibi Taç Başlığı:**
-   - Peygamber veya Kur'an dualarına göre dinamik başlık tacı: `“ Hz. Mûsâ (a.s.)'ın Niyazı ”`, `“ Hz. Eyyûb (a.s.)'ın Şifâ Niyazı ”`, `“ Kur'ân-ı Kerîm'den Bir Niyaz ”` (Lora Bold Italic, Şampanya Altın `#FDE6BA`).
-3. **İpeksi Beyaz Hat & Arapça Okunuş:**
-   - Arapça dua metni İpeksi Beyaz (`#FFF8EE`) Uthmani/Amiri hatla çizilir. `MIN_VERTICAL_GAP = 28px` (9:16) / `24px` (4:5) dinamik ink clearance ile tam hareke koruması.
-   - Latin okunuş satırı Şampanya Altın (`#FDE6BA`) renginde, okunaklı ve zarif akışla yer alır.
-4. **Saf Beyaz Hero Türkçe Anlam:**
-   - Kısa dualarda **60pt - 66pt (9:16)** / **54pt - 60pt (4:5)** heybetli punto.
-   - Mixed bold: Vurgulanan kelimeler Saf Beyaz (`#FFFFFF`) Ibarra Real Nova Bold, diğer kısımlar Yumuşak Beyaz (`#F1F5F9`) Regular.
-   - Arka planda şeffaf saten altın (`(253, 230, 186, 28)`) narin tırnak filigranı.
-5. **Açık Fazilet Notu ve Şık CTA:**
-   - Solunda narin altın çizgi (`#C29B38`) bulunan açık fazilet bloğu.
+### C. V19 Günün Duası Kartı (`dua_karti_ciz`) — Sabit Soft Sisli Gece Mavisi Mimarisi
+1. **Sabit Soft Pastel Zemin (Soft Sisli Gece Mavisi):**
+   - Merkez `(34, 58, 80)` (`#223A50`) ➔ Dış kenar `(16, 30, 44)` (`#101E2C`) organik radyal gradyan parşömen dokusu.
+   - Gecenin sükunetini yansıtan mat kadife gece mavisi; İnşirah ve ferahlık hissi veren sakinleştirici kontrast.
+2. **Devasa Uthmani Hat & Niyaz Başlığı:**
+   - Taç başlık: Lora Bold 52pt (9:16) / 44pt (4:5) Saf Beyaz (`#FFFFFF`).
+   - Arapça dua metni: İpeksi Beyaz (`#FFF8EE`), kısa dualarda **140pt (9:16) / 115pt (4:5)** devasa punto.
+   - Latin okunuş: Şampanya Altın (`#FDE6BA`).
+3. **Hero Türkçe Dua Anlamı:**
+   - Kısa dualarda **76pt (9:16) / 64pt (4:5)** devasa hero punto.
+   - Mixed bold: `**bold**` kelimeler Saf Beyaz (`#FFFFFF`), diğer kısımlar Buz Mavisi (`#E2EDF7`).
+4. **Sıfır Çakışma Garantili Tırnak Filigranı:**
+   - Sol-üst negatif alana kilitlenmiş `alpha = 15` saten altın tırnak filigranı; harflere binmez.
+5. **Açık Fazilet Notu ve Beyaz Ezan Plus CTA:**
+   - Solunda narin altın ayraç bulunan açık fazilet bloğu (`#EDF4FB` Italic).
    - Taban alanında zemin rengine kusursuz kontrast sağlayan gölgeli Beyaz Ezan Plus CTA Butonu (`_kelime_cta_butonu_ciz`).
 
 ### D. V17 Kur'an Sözlüğü & İslamî Kavram Kartı (`kelime_karti_ciz`)
