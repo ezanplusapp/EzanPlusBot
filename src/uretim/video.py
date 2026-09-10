@@ -347,6 +347,7 @@ def kelime_zamanlarini_hizala(
 
     # Zaman damgaları yoksa sentetik zamanlama üret
     if not kelime_zamanlari or len(kelime_zamanlari) == 0:
+        log.warning("Kelime zaman damgaları bulunamadı! Sentetik zamanlama üretiliyor.")
         pad_baslangic = min(0.6, toplam_sure * 0.05)
         pad_bitis = min(1.0, toplam_sure * 0.08)
         kullanilabilir_sure = max(1.0, toplam_sure - pad_baslangic - pad_bitis)
@@ -359,10 +360,16 @@ def kelime_zamanlarini_hizala(
         return hizali
 
     # Formatı normalize et: Her eleman (w_idx, s_sec, e_sec) olmalıdır
+    # 1-tabanlı indeksleme kontrolü (örn. ilk indeks 1 ve 0 hiç kullanılmamışsa)
+    is_one_based = False
+    valid_3items = [item for item in kelime_zamanlari if len(item) >= 3]
+    if valid_3items and int(valid_3items[0][0]) == 1 and all(int(it[0]) >= 1 for it in valid_3items):
+        is_one_based = True
+
     normalize_segs: List[Tuple[int, float, float]] = []
     for idx, item in enumerate(kelime_zamanlari):
         if len(item) >= 3:
-            w_idx = int(item[0])
+            w_idx = int(item[0]) - (1 if is_one_based else 0)
             s_sec = float(item[1])
             e_sec = float(item[2])
         elif len(item) == 2:
@@ -1207,6 +1214,46 @@ def reels_videosu_uret(
         tr_ham = [w.strip() for w in tr_str.split() if w.strip()]
         tr_kelimeler = turkce_okunus_hizala(tr_ham, ar_kelimeler)
 
+    # Kelime zaman damgaları verilmemişse otomatik tespit et (Sıfır desenkron garantisi)
+    if not kelime_zamanlari:
+        s_no = None
+        a_no = None
+        # 1. Ses dosyası adından dene (örn: 002127.mp3 -> sure: 2, ayet: 127)
+        try:
+            stem = ses_yolu.stem
+            if len(stem) == 6 and stem.isdigit():
+                s_no = int(stem[:3])
+                a_no = int(stem[3:])
+        except Exception:
+            pass
+
+        # 2. sure_ayet metninden dene (örn: "Bakara Sûresi, 127. Âyet")
+        if (s_no is None or a_no is None) and sure_ayet:
+            try:
+                import re
+                from ..kuran_db import sure_listesi_getir
+                m_ayet = re.search(r"(\d+)\s*\.?\s*[Aâa]yet", sure_ayet, re.IGNORECASE)
+                if m_ayet:
+                    a_cand = int(m_ayet.group(1))
+                    for s_info in sure_listesi_getir():
+                        s_name = s_info.get("sure_adi_tr", "")
+                        if s_name and s_name.lower() in sure_ayet.lower():
+                            s_no = s_info.get("sure_no")
+                            a_no = a_cand
+                            break
+            except Exception as e:
+                log.debug(f"sure_ayet üzerinden sûre/âyet çözümlenemedi: {e}")
+
+        if s_no is not None and a_no is not None:
+            try:
+                from .ses import ayet_kelime_zamanlari_getir
+                otomatik_zamanlar = ayet_kelime_zamanlari_getir(s_no, a_no)
+                if otomatik_zamanlar:
+                    kelime_zamanlari = otomatik_zamanlar
+                    log.info(f"Kelime zamanları otomatik tespit edildi: Sûre {s_no}, Âyet {a_no} ({len(otomatik_zamanlar)} segment)")
+            except Exception as e:
+                log.warning(f"Otomatik kelime zamanları alınırken hata: {e}")
+
     kelime_zamanlari = kelime_zamanlarini_hizala(kelime_zamanlari, toplam_kelime, toplam_sure)
 
     # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Kıraat & Çoklu Sayfa Motoru)
@@ -1327,7 +1374,9 @@ def reels_videosu_uret(
         for i in range(toplam_kare):
             ilerleme = (i + 1) / toplam_kare
             t_sec = i / FPS
-            t_eval = t_sec  # Tam 1:1 mikrosaniye ses-görüntü senkronu
+            # Şeyh Mişari'nin tilavet vuruşlarında kelimenin tam hece anında parlaması için
+            # 50 ms (0.05s, ~1.5 kare) ince görsel avans uygulanır (yayın standardı & insan algı refleksi)
+            t_eval = t_sec + 0.05
 
             # O an okunan kelime indeksi ve dolum yüzdesi
             aktif_idx = -1

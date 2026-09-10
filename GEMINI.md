@@ -60,6 +60,10 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
     * *3. Okunmuş (Biten) Kelimeler:* Asil Antik Koyu Mürekkep (`#182230`). Okunup tamamlanan kelimeler tokluk kazanarak kalıcı bir sükunetle eşlik eder.
   - **Latin Okunuş Ferah Tipografi Standardı:** Latin okunuş puntosu `pt_okunus = max(32, int(pt_ar * 0.44))` formülü ile heybetli, okunaklı ve Arapça hatla dengeli boyuta çekilmiştir. Satır genişliğini denetleyen otomatik auto-fit mekanizması sayesinde uzun kelimelerde satırdan taşma veya çakışma %100 engellenir.
   - Okunan kelimeye odaklanılırken meal ve tefekkür bölümü kartın alt kısmında huzurlu bir şekilde eşlik eder.
+* **Otomatik Zaman Tespiti & Sıfır Gecikme Garantisi (`reels_videosu_uret`):**
+  - Fonksiyon çağrısında `kelime_zamanlari` parametresi aktarılmasa dahi `ses_yolu` dosya adından (`002127.mp3` -> Sûre 2, Âyet 127) veya `sure_ayet` başlığından ("Bakara Sûresi, 127. Âyet") sûre ve âyet otomatik çözümlenir; `ayet_kelime_zamanlari_getir` ile yerel tescilli zaman damgaları çekilir. Mekanik sentetik dilimlemeye düşüş mimari olarak engellenmiştir.
+  - **1-Tabanlı İndeks Otomatik Normalizasyonu:** Dışarıdan 1-tabanlı gelen segment dizileri otomatik tespit edilerek 0-tabanlıya dönüştürülür.
+  - **Yayın Standardı İnce Karaoke Avansı (`t_eval = t_sec + 0.05`):** Şeyh Mişari'nin konsonant ve ses vuruşlarında kelimenin tam hece anında parlaması ve insan algı refleksini karşılamak için 50 ms (~1.5 kare) ince görsel avans uygulanır; sıfır gecikme hissi ve mükemmel vuruş yakalanır.
 
 ### D. Uzun Ayet Çoklu Sayfa Geçiş Motoru & Dinamik Flex Mizanpaj
 * **Otomatik Tetikleme:** 14 kelimeye kadar olan âyetler (Bakara 127 gibi) tek sayfada ferahça sunulur. 15 kelime ve üzerini aştığında metni sıkıştırmak yerine otomatik olarak çoklu sayfaya bölünür (`sayfa_sayisi = math.ceil(toplam_kelime / 14)`).

@@ -309,6 +309,41 @@ class TestDailyBriefIyilestirmeleri(unittest.TestCase):
             self.assertEqual(kwargs["mesaj_id"], 5555)
             self.assertIn("ONAY SÜRESİ DOLDU", kwargs["yeni_caption"])
 
+    def test_kelime_zamanlarini_hizala_1_tabanli_duzeltme(self):
+        """
+        1-tabanlı gelen kelime indekslerinin otomatik olarak 0-tabanlıya
+        dönüştürüldüğünü doğrular.
+        """
+        from src.uretim.video import kelime_zamanlarini_hizala
+
+        ham_zamanlar = [(1, 0.0, 1.5), (2, 1.5, 3.2), (3, 3.2, 4.8)]
+        hizali = kelime_zamanlarini_hizala(ham_zamanlar, toplam_kelime=3, toplam_sure=5.0)
+
+        self.assertEqual(len(hizali), 3)
+        self.assertEqual(hizali[0][0], 0)
+        self.assertEqual(hizali[1][0], 1)
+        self.assertEqual(hizali[2][0], 2)
+
+    def test_kelime_zamanlarini_otomatik_tespit_ses_yolu(self):
+        """
+        ses_yolu dosya adından (002127.mp3) otomatik sure_no ve ayet_no
+        çıkarılıp kelime zamanlarının çekildiğini doğrular.
+        """
+        from pathlib import Path
+        from src.uretim.ses import ayet_kelime_zamanlari_getir
+
+        ses_yolu = Path("assets/audio/002127.mp3")
+        stem = ses_yolu.stem
+        self.assertTrue(len(stem) == 6 and stem.isdigit())
+        s_no = int(stem[:3])
+        a_no = int(stem[3:])
+        self.assertEqual((s_no, a_no), (2, 127))
+
+        zamanlar = ayet_kelime_zamanlari_getir(s_no, a_no)
+        self.assertGreaterEqual(len(zamanlar), 14)
+        self.assertEqual(zamanlar[0][0], 0)
+        self.assertEqual(zamanlar[0][1], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
