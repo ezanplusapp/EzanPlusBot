@@ -65,6 +65,36 @@ def test_dua_kartlari():
         assert im.size == (1080, 1920)
 
 
+def test_v18_hibrit_kartlar():
+    # V18 Hadis (Arapça + Parşömen Taç)
+    p_hadis = hadis_karti_ciz(
+        hadis_metni="Müslüman, elinden ve dilinden diğer Müslümanların **emin olduğu** kimsedir.",
+        kaynak_ravi="Buhârî, Îmân 4; Müslim, Îmân 64",
+        tefekkur_notu="Mümin, çevresine emniyet ve huzur aşılayan güven timsalidir.",
+        cikti_dosya_adi="test_v18_hadis.png",
+        format_tipi="4:5",
+        arapca_metin="الْمُسْلِمُ مَنْ سَلِمَ الْمُسْلِمُونَ مِنْ لِسَانِهِ وَيَدِهِ",
+        arapca_okunus="El-müslimü men selime'l-müslimûne min lisânihî ve yedih.",
+        ravi="Abdullah b. Amr (r.a.)",
+    )
+    assert p_hadis.exists()
+
+    # V18 Dua (Ruh Hali + Dinamik Palet + Kimin Duası)
+    p_dua = dua_karti_ciz(
+        dua_basligi="Hz. Mûsâ'nın Gönül Genişliği Niyazı",
+        turkce_anlam="Rabbim! **Gönlüme ferahlık ver**, işimi bana kolaylaştır.",
+        arapca_metin="رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي",
+        arapca_okunus="Rabbi'şrah lî sadrî ve yessir lî emrî.",
+        cikti_dosya_adi="test_v18_dua.png",
+        format_tipi="9:16",
+        ruh_hali="İç Sıkıntısı ve Daralma Hissi",
+        kimin_duasi="Hz. Mûsâ (a.s.)'ın Niyazı",
+        kaynak_ref="Tâhâ Sûresi, 25-26",
+        fazilet_notu="Zor işlerin kolaylaşması için tavsiye edilir.",
+    )
+    assert p_dua.exists()
+
+
 def test_veritabani_kaydi():
     pid = db.paylasim_ekle(
         kategori="hadis",
@@ -89,6 +119,8 @@ if __name__ == "__main__":
     print("✓ test_hadis_kartlari başarılı!")
     test_dua_kartlari()
     print("✓ test_dua_kartlari başarılı!")
+    test_v18_hibrit_kartlar()
+    print("✓ test_v18_hibrit_kartlar başarılı!")
     test_veritabani_kaydi()
     print("✓ test_veritabani_kaydi başarılı!")
     print("Tüm testler eksiksiz geçti!")

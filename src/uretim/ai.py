@@ -612,6 +612,9 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
     veri["turkce_anlam"] = turkce_anlam
     veri["kaynak_fazilet"] = f"{kaynak_ref} • {fazilet_notu}"
     veri["okunus_veya_fazilet"] = f"{kaynak_ref} • {fazilet_notu}"
+    veri["ruh_hali"] = ruh_hali
+    veri["kaynak_ref"] = kaynak_ref
+    veri["fazilet_notu"] = fazilet_notu
     veri["format"] = f"post_{format_tipi.replace(':', '_')}"
 
     cap = str(veri.get("instagram_caption") or "").strip()

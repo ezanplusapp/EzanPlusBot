@@ -814,61 +814,62 @@ def hadis_karti_ciz(
     vurgulanan_kelime: Optional[str] = None,
 ) -> Path:
     """
-    Ezan Plus Sahih Hadis şablonu (V16 Mimarisi - Proportional Layout & Sıcak Parşömen Taç).
+    Ezan Plus Sahih Hadis şablonu (V18 Mimarisi - Kutusuz Asil Parşömen & Peygamber Serlevhası).
     1080x1350 (4:5 Feed) ve 1080x1920 (9:16 Story) tam destekler.
-    tac_stili: 'sicak_parcomen' (varsayılan & önerilen), 'seffaf_cizgili', 'kirmizi_tac'
+    Ağır kutular kaldırılarak ferah, nefes alan Mushaf zarafeti ve derin bordo hat uygulanmıştır.
     """
     w = 1080
     h = 1920 if format_tipi == "9:16" else 1350
-    kirmizi_ton = "#C02128"  # Logodaki Ezan Plus kırmızısının birebir aynısı (RGB: 192, 33, 40)
+    is_916 = (format_tipi == "9:16")
 
-    im = Image.new("RGB", (w, h), "#F7F4EC")
+    # Sıcak Mushaf Parşömen zemin
+    im = Image.new("RGB", (w, h), "#FBF9F4")
     draw = ImageDraw.Draw(im)
 
-    # Kenar payları
-    kx1, kx2 = 64, w - 64
-    ky1 = 140 if format_tipi == "9:16" else 64
-    ky2 = h - (140 if format_tipi == "9:16" else 64)
+    # Kenar payları ve İç Panel (Ferah, nefes alan asil çerçeve)
+    kx1, kx2 = (52, w - 52)
+    ky1 = 96 if is_916 else 52
+    ky2 = h - (96 if is_916 else 52)
 
-    # Dış kart gölgesi
+    # Dış yumuşak gölge
     shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(shadow)
-    s_draw.rounded_rectangle([kx1 + 4, ky1 + 14, kx2 - 4, ky2 + 14], radius=38, fill=(30, 25, 20, 26))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(18))
+    s_draw.rounded_rectangle([kx1 + 3, ky1 + 10, kx2 - 3, ky2 + 10], radius=32, fill=(24, 18, 14, 20))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(14))
     im.paste(shadow, (0, 0), shadow)
 
     draw = ImageDraw.Draw(im)
-    yuvarlak_kose_ciz(draw, (kx1, ky1, kx2, ky2), radius=36, dolgu="#FFFEFA", kenarlik="#E5DAC3", kenarlik_kalinlik=2)
+    # İç asil beyaz panel (Krem zemin üzerinde saf ipeksi kart)
+    yuvarlak_kose_ciz(draw, (kx1, ky1, kx2, ky2), radius=30, dolgu="#FFFEFA", kenarlik="#E8DFC8", kenarlik_kalinlik=1)
 
-    # İç ince altın bordür ve 4 köşe altın nokta
-    cp = 18
-    draw.rounded_rectangle([kx1 + cp, ky1 + cp, kx2 - cp, ky2 - cp], radius=26, outline="#F0E7D8", width=1)
+    # Dört köşe minik altın süsleme noktaları
+    cp = 16
     for cx, cy in [(kx1 + cp, ky1 + cp), (kx2 - cp, ky1 + cp), (kx1 + cp, ky2 - cp), (kx2 - cp, ky2 - cp)]:
-        draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill="#C29B38")
+        draw.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill="#C29B38")
 
-    # 1. HEADER ALANI (SOL: 68x68 LOGO | ORTA: BASKERVILLE BOLD 42pt ROZET | SAĞ: EZAN PLUS BLOĞU)
-    sol_x = kx1 + 44
-    sag_x = kx2 - 44
-    cur_y = ky1 + (34 if format_tipi == "9:16" else 28)
-    header_h = 70
+    # 1. HEADER ALANI (SOL: LOGO | ORTA: HADİS-İ ŞERİF ROZETİ | SAĞ: KÜNYE)
+    sol_x = kx1 + 38
+    sag_x = kx2 - 38
+    cur_y = ky1 + (28 if is_916 else 24)
+    header_h = 66
     mid_header_y = cur_y + header_h // 2
-    logo_yolu = IKONLAR / "logo.png"
 
-    # A) EN SOLDA LOGO
-    logo_size = 68
+    # A) Logo
+    logo_yolu = IKONLAR / "logo.png"
+    logo_size = 58
     if logo_yolu.exists():
         logo = Image.open(logo_yolu).convert("RGBA").resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         mask = Image.new("L", (logo_size, logo_size), 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, logo_size, logo_size], radius=16, fill=255)
+        ImageDraw.Draw(mask).rounded_rectangle([0, 0, logo_size, logo_size], radius=14, fill=255)
         im.paste(logo, (sol_x, mid_header_y - logo_size // 2), mask)
 
-    # B) EN SAĞDA "EZAN PLUS" + "SAHİH HADİS-İ ŞERİF REHBERİ"
-    font_sub = font_al(FONT_UI, 13, agirlik=600)
+    # B) Sağ Künye
+    font_sub = font_al(FONT_UI, 12, agirlik=600)
     s_txt = "SAHİH HADİS-İ ŞERİF REHBERİ"
     s_bb = draw.textbbox((0, 0), s_txt, font=font_sub)
     w_sub = s_bb[2] - s_bb[0]
 
-    font_marka = font_al(FONT_GOVDE, 39, agirlik=700)
+    font_marka = font_al(FONT_GOVDE, 34, agirlik=700)
     m_txt = "Ezan Plus"
     m_bb = draw.textbbox((0, 0), m_txt, font=font_marka)
     w_marka = m_bb[2] - m_bb[0]
@@ -877,70 +878,70 @@ def hadis_karti_ciz(
     total_text_h = h_marka + 4 + (s_bb[3] - s_bb[1])
     start_y = mid_header_y - total_text_h // 2
     draw.text((sag_x - w_marka, start_y - m_bb[1]), m_txt, font=font_marka, fill="#1C1917")
-    draw.text((sag_x - w_sub, start_y + h_marka + 8 - s_bb[1]), s_txt, font=font_sub, fill="#8C7A6B")
+    draw.text((sag_x - w_sub, start_y + h_marka + 6 - s_bb[1]), s_txt, font=font_sub, fill="#8C7A6B")
 
-    # C) ORTADA: BASKERVILLE BOLD 42pt ROZET
-    font_rozet = font_al(FONT_BASKERVILLE, 42, agirlik=700)
+    # C) Orta Rozet
+    font_rozet = font_al(FONT_BASKERVILLE, 38, agirlik=700)
     r_txt = "HADİS-İ ŞERİF"
     r_bb = draw.textbbox((0, 0), r_txt, font=font_rozet)
     rw = r_bb[2] - r_bb[0]
     rh = r_bb[3] - r_bb[1]
 
-    pad_x = 40
+    pad_x = 36
     rozet_w = rw + pad_x * 2
-    rozet_h = 70
+    rozet_h = 62
     rozet_x = (w - rozet_w) // 2
     rozet_y = mid_header_y - rozet_h // 2
 
-    yuvarlak_kose_ciz(draw, (rozet_x, rozet_y, rozet_x + rozet_w, rozet_y + rozet_h), radius=rozet_h // 2, dolgu=kirmizi_ton)
-
+    yuvarlak_kose_ciz(draw, (rozet_x, rozet_y, rozet_x + rozet_w, rozet_y + rozet_h), radius=rozet_h // 2, dolgu="#9B1B1B")
     rx = rozet_x + (rozet_w - rw) // 2 - r_bb[0]
-    ry = rozet_y + (rozet_h - rh) // 2 - r_bb[1] + 1
-    draw.text((rx, ry + 1), r_txt, font=font_rozet, fill=(70, 10, 15, 100))
+    ry = rozet_y + (rozet_h - rh) // 2 - r_bb[1]
     draw.text((rx, ry), r_txt, font=font_rozet, fill="#FFFFFF")
 
-    # Ayraç Hattı
-    ayrac_y = cur_y + (88 if format_tipi == "9:16" else 84)
-    draw.line([(kx1 + 44, ayrac_y), (kx2 - 44, ayrac_y)], fill="#EAE4D5", width=1)
-    draw.line([(w // 2 - 80, ayrac_y), (w // 2 + 80, ayrac_y)], fill="#C29B38", width=2)
-    draw.ellipse([w // 2 - 5, ayrac_y - 5, w // 2 + 5, ayrac_y + 5], fill="#C29B38")
+    # Ayraç Çizgisi
+    ayrac_y = cur_y + header_h + (16 if is_916 else 12)
+    draw.line([(kx1 + 38, ayrac_y), (kx2 - 38, ayrac_y)], fill="#EAE2D0", width=1)
+    draw.line([(w // 2 - 70, ayrac_y), (w // 2 + 70, ayrac_y)], fill="#C29B38", width=2)
+    draw.ellipse([w // 2 - 4, ayrac_y - 4, w // 2 + 4, ayrac_y + 4], fill="#C29B38")
 
-    # 2. ALT ALANLAR & NEBEVİ ÖĞÜT & CTA BUTONU
-    cta_cy = ky2 - (68 if format_tipi == "9:16" else 58)
-    _cta_butonu_ciz(im, draw, w // 2, cta_cy, w=670, h=(74 if format_tipi == "9:16" else 66))
+    # 2. ALT ALANLAR & NEBEVÎ ÖĞÜT & CTA BUTONU
+    cta_cy = ky2 - (64 if is_916 else 54)
+    _cta_butonu_ciz(im, draw, w // 2, cta_cy, w=660, h=(70 if is_916 else 62))
 
-    alt_cizgi_y = cta_cy - (60 if format_tipi == "9:16" else 50)
-    draw.line([(kx1 + 44, alt_cizgi_y), (kx2 - 44, alt_cizgi_y)], fill="#EFE9DC", width=1)
+    alt_cizgi_y = cta_cy - (52 if is_916 else 44)
+    draw.line([(kx1 + 38, alt_cizgi_y), (kx2 - 38, alt_cizgi_y)], fill="#EFE8DA", width=1)
 
-    # Genişletilmiş ferah kutu kenarları
-    box_w = (kx2 - kx1) - 64  # 888 px
+    # Ferah Metin Genişliği
+    box_w = (kx2 - kx1) - 64  # 912 px
     box_x1 = kx1 + 32
     box_x2 = kx2 - 32
-    text_max_w = box_w - 44   # 844 px
+    text_max_w = box_w - 32   # 880 px
 
-    # GÜNÜN NEBEVÎ ÖĞÜDÜ (4:5'te ferah ve kompakt safe area)
-    tef_metin = (tefekkur_notu or "Müslümanın basiretli, uyanık ve tecrübelerinden ders çıkaran bir duruşu olmalıdır. Hatalar tekrarlanmak için değil, ibret almak içindir.").strip()
-    font_tef = font_al(FONT_GOVDE, 22 if format_tipi == "9:16" else 19, agirlik=400)
-    tef_line_h = 36 if format_tipi == "9:16" else 28
-    tef_satirlar = metin_satirla(tef_metin, font_tef, box_w - 48, draw)
-    kutu_h = (56 if format_tipi == "9:16" else 46) + (len(tef_satirlar) * tef_line_h) + (16 if format_tipi == "9:16" else 12)
+    # GÜNÜN NEBEVÎ ÖĞÜDÜ (Zarif, açık alıntı bloğu)
+    tef_metin = (tefekkur_notu or "Müslümanın basiretli, uyanık ve tecrübelerinden ders çıkaran bir duruşu olmalıdır.").strip()
+    font_tef = font_al(FONT_GOVDE, 22 if is_916 else 19, agirlik=400)
+    tef_line_h = 35 if is_916 else 28
+    tef_satirlar = metin_satirla(tef_metin, font_tef, box_w - 56, draw)
 
-    kutu_y2 = alt_cizgi_y - 14
+    ogut_pad_v = 18 if is_916 else 14
+    kutu_h = (44 if is_916 else 38) + (len(tef_satirlar) * tef_line_h) + ogut_pad_v
+    kutu_y2 = alt_cizgi_y - 12
     kutu_y1 = kutu_y2 - kutu_h
 
-    yuvarlak_kose_ciz(draw, (box_x1, kutu_y1, box_x2, kutu_y2), radius=20, dolgu="#F9F6EE", kenarlik="#E5DAC3", kenarlik_kalinlik=1)
-    draw.rounded_rectangle([box_x1, kutu_y1, box_x1 + 6, kutu_y2], radius=3, fill="#C29B38")
-    draw.ellipse([box_x1 + 24, kutu_y1 + (24 if format_tipi == "9:16" else 18), box_x1 + 32, kutu_y1 + (32 if format_tipi == "9:16" else 26)], fill="#C29B38")
-    draw.text((box_x1 + 42, kutu_y1 + (18 if format_tipi == "9:16" else 14)), "GÜNÜN NEBEVÎ ÖĞÜDÜ", font=font_al(FONT_UI, 19 if format_tipi == "9:16" else 17, agirlik=700), fill="#B45309")
+    # Kutusuzluk felsefesi: Çok narin, şeffafımsı fildişi zemin + sol altın vurgu çizgisi
+    yuvarlak_kose_ciz(draw, (box_x1, kutu_y1, box_x2, kutu_y2), radius=16, dolgu="#FAF7F0", kenarlik="#E8DFC8", kenarlik_kalinlik=1)
+    draw.rounded_rectangle([box_x1, kutu_y1, box_x1 + 5, kutu_y2], radius=3, fill="#C29B38")
+    draw.ellipse([box_x1 + 18, kutu_y1 + (18 if is_916 else 14), box_x1 + 25, kutu_y1 + (25 if is_916 else 21)], fill="#C29B38")
+    draw.text((box_x1 + 34, kutu_y1 + (15 if is_916 else 11)), "GÜNÜN NEBEVÎ ÖĞÜDÜ", font=font_al(FONT_UI, 17 if is_916 else 15, agirlik=700), fill="#B45309")
 
-    ty = kutu_y1 + (56 if format_tipi == "9:16" else 46)
+    ty = kutu_y1 + (48 if is_916 else 40)
     for sat in tef_satirlar:
-        draw.text((box_x1 + 24, ty), sat, font=font_tef, fill="#292524")
+        draw.text((box_x1 + 24, ty), sat, font=font_tef, fill="#2C241D")
         ty += tef_line_h
 
     free_vertical = kutu_y1 - ayrac_y
 
-    # 3. TÜRKÇE HADİS MEALİ (HERO ELEMENT & MIXED BOLD VURGU)
+    # 3. TÜRKÇE HADİS MEALİ (HERO ELEMENT)
     temiz_hadis = hadis_metni.strip("“”\"' ")
     if vurgulanan_kelime and ("**" not in temiz_hadis) and (vurgulanan_kelime in temiz_hadis):
         temiz_hadis = temiz_hadis.replace(vurgulanan_kelime, f"**{vurgulanan_kelime}**")
@@ -949,129 +950,83 @@ def hadis_karti_ciz(
     ar_ham = (arapca_metin or "لاَ يُلْدَغُ الْمُؤْمِنُ مِنْ جُحْرٍ وَاحِدٍ مَرَّتَيْنِ").strip()
     ar_len = len(ar_ham)
 
-    # 1. Meal Punto Seçimi (Ters Orantılı: Kısa hadislerde daha heybetli 58-66pt!)
-    if format_tipi == "9:16":
-        if hadis_len < 40:
-            font_hadis_boyut = 66
-        elif hadis_len < 75:
-            font_hadis_boyut = 60
-        elif hadis_len < 120:
-            font_hadis_boyut = 54
-        elif hadis_len < 180:
-            font_hadis_boyut = 48
-        else:
-            font_hadis_boyut = 42
+    # Meal Punto Seçimi (Ters Orantılı)
+    if is_916:
+        font_hadis_boyut = 66 if hadis_len < 40 else (60 if hadis_len < 75 else (54 if hadis_len < 120 else (48 if hadis_len < 180 else 42)))
     else:
-        if hadis_len < 40:
-            font_hadis_boyut = 62
-        elif hadis_len < 75:
-            font_hadis_boyut = 56
-        elif hadis_len < 120:
-            font_hadis_boyut = 50
-        elif hadis_len < 180:
-            font_hadis_boyut = 45
-        else:
-            font_hadis_boyut = 41
+        font_hadis_boyut = 62 if hadis_len < 40 else (56 if hadis_len < 75 else (50 if hadis_len < 120 else (45 if hadis_len < 180 else 40)))
 
     font_hadis_reg = font_al(FONT_BASLIK, font_hadis_boyut, agirlik=400)
     font_hadis_bold = font_al(FONT_BASLIK, font_hadis_boyut, agirlik=700)
 
     meal_tokens = parse_markdown_bold(temiz_hadis)
-    tr_wrapped_lines, space_w = wrap_mixed_tokens(meal_tokens, font_hadis_reg, font_hadis_bold, box_w - 30, draw)
-    tr_line_h = int(font_hadis_boyut * 1.44)
+    tr_wrapped_lines, space_w = wrap_mixed_tokens(meal_tokens, font_hadis_reg, font_hadis_bold, box_w - 24, draw)
+    tr_line_h = int(font_hadis_boyut * 1.42)
     tr_toplam_h = len(tr_wrapped_lines) * tr_line_h
 
+    # Kaynak Metni
     raw_kaynak = (kaynak_ravi or kaynak or "Buhârî ve Müslim").strip()
-    kaynak_metni = re.split(r'[\.;,]?\s*Ayrıca bkz?[\.:]?', raw_kaynak, flags=re.IGNORECASE)[0].strip()
-    if not kaynak_metni:
-        kaynak_metni = raw_kaynak
+    kaynak_metni = re.split(r'[\.;,]?\s*Ayrıca bkz?[\.:]?', raw_kaynak, flags=re.IGNORECASE)[0].strip() or raw_kaynak
 
-    max_badge_w = box_w - 60
-    font_k_pt = 24 if format_tipi == "9:16" else (24 if hadis_len < 60 else 22)
+    font_k_pt = 24 if is_916 else (23 if hadis_len < 60 else 21)
     font_kaynak = font_al(FONT_BASLIK, font_k_pt)
     kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
-    while (kw + 52) > max_badge_w and font_k_pt > 16:
-        font_k_pt -= 1
-        font_kaynak = font_al(FONT_BASLIK, font_k_pt)
-        kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
-    kaynak_h = 42 if format_tipi == "4:5" else 46
+    kaynak_h = 42 if not is_916 else 46
 
-    # 4. SERLEVHA KUTUSU SAFE AREA & AKILLI ARAPÇA MİZANPAJ (Ayet Standardı)
-    MIN_VERTICAL_GAP = 28 if format_tipi == "9:16" else 24
-    tac_h = 48 if format_tipi == "9:16" else (46 if hadis_len < 75 else 42)
-    pad_ic_ust = 40 if format_tipi == "9:16" else (34 if hadis_len < 75 else 28)
-    pad_ic_alt = 38 if format_tipi == "9:16" else (34 if hadis_len < 75 else 28)
+    # 4. PEYGAMBER TAÇ SERLEVHASI & KUTUSUZ ARAPÇA METİN
+    MIN_VERTICAL_GAP = 28 if is_916 else 24
+    intro_txt = "Resûlullah sallallahu aleyhi ve sellem şöyle buyurdu:"
+    font_intro = font_al(FONT_GOVDE, 23 if is_916 else 20, agirlik=700)
+    in_bb = draw.textbbox((0, 0), intro_txt, font=font_intro)
+    in_w = in_bb[2] - in_bb[0]
+    tac_h = 36 if is_916 else 30
 
-    if arapca_okunus:
+    # Râvi / Latin Okunuş
+    if ravi:
+        temiz_ravi = re.sub(r"^hz\.?\s*", "", ravi.strip("“”\"'{}[] "), flags=re.IGNORECASE).strip()
+        ok_ham = f"Hz. {temiz_ravi} (r.a.) rivayet etti"
+    elif arapca_okunus:
         ok_ham = arapca_okunus.strip("“”\"'{}[] ")
-    elif ravi:
-        temiz_ravi = ravi.strip("“”\"'{}[] ")
-        if re.match(r"^hz\.?\s*", temiz_ravi, re.IGNORECASE):
-            temiz_ravi = re.sub(r"^hz\.?\s*", "", temiz_ravi, flags=re.IGNORECASE).strip()
-        ok_ham = f"Hz. {temiz_ravi} rivayet etti"
     else:
-        ok_ham = "Sahih Hadis-i Şerif"
-    ok_gosterim = f"“{ok_ham}”" if ok_ham else ""
-    font_ok_pt = 28 if format_tipi == "9:16" else (26 if hadis_len < 75 else 20)
+        ok_ham = ""
+    ok_gosterim = f"“ {ok_ham} ”" if ok_ham else ""
+
+    font_ok_pt = 26 if is_916 else (24 if hadis_len < 75 else 20)
     font_okunus = font_al(FONT_GOVDE, font_ok_pt)
-    ok_satirlar = metin_satirla(ok_gosterim, font_okunus, box_w - 60, draw) if ok_gosterim else []
-    ok_line_h = (40 if format_tipi == "9:16" else 36) if hadis_len < 75 else (32 if format_tipi == "9:16" else 26)
+    ok_satirlar = metin_satirla(ok_gosterim, font_okunus, box_w - 40, draw) if ok_gosterim else []
+    ok_line_h = 36 if is_916 else 30
     ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
-    gap_ar_ok = (28 if format_tipi == "9:16" else 22) if ok_satirlar else 0
+    gap_ar_ok = (24 if is_916 else 18) if ok_satirlar else 0
 
-    # Arapça Metin Temizliği (Secavend ve durak işaretlerini ayıkla)
+    # Arapça Metin Temizliği
     secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
-    ar_temiz = secavend_regex.sub("", ar_ham).strip()
-    if not ar_temiz:
-        ar_temiz = ar_ham
+    ar_temiz = secavend_regex.sub("", ar_ham).strip() or ar_ham
 
-    # Ayet motoru standartlarında satır hedefli autofit (Önce 2 satır, sığmazsa 3 satır)
-    if format_tipi == "9:16":
-        start_pt = 114 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))
-        min_pt = 50
-    else:
-        start_pt = 98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 54))
-        min_pt = 42
+    # Arapça Autofit
+    start_pt = (116 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))) if is_916 else (98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 54)))
+    min_pt = 46 if is_916 else 40
+    hedef_satirlar = [1, 2] if ar_len < 65 else [2, 3]
 
-    hedef_satir_sayilari = [1, 2] if ar_len < 65 else [2, 3]
     font_ar_boyut = min_pt
     ar_satirlar = []
     found_ar = False
 
-    for target_l in hedef_satir_sayilari:
+    for target_l in hedef_satirlar:
         for test_pt in range(start_pt, min_pt - 1, -2):
             f_test = font_al(FONT_ARAPCA, test_pt)
             sats = arapca_satirla(ar_temiz, f_test, text_max_w, draw)
             if not sats or len(sats) > target_l:
                 continue
-
             max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
             if max_line_w > text_max_w:
                 continue
-
-            # Yetim kelime önleme: Son satırda tek kelime kalmışsa reddet
             if len(sats) >= 2 and len(sats[-1].split()) == 1 and len(sats[-1].strip()) < 16:
                 if test_pt > min_pt + 4:
                     continue
-
-            # Gerçek mürekkep yüksekliği ve satır arası net clearance simülasyonu
-            sim_prev_ink = 0
-            for s_idx, s in enumerate(sats):
-                bb = draw.textbbox((0, 0), s, font=f_test)
-                top_ink, bottom_ink = bb[1], bb[3]
-                l_y = -top_ink if s_idx == 0 else (sim_prev_ink + MIN_VERTICAL_GAP - top_ink)
-                sim_prev_ink = l_y + bottom_ink
-
-            sim_total_ar_h = sim_prev_ink
-            sim_box_h = tac_h + pad_ic_ust + sim_total_ar_h + gap_ar_ok + ok_toplam_h + pad_ic_alt
-            sim_kalan = free_vertical - (sim_box_h + tr_toplam_h + kaynak_h)
-            min_kalan = 40 if format_tipi == "9:16" else 28
-
-            if sim_kalan >= min_kalan:
-                font_ar_boyut = test_pt
-                ar_satirlar = sats
-                found_ar = True
-                break
+            ar_satirlar = sats
+            font_ar_boyut = test_pt
+            found_ar = True
+            break
         if found_ar:
             break
 
@@ -1081,7 +1036,7 @@ def hadis_karti_ciz(
     else:
         font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
 
-    # Her satırın Y offsetini gerçek mürekkep sınırlarına göre hesapla
+    # Arapça Y offsetleri (Mürekkep hizalama)
     ar_offsets = []
     prev_ink_bottom = 0
     for s_idx, asat in enumerate(ar_satirlar):
@@ -1090,561 +1045,95 @@ def hadis_karti_ciz(
         l_y = -top_ink if s_idx == 0 else (prev_ink_bottom + MIN_VERTICAL_GAP - top_ink)
         ar_offsets.append(l_y)
         prev_ink_bottom = l_y + bottom_ink
-
     total_ar_h = prev_ink_bottom
 
-    # Okunuş Satırları Offsetleri
-    ok_offsets = []
-    if ok_satirlar:
-        cur_ok_off = total_ar_h + gap_ar_ok
-        for osat in ok_satirlar:
-            ok_offsets.append(cur_ok_off)
-            cur_ok_off += ok_line_h
-        total_content_h = cur_ok_off
-    else:
-        total_content_h = total_ar_h
-
-    box_s_h = tac_h + pad_ic_ust + total_content_h + pad_ic_alt
-
-    # 5. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANLARI)
-    toplam_icerik_h = box_s_h + tr_toplam_h + kaynak_h
+    # 5. DİKEY DENGELİ DAĞILIM (Kutusuz Nefes Alan Mizanpaj)
+    ust_blok_h = tac_h + (20 if is_916 else 14) + total_ar_h + gap_ar_ok + ok_toplam_h
+    toplam_icerik_h = ust_blok_h + tr_toplam_h + kaynak_h
     kalan_bosluk = max(40, free_vertical - toplam_icerik_h)
 
-    if format_tipi == "9:16":
-        gap_ust = max(24, min(170, int(kalan_bosluk * 0.23)))
-        kalan_orta_alt = kalan_bosluk - gap_ust
-        gap_kutu_tr = max(36, min(260, int(kalan_orta_alt * 0.44)))
-        gap_alt_toplam = max(40, kalan_orta_alt - gap_kutu_tr)
-        gap_tr_kaynak = max(26, min(80, int(gap_alt_toplam * 0.36)))
-    else:  # 4:5
-        gap_ust = max(20, min(65, int(kalan_bosluk * 0.20)))
-        kalan_orta_alt = kalan_bosluk - gap_ust
-        gap_kutu_tr = max(28, min(65, int(kalan_orta_alt * 0.44)))
-        gap_alt_toplam = max(30, kalan_orta_alt - gap_kutu_tr)
-        gap_tr_kaynak = max(20, min(38, int(gap_alt_toplam * 0.40)))
+    if is_916:
+        gap_ust = max(24, min(140, int(kalan_bosluk * 0.22)))
+        kalan_orta = kalan_bosluk - gap_ust
+        gap_ar_tr = max(36, min(240, int(kalan_orta * 0.46)))
+        gap_alt = max(36, kalan_orta - gap_ar_tr)
+        gap_tr_kaynak = max(24, min(70, int(gap_alt * 0.38)))
+    else:
+        gap_ust = max(18, min(55, int(kalan_bosluk * 0.20)))
+        kalan_orta = kalan_bosluk - gap_ust
+        gap_ar_tr = max(28, min(60, int(kalan_orta * 0.46)))
+        gap_alt = max(28, kalan_orta - gap_ar_tr)
+        gap_tr_kaynak = max(18, min(36, int(gap_alt * 0.40)))
 
-    box_s_y1 = ayrac_y + gap_ust
-    box_s_y2 = box_s_y1 + box_s_h
+    # A) Peygamber Taç Serlevhası Çizimi (Kutusuz, Narin Altın Kanatlı)
+    cur_y_draw = ayrac_y + gap_ust
+    in_x = (w - in_w) // 2
+    in_y = cur_y_draw
 
-    # SERLEVHA KUTUSUNU ÇİZ
-    yuvarlak_kose_ciz(draw, (box_x1, box_s_y1, box_x2, box_s_y2), radius=24, dolgu="#FFFEFA", kenarlik="#E5DAC3", kenarlik_kalinlik=1)
+    orn_w = 60
+    orn_y = in_y + tac_h // 2 + 1
+    # Sol kanat
+    draw.line([(in_x - orn_w - 24, orn_y), (in_x - 24, orn_y)], fill="#C29B38", width=1)
+    draw.ellipse([in_x - 18, orn_y - 3, in_x - 12, orn_y + 3], fill="#C29B38")
+    # Sağ kanat
+    draw.line([(in_x + in_w + 24, orn_y), (in_x + in_w + orn_w + 24, orn_y)], fill="#C29B38", width=1)
+    draw.ellipse([in_x + in_w + 12, orn_y - 3, in_x + in_w + 18, orn_y + 3], fill="#C29B38")
+    # Başlık Metni
+    draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#8B1D24")
 
-    intro_txt = "Resûlullah sallallahu aleyhi ve sellem şöyle buyurdu:"
-
-    # --- TAÇ STİLİ UYGULAMASI ---
-    if tac_stili == "kirmizi_tac":
-        tac_mask = Image.new("L", (w, h), 0)
-        tm_draw = ImageDraw.Draw(tac_mask)
-        tm_draw.rounded_rectangle([box_x1, box_s_y1, box_x2, box_s_y1 + tac_h * 2], radius=24, fill=255)
-        tm_draw.rectangle([0, box_s_y1 + tac_h, w, h], fill=0)
-
-        tac_img = Image.new("RGB", (w, h), kirmizi_ton)
-        im.paste(tac_img, (0, 0), tac_mask)
-        draw.line([(box_x1, box_s_y1 + tac_h), (box_x2, box_s_y1 + tac_h)], fill="#C29B38", width=2)
-
-        font_intro = font_al(FONT_GOVDE, 24 if format_tipi == "9:16" else 20, agirlik=700)
-        in_bb = draw.textbbox((0, 0), intro_txt, font=font_intro)
-        in_w, in_h = in_bb[2] - in_bb[0], in_bb[3] - in_bb[1]
-        in_x = (w - in_w) // 2 - in_bb[0]
-        in_y = box_s_y1 + (tac_h - in_h) // 2 - in_bb[1] + 1
-        draw.text((in_x, in_y + 1), intro_txt, font=font_intro, fill=(70, 10, 15, 120))
-        draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#FFFFFF")
-
-    elif tac_stili == "sicak_parcomen":
-        tac_mask = Image.new("L", (w, h), 0)
-        tm_draw = ImageDraw.Draw(tac_mask)
-        tm_draw.rounded_rectangle([box_x1, box_s_y1, box_x2, box_s_y1 + tac_h * 2], radius=24, fill=255)
-        tm_draw.rectangle([0, box_s_y1 + tac_h, w, h], fill=0)
-
-        tac_img = Image.new("RGB", (w, h), "#F5EFE3")
-        im.paste(tac_img, (0, 0), tac_mask)
-        draw.line([(box_x1, box_s_y1 + tac_h), (box_x2, box_s_y1 + tac_h)], fill="#E2D7C3", width=1)
-        draw.line([(w // 2 - 40, box_s_y1 + tac_h), (w // 2 + 40, box_s_y1 + tac_h)], fill="#C29B38", width=2)
-
-        font_intro = font_al(FONT_GOVDE, 22 if format_tipi == "9:16" else 19, agirlik=700)
-        in_bb = draw.textbbox((0, 0), intro_txt, font=font_intro)
-        in_w, in_h = in_bb[2] - in_bb[0], in_bb[3] - in_bb[1]
-        in_x = (w - in_w) // 2 - in_bb[0]
-        in_y = box_s_y1 + (tac_h - in_h) // 2 - in_bb[1] + 1
-        draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#8B1D24")
-
-    else:  # "seffaf_cizgili" - Klasik Mushaf Tezhip & Zarif Çizgili (En Ferah & Asil Tasarım)
-        font_intro = font_al(FONT_GOVDE, 22 if format_tipi == "9:16" else 19, agirlik=700)
-        in_bb = draw.textbbox((0, 0), intro_txt, font=font_intro)
-        in_w, in_h = in_bb[2] - in_bb[0], in_bb[3] - in_bb[1]
-        in_x = (w - in_w) // 2 - in_bb[0]
-        in_y = box_s_y1 + (tac_h - in_h) // 2 - in_bb[1] + 4
-
-        line_w = 60
-        y_cizgi = box_s_y1 + tac_h // 2 + 2
-        draw.line([(in_x - line_w - 20, y_cizgi), (in_x - 20, y_cizgi)], fill="#C29B38", width=1)
-        draw.ellipse([in_x - 14, y_cizgi - 3, in_x - 8, y_cizgi + 3], fill="#C29B38")
-
-        draw.line([(in_x + in_w + 20, y_cizgi), (in_x + in_w + line_w + 20, y_cizgi)], fill="#C29B38", width=1)
-        draw.ellipse([in_x + in_w + 8, y_cizgi - 3, in_x + in_w + 14, y_cizgi + 3], fill="#C29B38")
-
-        draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#9B1B1B")
-        draw.line([(box_x1 + 30, box_s_y1 + tac_h), (box_x2 - 30, box_s_y1 + tac_h)], fill="#F0E8D9", width=1)
-
-    # Arapça Metin Çizimi (Tamamı ve Harekeli, Gerçek Mürekkep Hizalaması)
-    content_base_y = box_s_y1 + tac_h + pad_ic_ust
+    # B) Arapça Hat Çizimi (Derin Bordo, Kutusuz Ferah)
+    ar_base_y = in_y + tac_h + (20 if is_916 else 14)
     for s_idx, asat in enumerate(ar_satirlar):
         as_bb = draw.textbbox((0, 0), asat, font=font_ar)
         as_w = as_bb[2] - as_bb[0]
         line_x = (w - as_w) // 2
-        line_y = content_base_y + ar_offsets[s_idx]
-        draw.text((line_x, line_y), asat, font=font_ar, fill="#9B1B1B")
+        line_y = ar_base_y + ar_offsets[s_idx]
+        draw.text((line_x, line_y), asat, font=font_ar, fill="#8B1D24")
 
-    # Latin Okunuş Çizimi (Safe area garantili)
+    # C) Râvi / Latin Okunuş
     if ok_satirlar:
-        for o_idx, osat in enumerate(ok_satirlar):
+        ok_y_cur = ar_base_y + total_ar_h + gap_ar_ok
+        for osat in ok_satirlar:
             o_bb = draw.textbbox((0, 0), osat, font=font_okunus)
             o_w = o_bb[2] - o_bb[0]
-            ok_x = (w - o_w) // 2
-            ok_y = content_base_y + ok_offsets[o_idx]
-            draw.text((ok_x, ok_y), osat, font=font_okunus, fill="#5A4B42")
+            draw.text(((w - o_w) // 2, ok_y_cur), osat, font=font_okunus, fill="#5A4B42")
+            ok_y_cur += ok_line_h
+        ust_son_y = ok_y_cur
+    else:
+        ust_son_y = ar_base_y + total_ar_h
 
-    # 6. TÜRKÇE HADİS & ZARİF PARŞÖMEN TIRNAK FİLİGRANI
-    tr_y = box_s_y2 + gap_kutu_tr
+    # D) Ara Zarif Altın Ayraç
+    mid_ayrac_y = ust_son_y + gap_ar_tr // 2
+    draw.line([(w // 2 - 50, mid_ayrac_y), (w // 2 + 50, mid_ayrac_y)], fill="#C29B38", width=1)
+    draw.ellipse([w // 2 - 3, mid_ayrac_y - 3, w // 2 + 3, mid_ayrac_y + 3], fill="#C29B38")
 
-    # Asil ve narin parşömen tırnak filigranı (Metinle çakışmayan, huzurlu krem tonu)
-    font_fili_pt = int(font_hadis_boyut * 2.3)
+    # E) Türkçe Meal Çizimi
+    tr_y = ust_son_y + gap_ar_tr
+
+    # Asil parşömen filigran tırnak
+    font_fili_pt = int(font_hadis_boyut * 2.2)
     font_fili = font_al(FONT_BASLIK, font_fili_pt, agirlik=700)
-    draw.text((w // 2 - 120, tr_y - int(font_fili_pt * 0.45)), "“", font=font_fili, fill="#EFE8DA")
+    draw.text((w // 2 - 120, tr_y - int(font_fili_pt * 0.44)), "“", font=font_fili, fill="#EFE8DA")
 
-    # TÜRKÇE MEAL ÇİZİMİ (BOLD VE REGULAR KELİMELER KUSURSUZ YANYANA)
     for line_tokens, line_w in tr_wrapped_lines:
         cur_x = (w - line_w) // 2
         for word, is_bold, word_w in line_tokens:
             f = font_hadis_bold if is_bold else font_hadis_reg
-            fill_c = "#111827" if is_bold else "#1C1917"
+            fill_c = "#0F172A" if is_bold else "#1C1917"
             draw.text((cur_x, tr_y), word, font=f, fill=fill_c)
             cur_x += word_w + space_w
         tr_y += tr_line_h
 
+    # F) Kaynak Rozeti
     tr_y += gap_tr_kaynak
-    max_badge_bottom = cta_cy - (48 if format_tipi == "9:16" else 42)
-    if tr_y + 34 > max_badge_bottom:
-        tr_y = max_badge_bottom - 34
-
-    # Kaynak Rozeti (Kart sınırlarına tam kilitli, asla taşmaz)
     kx = (w - kw) // 2
-    badge_x1 = max(kx1 + 24, kx - 26)
-    badge_x2 = min(kx2 - 24, kx + kw + 26)
+    badge_x1 = max(kx1 + 24, kx - 24)
+    badge_x2 = min(kx2 - 24, kx + kw + 24)
     yuvarlak_kose_ciz(draw, (badge_x1, tr_y - 6, badge_x2, tr_y + 34), radius=12, dolgu="#FFFDF9", kenarlik="#E5DAC3", kenarlik_kalinlik=1)
     draw.text((kx, tr_y - 1), kaynak_metni, font=font_kaynak, fill="#B45309")
 
     if not cikti_dosya_adi:
         cikti_dosya_adi = f"hadis_{format_tipi.replace(':', '_')}.png"
-    cikti_yolu = CIKTI_DIZINI / cikti_dosya_adi
-    im.save(str(cikti_yolu), quality=96)
-    return cikti_yolu
-
-
-def dua_karti_ciz(
-    dua_basligi: str,
-    turkce_anlam: str,
-    arapca_metin: Optional[str] = None,
-    arapca_okunus: Optional[str] = None,
-    kimin_duasi: Optional[str] = None,
-    kaynak_ref: Optional[str] = None,
-    fazilet_notu: Optional[str] = None,
-    okunus_veya_fazilet: Optional[str] = None,
-    kaynak_fazilet: Optional[str] = None,
-    cikti_dosya_adi: Optional[str] = None,
-    format_tipi: str = "4:5",
-    tac_stili: str = "sicak_parcomen",
-    vurgulanan_kelime: Optional[str] = None,
-) -> Path:
-    """
-    Ezan Plus Günün Duası & Manevi Niyaz şablonu (V16 Mimarisi - Proportional Layout & Sıcak Parşömen Taç).
-    1080x1350 (4:5 Feed) ve 1080x1920 (9:16 Story) tam destekler.
-    tac_stili: 'sicak_parcomen' (varsayılan), 'seffaf_cizgili', 'kirmizi_tac'
-    """
-    w = 1080
-    h = 1920 if format_tipi == "9:16" else 1350
-    yesil_ton = "#1B4332"  # İslam Yeşili kurumsal dua rozeti (RGB: 27, 67, 50)
-
-    im = Image.new("RGB", (w, h), "#F7F4EC")
-    draw = ImageDraw.Draw(im)
-
-    # Kenar payları
-    kx1, kx2 = 64, w - 64
-    ky1 = 140 if format_tipi == "9:16" else 64
-    ky2 = h - (140 if format_tipi == "9:16" else 64)
-
-    # Dış kart gölgesi
-    shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    s_draw = ImageDraw.Draw(shadow)
-    s_draw.rounded_rectangle([kx1 + 4, ky1 + 14, kx2 - 4, ky2 + 14], radius=38, fill=(30, 25, 20, 26))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(18))
-    im.paste(shadow, (0, 0), shadow)
-
-    draw = ImageDraw.Draw(im)
-    yuvarlak_kose_ciz(draw, (kx1, ky1, kx2, ky2), radius=36, dolgu="#FFFEFA", kenarlik="#E5DAC3", kenarlik_kalinlik=2)
-
-    # İç ince altın bordür ve 4 köşe altın nokta
-    cp = 18
-    draw.rounded_rectangle([kx1 + cp, ky1 + cp, kx2 - cp, ky2 - cp], radius=26, outline="#F0E7D8", width=1)
-    for cx, cy in [(kx1 + cp, ky1 + cp), (kx2 - cp, ky1 + cp), (kx1 + cp, ky2 - cp), (kx2 - cp, ky2 - cp)]:
-        draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill="#C29B38")
-
-    # 1. HEADER ALANI (SOL: 68x68 LOGO | ORTA: BASKERVILLE BOLD 42pt ROZET | SAĞ: EZAN PLUS BLOĞU)
-    sol_x = kx1 + 44
-    sag_x = kx2 - 44
-    cur_y = ky1 + (34 if format_tipi == "9:16" else 28)
-    header_h = 70
-    mid_header_y = cur_y + header_h // 2
-    logo_yolu = IKONLAR / "logo.png"
-
-    # A) EN SOLDA LOGO
-    logo_size = 68
-    if logo_yolu.exists():
-        logo = Image.open(logo_yolu).convert("RGBA").resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-        mask = Image.new("L", (logo_size, logo_size), 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, logo_size, logo_size], radius=16, fill=255)
-        im.paste(logo, (sol_x, mid_header_y - logo_size // 2), mask)
-
-    # B) EN SAĞDA "EZAN PLUS" + "MANEVİ REHBER & DUALAR"
-    font_sub = font_al(FONT_UI, 13, agirlik=600)
-    s_txt = "MANEVİ REHBER & DUALAR"
-    s_bb = draw.textbbox((0, 0), s_txt, font=font_sub)
-    w_sub = s_bb[2] - s_bb[0]
-
-    font_marka = font_al(FONT_GOVDE, 39, agirlik=700)
-    m_txt = "Ezan Plus"
-    m_bb = draw.textbbox((0, 0), m_txt, font=font_marka)
-    w_marka = m_bb[2] - m_bb[0]
-    h_marka = m_bb[3] - m_bb[1]
-
-    total_text_h = h_marka + 4 + (s_bb[3] - s_bb[1])
-    start_y = mid_header_y - total_text_h // 2
-    draw.text((sag_x - w_marka, start_y - m_bb[1]), m_txt, font=font_marka, fill="#1C1917")
-    draw.text((sag_x - w_sub, start_y + h_marka + 8 - s_bb[1]), s_txt, font=font_sub, fill="#8C7A6B")
-
-    # C) ORTADA: BASKERVILLE BOLD 42pt ROZET
-    font_rozet = font_al(FONT_BASKERVILLE, 42, agirlik=700)
-    r_txt = "GÜNÜN DUASI"
-    r_bb = draw.textbbox((0, 0), r_txt, font=font_rozet)
-    rw = r_bb[2] - r_bb[0]
-    rh = r_bb[3] - r_bb[1]
-
-    pad_x = 40
-    rozet_w = rw + pad_x * 2
-    rozet_h = 70
-    rozet_x = (w - rozet_w) // 2
-    rozet_y = mid_header_y - rozet_h // 2
-
-    yuvarlak_kose_ciz(draw, (rozet_x, rozet_y, rozet_x + rozet_w, rozet_y + rozet_h), radius=rozet_h // 2, dolgu=yesil_ton)
-
-    rx = rozet_x + (rozet_w - rw) // 2 - r_bb[0]
-    ry = rozet_y + (rozet_h - rh) // 2 - r_bb[1] + 1
-    draw.text((rx, ry + 1), r_txt, font=font_rozet, fill=(10, 40, 25, 100))
-    draw.text((rx, ry), r_txt, font=font_rozet, fill="#FFFFFF")
-
-    # Ayraç Hattı
-    ayrac_y = cur_y + (88 if format_tipi == "9:16" else 84)
-    draw.line([(kx1 + 44, ayrac_y), (kx2 - 44, ayrac_y)], fill="#EAE4D5", width=1)
-    draw.line([(w // 2 - 80, ayrac_y), (w // 2 + 80, ayrac_y)], fill="#C29B38", width=2)
-    draw.ellipse([w // 2 - 5, ayrac_y - 5, w // 2 + 5, ayrac_y + 5], fill="#C29B38")
-
-    # 2. ALT ALANLAR & FAZİLET KUTUSU & CTA BUTONU
-    cta_cy = ky2 - (68 if format_tipi == "9:16" else 58)
-    _cta_butonu_ciz(im, draw, w // 2, cta_cy, w=670, h=(74 if format_tipi == "9:16" else 66))
-
-    alt_cizgi_y = cta_cy - (60 if format_tipi == "9:16" else 50)
-    draw.line([(kx1 + 44, alt_cizgi_y), (kx2 - 44, alt_cizgi_y)], fill="#EFE9DC", width=1)
-
-    # Genişletilmiş ferah kutu kenarları
-    box_w = (kx2 - kx1) - 64  # 888 px
-    box_x1 = kx1 + 32
-    box_x2 = kx2 - 32
-    text_max_w = box_w - 44   # 844 px
-
-    # FAZİLET & HİKMET KUTUSU
-    ham_fazilet = (fazilet_notu or okunus_veya_fazilet or kaynak_fazilet or "Bu mübarek niyaz, kalbe ferahlık ve işlerde kolaylık için sabah-akşam ihlasla tekrar edilir.").strip()
-    # Kaynak bilgisi fazilet metninde varsa ayıkla
-    if " • " in ham_fazilet:
-        faz_parcalar = ham_fazilet.split(" • ", 1)
-        if not kaynak_ref:
-            kaynak_ref = faz_parcalar[0].strip()
-        fazilet_metni = faz_parcalar[1].strip()
-    else:
-        fazilet_metni = ham_fazilet
-
-    font_faz = font_al(FONT_GOVDE, 22 if format_tipi == "9:16" else 19, agirlik=400)
-    faz_line_h = 36 if format_tipi == "9:16" else 28
-    faz_satirlar = metin_satirla(fazilet_metni, font_faz, box_w - 48, draw)
-    kutu_h = (56 if format_tipi == "9:16" else 46) + (len(faz_satirlar) * faz_line_h) + (16 if format_tipi == "9:16" else 12)
-
-    kutu_y2 = alt_cizgi_y - 14
-    kutu_y1 = kutu_y2 - kutu_h
-
-    yuvarlak_kose_ciz(draw, (box_x1, kutu_y1, box_x2, kutu_y2), radius=20, dolgu="#F9F6EE", kenarlik="#E5DAC3", kenarlik_kalinlik=1)
-    draw.rounded_rectangle([box_x1, kutu_y1, box_x1 + 6, kutu_y2], radius=3, fill="#C29B38")
-    draw.ellipse([box_x1 + 24, kutu_y1 + (24 if format_tipi == "9:16" else 18), box_x1 + 32, kutu_y1 + (32 if format_tipi == "9:16" else 26)], fill="#C29B38")
-    draw.text((box_x1 + 42, kutu_y1 + (18 if format_tipi == "9:16" else 14)), "DUANIN FAZİLETİ & NE ZAMAN OKUNMALI?", font=font_al(FONT_UI, 19 if format_tipi == "9:16" else 17, agirlik=700), fill="#B45309")
-
-    fy = kutu_y1 + (56 if format_tipi == "9:16" else 46)
-    for sat in faz_satirlar:
-        draw.text((box_x1 + 24, fy), sat, font=font_faz, fill="#292524")
-        fy += faz_line_h
-
-    free_vertical = kutu_y1 - ayrac_y
-
-    # 3. TÜRKÇE DUA ANLAMI (HERO ELEMENT & MIXED BOLD VURGU)
-    temiz_anlam = turkce_anlam.strip("“”\"' ")
-    if vurgulanan_kelime and ("**" not in temiz_anlam) and (vurgulanan_kelime in temiz_anlam):
-        temiz_anlam = temiz_anlam.replace(vurgulanan_kelime, f"**{vurgulanan_kelime}**")
-
-    anlam_len = len(re.sub(r'\*\*', '', temiz_anlam))
-    ar_ham = (arapca_metin or "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً").strip()
-    ar_len = len(ar_ham)
-
-    # 1. Dua Anlamı Punto Seçimi (Ters Orantılı: Kısa dualarda 56-66pt heybetli punto!)
-    if format_tipi == "9:16":
-        if anlam_len < 45:
-            font_anlam_boyut = 66
-        elif anlam_len < 75:
-            font_anlam_boyut = 60
-        elif anlam_len < 130:
-            font_anlam_boyut = 52
-        elif anlam_len < 190:
-            font_anlam_boyut = 46
-        else:
-            font_anlam_boyut = 41
-    else:
-        if anlam_len < 45:
-            font_anlam_boyut = 60
-        elif anlam_len < 75:
-            font_anlam_boyut = 54
-        elif anlam_len < 130:
-            font_anlam_boyut = 48
-        elif anlam_len < 190:
-            font_anlam_boyut = 43
-        else:
-            font_anlam_boyut = 39
-
-    font_anlam_reg = font_al(FONT_BASLIK, font_anlam_boyut, agirlik=400)
-    font_anlam_bold = font_al(FONT_BASLIK, font_anlam_boyut, agirlik=700)
-
-    anlam_tokens = parse_markdown_bold(temiz_anlam)
-    tr_wrapped_lines, space_w = wrap_mixed_tokens(anlam_tokens, font_anlam_reg, font_anlam_bold, box_w - 30, draw)
-    tr_line_h = int(font_anlam_boyut * 1.44)
-    tr_toplam_h = len(tr_wrapped_lines) * tr_line_h
-
-    raw_kaynak = (kaynak_ref or "Kur'an-ı Kerim").strip()
-    kaynak_metni = re.split(r'[\.;,]?\s*Ayrıca bkz?[\.:]?', raw_kaynak, flags=re.IGNORECASE)[0].strip()
-    if not kaynak_metni:
-        kaynak_metni = raw_kaynak
-
-    max_badge_w = box_w - 60
-    font_k_pt = 24 if format_tipi == "9:16" else (24 if anlam_len < 70 else 22)
-    font_kaynak = font_al(FONT_BASLIK, font_k_pt)
-    kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
-    while (kw + 52) > max_badge_w and font_k_pt > 16:
-        font_k_pt -= 1
-        font_kaynak = font_al(FONT_BASLIK, font_k_pt)
-        kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
-    kaynak_h = 42 if format_tipi == "4:5" else 46
-
-    # 4. SERLEVHA KUTUSU SAFE AREA & AKILLI ARAPÇA MİZANPAJ (Ayet Standardı)
-    MIN_VERTICAL_GAP = 28 if format_tipi == "9:16" else 24
-    tac_h = 48 if format_tipi == "9:16" else (46 if anlam_len < 75 else 42)
-    pad_ic_ust = 40 if format_tipi == "9:16" else (34 if anlam_len < 75 else 28)
-    pad_ic_alt = 38 if format_tipi == "9:16" else (34 if anlam_len < 75 else 28)
-
-    ok_gosterim = f"“{ok_ham}”" if (ok_ham := (arapca_okunus or "").strip("“”\"'{}[] ")) else ""
-    font_ok_pt = 28 if format_tipi == "9:16" else (26 if anlam_len < 75 else 20)
-    font_okunus = font_al(FONT_GOVDE, font_ok_pt)
-    ok_satirlar = metin_satirla(ok_gosterim, font_okunus, box_w - 60, draw) if ok_gosterim else []
-    ok_line_h = (40 if format_tipi == "9:16" else 36) if anlam_len < 75 else (32 if format_tipi == "9:16" else 26)
-    ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
-    gap_ar_ok = (28 if format_tipi == "9:16" else 22) if ok_satirlar else 0
-
-    # Arapça Metin Temizliği (Secavend ve durak işaretlerini ayıkla)
-    secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
-    ar_temiz = secavend_regex.sub("", ar_ham).strip()
-    if not ar_temiz:
-        ar_temiz = ar_ham
-
-    # Safe area bazlı Arapça autofit (Kısa dualarda 88-114pt heybetli hat, yetim kelime önleme)
-    if format_tipi == "9:16":
-        start_pt = 114 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))
-        min_pt = 50
-    else:
-        start_pt = 98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 54))
-        min_pt = 42
-
-    hedef_satir_sayilari = [1, 2] if ar_len < 65 else [2, 3]
-    font_ar_boyut = min_pt
-    ar_satirlar = []
-    found_ar = False
-
-    for target_l in hedef_satir_sayilari:
-        for test_pt in range(start_pt, min_pt - 1, -2):
-            f_test = font_al(FONT_ARAPCA, test_pt)
-            sats = arapca_satirla(ar_temiz, f_test, text_max_w, draw)
-            if not sats or len(sats) > target_l:
-                continue
-
-            max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
-            if max_line_w > text_max_w:
-                continue
-
-            # Yetim kelime önleme: Son satırda tek kelime kalmışsa reddet
-            if len(sats) >= 2 and len(sats[-1].split()) == 1 and len(sats[-1].strip()) < 16:
-                if test_pt > min_pt + 4:
-                    continue
-
-            # Gerçek mürekkep yüksekliği ve satır arası net clearance simülasyonu
-            sim_prev_ink = 0
-            for s_idx, s in enumerate(sats):
-                bb = draw.textbbox((0, 0), s, font=f_test)
-                top_ink, bottom_ink = bb[1], bb[3]
-                l_y = -top_ink if s_idx == 0 else (sim_prev_ink + MIN_VERTICAL_GAP - top_ink)
-                sim_prev_ink = l_y + bottom_ink
-
-            sim_total_ar_h = sim_prev_ink
-            sim_box_h = tac_h + pad_ic_ust + sim_total_ar_h + gap_ar_ok + ok_toplam_h + pad_ic_alt
-            sim_kalan = free_vertical - (sim_box_h + tr_toplam_h + kaynak_h)
-            min_kalan = 40 if format_tipi == "9:16" else 28
-
-            if sim_kalan >= min_kalan:
-                font_ar_boyut = test_pt
-                ar_satirlar = sats
-                found_ar = True
-                break
-        if found_ar:
-            break
-
-    if not ar_satirlar:
-        font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
-        ar_satirlar = arapca_satirla(ar_temiz, font_ar, text_max_w, draw)
-    else:
-        font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
-
-    # Her satırın Y offsetini gerçek mürekkep sınırlarına göre hesapla
-    ar_offsets = []
-    prev_ink_bottom = 0
-    for s_idx, asat in enumerate(ar_satirlar):
-        bb = draw.textbbox((0, 0), asat, font=font_ar)
-        top_ink, bottom_ink = bb[1], bb[3]
-        l_y = -top_ink if s_idx == 0 else (prev_ink_bottom + MIN_VERTICAL_GAP - top_ink)
-        ar_offsets.append(l_y)
-        prev_ink_bottom = l_y + bottom_ink
-
-    total_ar_h = prev_ink_bottom
-
-    # Okunuş Satırları Offsetleri
-    ok_offsets = []
-    if ok_satirlar:
-        cur_ok_off = total_ar_h + gap_ar_ok
-        for osat in ok_satirlar:
-            ok_offsets.append(cur_ok_off)
-            cur_ok_off += ok_line_h
-        total_content_h = cur_ok_off
-    else:
-        total_content_h = total_ar_h
-
-    box_s_h = tac_h + pad_ic_ust + total_content_h + pad_ic_alt
-
-    # 5. DİKEY FLEX DAĞILIMI (DENGELİ MERKEZLEME VE EŞİT NEFES ALANLARI)
-    toplam_icerik_h = box_s_h + tr_toplam_h + kaynak_h
-    kalan_bosluk = max(40, free_vertical - toplam_icerik_h)
-
-    if format_tipi == "9:16":
-        gap_ust = max(24, min(170, int(kalan_bosluk * 0.23)))
-        kalan_orta_alt = kalan_bosluk - gap_ust
-        gap_kutu_tr = max(36, min(260, int(kalan_orta_alt * 0.44)))
-        gap_alt_toplam = max(40, kalan_orta_alt - gap_kutu_tr)
-        gap_tr_kaynak = max(26, min(80, int(gap_alt_toplam * 0.36)))
-    else:  # 4:5
-        gap_ust = max(20, min(65, int(kalan_bosluk * 0.20)))
-        kalan_orta_alt = kalan_bosluk - gap_ust
-        gap_kutu_tr = max(28, min(65, int(kalan_orta_alt * 0.44)))
-        gap_alt_toplam = max(30, kalan_orta_alt - gap_kutu_tr)
-        gap_tr_kaynak = max(20, min(38, int(gap_alt_toplam * 0.40)))
-
-    box_s_y1 = ayrac_y + gap_ust
-    box_s_y2 = box_s_y1 + box_s_h
-
-    # SERLEVHA KUTUSUNU ÇİZ
-    yuvarlak_kose_ciz(draw, (box_x1, box_s_y1, box_x2, box_s_y2), radius=24, dolgu="#FFFEFA", kenarlik="#E5DAC3", kenarlik_kalinlik=1)
-
-    if kimin_duasi:
-        intro_txt = f"{kimin_duasi}'ın Niyazı:"
-    else:
-        intro_txt = "Kur'an ve Sünnet'ten Manevî Niyaz:"
-
-    # --- TAÇ STİLİ UYGULAMASI (Sıcak Parşömen) ---
-    tac_mask = Image.new("L", (w, h), 0)
-    tm_draw = ImageDraw.Draw(tac_mask)
-    tm_draw.rounded_rectangle([box_x1, box_s_y1, box_x2, box_s_y1 + tac_h * 2], radius=24, fill=255)
-    tm_draw.rectangle([0, box_s_y1 + tac_h, w, h], fill=0)
-
-    tac_img = Image.new("RGB", (w, h), "#F5EFE3")
-    im.paste(tac_img, (0, 0), tac_mask)
-    draw.line([(box_x1, box_s_y1 + tac_h), (box_x2, box_s_y1 + tac_h)], fill="#E2D7C3", width=1)
-    draw.line([(w // 2 - 40, box_s_y1 + tac_h), (w // 2 + 40, box_s_y1 + tac_h)], fill="#C29B38", width=2)
-
-    font_intro = font_al(FONT_GOVDE, 22 if format_tipi == "9:16" else 19, agirlik=700)
-    in_bb = draw.textbbox((0, 0), intro_txt, font=font_intro)
-    in_w, in_h = in_bb[2] - in_bb[0], in_bb[3] - in_bb[1]
-    in_x = (w - in_w) // 2 - in_bb[0]
-    in_y = box_s_y1 + (tac_h - in_h) // 2 - in_bb[1] + 1
-    draw.text((in_x, in_y), intro_txt, font=font_intro, fill="#1B4332")
-
-    # Arapça Metin Çizimi (Tamamı ve Harekeli, İslam Yeşili, Gerçek Mürekkep Hizalaması)
-    content_base_y = box_s_y1 + tac_h + pad_ic_ust
-    for s_idx, asat in enumerate(ar_satirlar):
-        as_bb = draw.textbbox((0, 0), asat, font=font_ar)
-        as_w = as_bb[2] - as_bb[0]
-        line_x = (w - as_w) // 2
-        line_y = content_base_y + ar_offsets[s_idx]
-        draw.text((line_x, line_y), asat, font=font_ar, fill="#1B4332")
-
-    # Latin Okunuş Çizimi (Safe area garantili)
-    if ok_satirlar:
-        for o_idx, osat in enumerate(ok_satirlar):
-            o_bb = draw.textbbox((0, 0), osat, font=font_okunus)
-            o_w = o_bb[2] - o_bb[0]
-            ok_x = (w - o_w) // 2
-            ok_y = content_base_y + ok_offsets[o_idx]
-            draw.text((ok_x, ok_y), osat, font=font_okunus, fill="#5A4B42")
-
-    # 6. TÜRKÇE DUA ANLAMI & ZARİF PARŞÖMEN TIRNAK FİLİGRANI
-    tr_y = box_s_y2 + gap_kutu_tr
-
-    # Asil ve narin parşömen tırnak filigranı (Metinle çakışmayan, huzurlu krem tonu)
-    font_fili_pt = int(font_anlam_boyut * 2.3)
-    font_fili = font_al(FONT_BASLIK, font_fili_pt, agirlik=700)
-    draw.text((w // 2 - 120, tr_y - int(font_fili_pt * 0.45)), "“", font=font_fili, fill="#EFE8DA")
-
-    # TÜRKÇE ANLAM ÇİZİMİ (BOLD VE REGULAR KELİMELER KUSURSUZ YANYANA)
-    for line_tokens, line_w in tr_wrapped_lines:
-        cur_x = (w - line_w) // 2
-        for word, is_bold, word_w in line_tokens:
-            f = font_anlam_bold if is_bold else font_anlam_reg
-            fill_c = "#111827" if is_bold else "#1C1917"
-            draw.text((cur_x, tr_y), word, font=f, fill=fill_c)
-            cur_x += word_w + space_w
-        tr_y += tr_line_h
-
-    tr_y += gap_tr_kaynak
-    max_badge_bottom = cta_cy - (48 if format_tipi == "9:16" else 42)
-    if tr_y + 34 > max_badge_bottom:
-        tr_y = max_badge_bottom - 34
-
-    # Kaynak Rozeti (Kart sınırlarına tam kilitli, asla taşmaz)
-    kx = (w - kw) // 2
-    badge_x1 = max(kx1 + 24, kx - 26)
-    badge_x2 = min(kx2 - 24, kx + kw + 26)
-    yuvarlak_kose_ciz(draw, (badge_x1, tr_y - 6, badge_x2, tr_y + 34), radius=12, dolgu="#FFFDF9", kenarlik="#E5DAC3", kenarlik_kalinlik=1)
-    draw.text((kx, tr_y - 1), kaynak_metni, font=font_kaynak, fill="#B45309")
-
-    if not cikti_dosya_adi:
-        cikti_dosya_adi = f"dua_{format_tipi.replace(':', '_')}.png"
     cikti_yolu = CIKTI_DIZINI / cikti_dosya_adi
     im.save(str(cikti_yolu), quality=96)
     return cikti_yolu
@@ -1666,6 +1155,496 @@ def create_paper_background(w: int, h: int, center_rgb: tuple, outer_rgb: tuple)
 
     arr = np.stack([r, g, b], axis=-1)
     return Image.fromarray(arr)
+
+
+def _kelime_cta_butonu_ciz(im: Image.Image, format_tipi: str = "9:16") -> int:
+    """Ezan Plus İndirin alt butonunu çizer ve butonun üst Y koordinatını döner (İncelen zarif yükseklik)."""
+    draw = ImageDraw.Draw(im)
+    w, h = im.size
+    is_916 = (format_tipi == "9:16")
+
+    nav_w = 710 if is_916 else 650
+    nav_h = 72 if is_916 else 62
+    nav_x1 = (w - nav_w) // 2
+    nav_x2 = nav_x1 + nav_w
+    nav_y1 = (h - 130) if is_916 else (h - 96)
+    nav_y2 = nav_y1 + nav_h
+    btn_y = nav_y1 + nav_h // 2
+
+    # Lüks yumuşak gölge
+    shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow)
+    s_draw.rounded_rectangle([nav_x1 + 2, nav_y1 + 3, nav_x2 - 2, nav_y2 + 6], radius=24 if is_916 else 20, fill=(15, 3, 6, 45))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(10))
+    im.paste(shadow, (0, 0), shadow)
+
+    draw = ImageDraw.Draw(im)
+    # Beyaz Buton Gövdesi
+    draw.rounded_rectangle([nav_x1, nav_y1, nav_x2, nav_y2], radius=22 if is_916 else 18, fill="#FFFFFF", outline="#EFE8DC", width=1)
+
+    # 1. Logo
+    logo_path = IKONLAR / "logo.png"
+    logo_size = 40 if is_916 else 34
+    logo_x = nav_x1 + (18 if is_916 else 14)
+    if logo_path.exists():
+        logo = Image.open(logo_path).convert("RGBA").resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+        mask = Image.new("L", (logo_size, logo_size), 0)
+        ImageDraw.Draw(mask).rounded_rectangle([0, 0, logo_size, logo_size], radius=11, fill=255)
+        im.paste(logo, (logo_x, btn_y - logo_size // 2), mask)
+
+    # 2. CTA Yazısı (Dikeyde tam ortalı)
+    pt_cta = 22 if is_916 else 18
+    font_cta = font_al(FONT_UI, pt_cta, agirlik=700)
+    txt_x = logo_x + logo_size + (14 if is_916 else 12)
+    txt_bb = draw.textbbox((0, 0), "Ezan Plus • Ücretsiz İndirin", font=font_cta)
+    txt_h = txt_bb[3] - txt_bb[1]
+    draw.text((txt_x, btn_y - txt_h // 2 - txt_bb[1]), "Ezan Plus • Ücretsiz İndirin", font=font_cta, fill="#182230")
+
+    # 3. Store İkonları
+    ps_size = 22 if is_916 else 19
+    ps_x = nav_x2 - (48 if is_916 else 42)
+    ps_y = btn_y - ps_size // 2
+    _play_store_vektor_ciz(draw, ps_x, ps_y, ps_size)
+
+    # Apple İkonu
+    apple_path = IKONLAR / "apple.png"
+    ap_size = 20 if is_916 else 17
+    if apple_path.exists():
+        ap_img = Image.open(apple_path).convert("RGBA").resize((ap_size, ap_size), Image.Resampling.LANCZOS)
+        ap_x = ps_x - ap_size - (15 if is_916 else 12)
+        im.paste(ap_img, (ap_x, btn_y - ap_size // 2), ap_img)
+    else:
+        try:
+            font_apple = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 24 if is_916 else 20)
+            bbox_ap = draw.textbbox((0, 0), "", font=font_apple)
+            ap_w, ap_h = bbox_ap[2] - bbox_ap[0], bbox_ap[3] - bbox_ap[1]
+            ap_y = btn_y - ap_h // 2 - bbox_ap[1]
+            ap_x = ps_x - ap_w - 15
+            draw.text((ap_x, ap_y), "", font=font_apple, fill="#000000")
+        except Exception:
+            pass
+
+    return nav_y1
+
+
+# ==============================================================================
+# 8 MANEVİ RUH HALİ RENK PALETLERİ (Ezan Plus Günün Duası V18)
+# ==============================================================================
+DUA_RENK_PALETLERI: Dict[str, dict] = {
+    # 1. İç Sıkıntısı ve Daralma Hissi -> Gece Safiri (Kalbe ferahlık & İnşirah)
+    "gece_safiri": {
+        "ad": "Gece Safiri (İnşirah & Ferahlık)",
+        "center_rgb": (24, 52, 88),     # #183458
+        "outer_rgb": (10, 22, 40),      # #0A1628
+        "c_divider": "#355F8D",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#FFF9EE",
+        "c_accent": "#FDE6BA",
+        "c_body_reg": "#DFE9F4",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#B8CCE0",
+        "fili_rgba": (253, 230, 186, 22),
+    },
+    # 2. Gelecek Endişesi ve Kaygı -> Okyanus Huzuru (Teal / Derin Deniz)
+    "okyanus_huzuru": {
+        "ad": "Okyanus Huzuru (Sükunet & Güven)",
+        "center_rgb": (18, 68, 80),     # #124450
+        "outer_rgb": (8, 32, 42),       # #08202A
+        "c_divider": "#2C7588",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#F2FAF9",
+        "c_accent": "#FDE6BA",
+        "c_body_reg": "#D8EEF0",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#B2DCE0",
+        "fili_rgba": (253, 230, 186, 22),
+    },
+    # 3. Hastalık ve Şifa Talebi -> Mescid Zümrüdü (Ravza Şifası)
+    "mescid_zumrudu": {
+        "ad": "Mescid Zümrüdü (Ravza Şifası)",
+        "center_rgb": (22, 72, 54),     # #164836
+        "outer_rgb": (8, 34, 24),       # #082218
+        "c_divider": "#327A5E",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#F2FAF6",
+        "c_accent": "#FCE7B8",
+        "c_body_reg": "#D6EDE2",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#B2DBC6",
+        "fili_rgba": (252, 231, 184, 22),
+    },
+    # 4. Şükür ve Sevinç Anı -> Sıcak Kehribar (Hamd & Minnet)
+    "sicak_kehribar": {
+        "ad": "Sıcak Kehribar (Hamd & Minnet)",
+        "center_rgb": (156, 68, 34),    # #9C4422
+        "outer_rgb": (86, 30, 12),      # #561E0C
+        "c_divider": "#BC5B34",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#FFF9F0",
+        "c_accent": "#FDE4B0",
+        "c_body_reg": "#FCE6DA",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#E8C8B6",
+        "fili_rgba": (253, 228, 176, 22),
+    },
+    # 5. Tevekkül ve Teslimiyet İhtiyacı -> Derin Moka / Sahra
+    "derin_kahve": {
+        "ad": "Derin Moka / Sahra (Tevekkül & Teslimiyet)",
+        "center_rgb": (82, 50, 38),     # #523226
+        "outer_rgb": (42, 22, 14),      # #2A160E
+        "c_divider": "#986250",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#FFF8F2",
+        "c_accent": "#FDE6BA",
+        "c_body_reg": "#F6E6DC",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#DAC2B4",
+        "fili_rgba": (253, 230, 186, 22),
+    },
+    # 6. Tevbe ve Günahlardan Arınma Niyazı -> Asil Mürdüm (Ametist & Mağfiret)
+    "asil_murdum": {
+        "ad": "Asil Mürdüm (Tevbe & Mağfiret)",
+        "center_rgb": (88, 32, 70),     # #582046
+        "outer_rgb": (42, 12, 34),      # #2A0C22
+        "c_divider": "#823768",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#FFF5F8",
+        "c_accent": "#FDE6BA",
+        "c_body_reg": "#FCE4F0",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#E0BACF",
+        "fili_rgba": (253, 230, 186, 22),
+    },
+    # 7. Geçim Darlığı ve Helal Rızık Arayışı -> Yakut Kırmızı (Bereket & Rızık)
+    "yakut_kirmizi": {
+        "ad": "Yakut Kırmızı (Bereket & Rızık)",
+        "center_rgb": (150, 26, 32),    # #961A20
+        "outer_rgb": (80, 12, 16),      # #500C10
+        "c_divider": "#BA3A40",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#FFF8F2",
+        "c_accent": "#FDE6BA",
+        "c_body_reg": "#FDE4E6",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#E8BBC0",
+        "fili_rgba": (253, 230, 186, 22),
+    },
+    # 8. Öfke ve Kararsızlık Durumu -> Huzur Mavisi (İtidal & Sekînet)
+    "huzur_mavisi": {
+        "ad": "Huzur Mavisi (İtidal & Sekînet)",
+        "center_rgb": (28, 44, 70),     # #1C2C46
+        "outer_rgb": (12, 20, 32),      # #0C1420
+        "c_divider": "#385880",
+        "c_hero": "#FFFFFF",
+        "c_arabic": "#F4F8FC",
+        "c_accent": "#FDE6BA",
+        "c_body_reg": "#DEE8F4",
+        "c_body_bold": "#FFFFFF",
+        "c_sub": "#B8CADE",
+        "fili_rgba": (253, 230, 186, 22),
+    },
+}
+
+
+def dua_palet_sec(ruh_hali: Optional[str] = None, dua_basligi: Optional[str] = None) -> Dict[str, Any]:
+    """Ruh haline veya dua başlığına göre en uygun renk paletini döner."""
+    metin = f"{ruh_hali or ''} {dua_basligi or ''}".lower()
+    if any(k in metin for k in ["sıkıntı", "daralma", "inşirah", "ferahlık"]):
+        return DUA_RENK_PALETLERI["gece_safiri"]
+    if any(k in metin for k in ["şifa", "hastalık", "dert", "ağrı"]):
+        return DUA_RENK_PALETLERI["mescid_zumrudu"]
+    if any(k in metin for k in ["şükür", "sevinç", "hamd", "nimet"]):
+        return DUA_RENK_PALETLERI["sicak_kehribar"]
+    if any(k in metin for k in ["endişe", "kaygı", "korku", "sınav", "iş", "çaresiz"]):
+        return DUA_RENK_PALETLERI["okyanus_huzuru"]
+    if any(k in metin for k in ["tevekkül", "teslimiyet", "namaz"]):
+        return DUA_RENK_PALETLERI["derin_kahve"]
+    if any(k in metin for k in ["tevbe", "arınma", "günah", "mağfiret", "af"]):
+        return DUA_RENK_PALETLERI["asil_murdum"]
+    if any(k in metin for k in ["rızık", "geçim", "borç", "bereket", "darlık"]):
+        return DUA_RENK_PALETLERI["yakut_kirmizi"]
+    if any(k in metin for k in ["öfke", "kararsızlık", "vesvese", "itidal"]):
+        return DUA_RENK_PALETLERI["huzur_mavisi"]
+    return DUA_RENK_PALETLERI["gece_safiri"]
+
+
+def dua_karti_ciz(
+    dua_basligi: str,
+    turkce_anlam: str,
+    arapca_metin: Optional[str] = None,
+    arapca_okunus: Optional[str] = None,
+    kimin_duasi: Optional[str] = None,
+    kaynak_ref: Optional[str] = None,
+    fazilet_notu: Optional[str] = None,
+    okunus_veya_fazilet: Optional[str] = None,
+    kaynak_fazilet: Optional[str] = None,
+    cikti_dosya_adi: Optional[str] = None,
+    format_tipi: str = "4:5",
+    tac_stili: str = "sicak_parcomen",
+    vurgulanan_kelime: Optional[str] = None,
+    ruh_hali: Optional[str] = None,
+    palet_adi: Optional[str] = None,
+) -> Path:
+    """
+    Ezan Plus Günün Duası & Manevi Niyaz şablonu (V18 Mimarisi - Dinamik 8 Manevi Renk & Peygamber Serlevhası).
+    1080x1350 (4:5 Feed) ve 1080x1920 (9:16 Story) tam destekler.
+    Kutusuz, nefes alan zengin radial vignette zemin ve yüksek kontrastlı saf beyaz/şampanya tipografi.
+    """
+    w = 1080
+    h = 1920 if format_tipi == "9:16" else 1350
+    is_916 = (format_tipi == "9:16")
+
+    # 1. Renk Paleti Seçimi (Ruh haline veya açık belirtilen ada göre)
+    if palet_adi and palet_adi in DUA_RENK_PALETLERI:
+        secili_palet = DUA_RENK_PALETLERI[palet_adi]
+    else:
+        secili_palet = dua_palet_sec(ruh_hali, dua_basligi)
+
+    # 2. Zengin Radial Vignette Parşömen Zemin
+    im = create_paper_background(w, h, secili_palet["center_rgb"], secili_palet["outer_rgb"])
+    draw = ImageDraw.Draw(im)
+
+    # 3. Alt Store Butonu & Güvenli Taban
+    cta_ust_y = _kelime_cta_butonu_ciz(im, format_tipi)
+
+    # Genişlik ve Safe Area
+    max_text_w = 880 if is_916 else 840
+    box_x1 = (w - max_text_w) // 2
+    box_x2 = box_x1 + max_text_w
+
+    # 4. ÜST KÜNYE & PEYGAMBER SERLEVHASI
+    cur_y = 110 if is_916 else 60
+
+    # A) Kategori Rozeti (Şampanya Altın)
+    kategori_etiket = "GÜNÜN DUASI • MANEVÎ REHBER & NİYAZ"
+    font_kat = font_al(FONT_UI, 14 if is_916 else 13, agirlik=700)
+    kat_bb = draw.textbbox((0, 0), kategori_etiket, font=font_kat)
+    kat_w = kat_bb[2] - kat_bb[0]
+    draw.text(((w - kat_w) // 2, cur_y), kategori_etiket, font=font_kat, fill=secili_palet["c_accent"])
+    cur_y += (32 if is_916 else 26)
+
+    # B) Peygamber / Âyet Serlevha Başlığı (Hero Subtitle)
+    if kimin_duasi and kimin_duasi.strip() and kimin_duasi.strip().lower() != "kur'an-ı kerim":
+        temiz_kim = kimin_duasi.strip()
+        if not temiz_kim.endswith((")", ".")):
+            hero_baslik = f"{temiz_kim}'ın Niyazı"
+        else:
+            hero_baslik = f"{temiz_kim} Niyazı"
+    elif "duası" in dua_basligi.lower() or "niyazı" in dua_basligi.lower():
+        hero_baslik = dua_basligi.strip()
+    else:
+        hero_baslik = "Kur'an-ı Kerim'den Niyaz"
+
+    font_hero_pt = 44 if is_916 else 38
+    font_hero = font_al(FONT_BASKERVILLE, font_hero_pt, agirlik=700)
+    h_bb = draw.textbbox((0, 0), hero_baslik, font=font_hero)
+    h_w = h_bb[2] - h_bb[0]
+    while h_w > max_text_w and font_hero_pt > 28:
+        font_hero_pt -= 2
+        font_hero = font_al(FONT_BASKERVILLE, font_hero_pt, agirlik=700)
+        h_bb = draw.textbbox((0, 0), hero_baslik, font=font_hero)
+        h_w = h_bb[2] - h_bb[0]
+
+    # Başlık altında hafif ışıltı
+    draw.text(((w - h_w) // 2, cur_y + 1), hero_baslik, font=font_hero, fill=(10, 10, 15, 100))
+    draw.text(((w - h_w) // 2, cur_y), hero_baslik, font=font_hero, fill=secili_palet["c_hero"])
+    cur_y += (h_bb[3] - h_bb[1]) + (18 if is_916 else 14)
+
+    # Üst Zarif Ayraç
+    draw.line([(w // 2 - 60, cur_y), (w // 2 + 60, cur_y)], fill=secili_palet["c_divider"], width=1)
+    draw.ellipse([w // 2 - 3, cur_y - 3, w // 2 + 3, cur_y + 3], fill=secili_palet["c_accent"])
+    cur_y += (22 if is_916 else 18)
+    ust_sinir_y = cur_y
+
+    # 5. ALT ALAN: FAZİLET & HİKMET BLOĞU (Açık zarif alıntı)
+    ham_fazilet = (fazilet_notu or okunus_veya_fazilet or kaynak_fazilet or "Bu mübarek niyaz, kalbe ferahlık ve işlerde kolaylık için sabah-akşam ihlasla tekrar edilir.").strip()
+    if " • " in ham_fazilet and not kaynak_ref:
+        faz_parcalar = ham_fazilet.split(" • ", 1)
+        kaynak_ref = faz_parcalar[0].strip()
+        fazilet_metni = faz_parcalar[1].strip()
+    else:
+        fazilet_metni = ham_fazilet
+
+    font_faz = font_al(FONT_GOVDE, 21 if is_916 else 18, agirlik=400)
+    faz_line_h = 34 if is_916 else 27
+    faz_satirlar = metin_satirla(fazilet_metni, font_faz, max_text_w - 40, draw)
+    faz_h = (36 if is_916 else 30) + (len(faz_satirlar) * faz_line_h) + (14 if is_916 else 10)
+
+    alt_sinir_y = cta_ust_y - (30 if is_916 else 24)
+    faz_y2 = alt_sinir_y
+    faz_y1 = faz_y2 - faz_h
+
+    # Fazilet Alıntı Çizgisi (Şampanya Altın sol çizgi)
+    draw.line([(box_x1, faz_y1), (box_x1, faz_y2)], fill=secili_palet["c_accent"], width=3)
+    draw.ellipse([box_x1 + 16, faz_y1 + (3 if is_916 else 2), box_x1 + 23, faz_y1 + (10 if is_916 else 9)], fill=secili_palet["c_accent"])
+    draw.text((box_x1 + 32, faz_y1), "DUANIN FAZİLETİ & HİKMETİ", font=font_al(FONT_UI, 16 if is_916 else 14, agirlik=700), fill=secili_palet["c_accent"])
+    fy = faz_y1 + (32 if is_916 else 26)
+    for fs in faz_satirlar:
+        draw.text((box_x1 + 18, fy), fs, font=font_faz, fill=secili_palet["c_body_reg"])
+        fy += faz_line_h
+
+    free_vertical = faz_y1 - ust_sinir_y
+
+    # 6. TÜRKÇE DUA ANLAMI (HERO ELEMENT & MIXED BOLD)
+    temiz_anlam = turkce_anlam.strip("“”\"' ")
+    if vurgulanan_kelime and ("**" not in temiz_anlam) and (vurgulanan_kelime in temiz_anlam):
+        temiz_anlam = temiz_anlam.replace(vurgulanan_kelime, f"**{vurgulanan_kelime}**")
+
+    anlam_len = len(re.sub(r'\*\*', '', temiz_anlam))
+    ar_ham = (arapca_metin or "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً").strip()
+    ar_len = len(ar_ham)
+
+    # Anlam Punto Seçimi
+    if is_916:
+        font_anlam_boyut = 64 if anlam_len < 45 else (58 if anlam_len < 75 else (52 if anlam_len < 130 else (46 if anlam_len < 190 else 40)))
+    else:
+        font_anlam_boyut = 58 if anlam_len < 45 else (52 if anlam_len < 75 else (46 if anlam_len < 130 else (42 if anlam_len < 190 else 38)))
+
+    font_anlam_reg = font_al(FONT_BASLIK, font_anlam_boyut, agirlik=400)
+    font_anlam_bold = font_al(FONT_BASLIK, font_anlam_boyut, agirlik=700)
+
+    anlam_tokens = parse_markdown_bold(temiz_anlam)
+    tr_wrapped_lines, space_w = wrap_mixed_tokens(anlam_tokens, font_anlam_reg, font_anlam_bold, max_text_w - 20, draw)
+    tr_line_h = int(font_anlam_boyut * 1.42)
+    tr_toplam_h = len(tr_wrapped_lines) * tr_line_h
+
+    # Kaynak Metni
+    raw_kaynak = (kaynak_ref or "Kur'an-ı Kerim").strip()
+    kaynak_metni = re.split(r'[\.;,]?\s*Ayrıca bkz?[\.:]?', raw_kaynak, flags=re.IGNORECASE)[0].strip() or raw_kaynak
+
+    font_k_pt = 24 if is_916 else (22 if anlam_len < 70 else 20)
+    font_kaynak = font_al(FONT_BASLIK, font_k_pt)
+    kw = draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[2] - draw.textbbox((0, 0), kaynak_metni, font=font_kaynak)[0]
+    kaynak_h = 36 if is_916 else 30
+
+    # 7. KUTUSUZ HEYBETLİ ARAPÇA HAT
+    MIN_VERTICAL_GAP = 28 if is_916 else 24
+    ok_ham = (arapca_okunus or "").strip("“”\"'{}[] ")
+    ok_gosterim = f"“ {ok_ham} ”" if ok_ham else ""
+
+    font_ok_pt = 26 if is_916 else (24 if anlam_len < 75 else 20)
+    font_okunus = font_al(FONT_GOVDE, font_ok_pt)
+    ok_satirlar = metin_satirla(ok_gosterim, font_okunus, max_text_w - 40, draw) if ok_gosterim else []
+    ok_line_h = 36 if is_916 else 30
+    ok_toplam_h = len(ok_satirlar) * ok_line_h if ok_satirlar else 0
+    gap_ar_ok = (22 if is_916 else 16) if ok_satirlar else 0
+
+    secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
+    ar_temiz = secavend_regex.sub("", ar_ham).strip() or ar_ham
+
+    start_pt = (116 if ar_len < 35 else (98 if ar_len < 65 else (84 if ar_len < 120 else 72))) if is_916 else (98 if ar_len < 35 else (86 if ar_len < 65 else (72 if ar_len < 120 else 54)))
+    min_pt = 46 if is_916 else 40
+    hedef_satirlar = [1, 2] if ar_len < 65 else [2, 3]
+
+    font_ar_boyut = min_pt
+    ar_satirlar = []
+    found_ar = False
+
+    for target_l in hedef_satirlar:
+        for test_pt in range(start_pt, min_pt - 1, -2):
+            f_test = font_al(FONT_ARAPCA, test_pt)
+            sats = arapca_satirla(ar_temiz, f_test, max_text_w, draw)
+            if not sats or len(sats) > target_l:
+                continue
+            max_line_w = max(draw.textbbox((0, 0), s, font=f_test)[2] - draw.textbbox((0, 0), s, font=f_test)[0] for s in sats)
+            if max_line_w > max_text_w:
+                continue
+            if len(sats) >= 2 and len(sats[-1].split()) == 1 and len(sats[-1].strip()) < 16:
+                if test_pt > min_pt + 4:
+                    continue
+            ar_satirlar = sats
+            font_ar_boyut = test_pt
+            found_ar = True
+            break
+        if found_ar:
+            break
+
+    if not ar_satirlar:
+        font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
+        ar_satirlar = arapca_satirla(ar_temiz, font_ar, max_text_w, draw)
+    else:
+        font_ar = font_al(FONT_ARAPCA, font_ar_boyut)
+
+    ar_offsets = []
+    prev_ink_bottom = 0
+    for s_idx, asat in enumerate(ar_satirlar):
+        bb = draw.textbbox((0, 0), asat, font=font_ar)
+        top_ink, bottom_ink = bb[1], bb[3]
+        l_y = -top_ink if s_idx == 0 else (prev_ink_bottom + MIN_VERTICAL_GAP - top_ink)
+        ar_offsets.append(l_y)
+        prev_ink_bottom = l_y + bottom_ink
+    total_ar_h = prev_ink_bottom
+
+    # 8. DİKEY DENGELİ FLEX MİZANPAJ
+    ust_blok_h = total_ar_h + gap_ar_ok + ok_toplam_h
+    toplam_icerik_h = ust_blok_h + tr_toplam_h + kaynak_h
+    kalan_bosluk = max(40, free_vertical - toplam_icerik_h)
+
+    if is_916:
+        gap_ust = max(24, min(140, int(kalan_bosluk * 0.22)))
+        kalan_orta = kalan_bosluk - gap_ust
+        gap_ar_tr = max(36, min(240, int(kalan_orta * 0.46)))
+        gap_alt = max(36, kalan_orta - gap_ar_tr)
+        gap_tr_kaynak = max(22, min(65, int(gap_alt * 0.38)))
+    else:
+        gap_ust = max(18, min(50, int(kalan_bosluk * 0.20)))
+        kalan_orta = kalan_bosluk - gap_ust
+        gap_ar_tr = max(26, min(58, int(kalan_orta * 0.46)))
+        gap_alt = max(26, kalan_orta - gap_ar_tr)
+        gap_tr_kaynak = max(16, min(34, int(gap_alt * 0.40)))
+
+    # A) Arapça Hat Çizimi (İpeksi Beyaz)
+    ar_base_y = ust_sinir_y + gap_ust
+    for s_idx, asat in enumerate(ar_satirlar):
+        as_bb = draw.textbbox((0, 0), asat, font=font_ar)
+        as_w = as_bb[2] - as_bb[0]
+        line_x = (w - as_w) // 2
+        line_y = ar_base_y + ar_offsets[s_idx]
+        draw.text((line_x, line_y), asat, font=font_ar, fill=secili_palet["c_arabic"])
+
+    # B) Latin Okunuş
+    if ok_satirlar:
+        ok_y_cur = ar_base_y + total_ar_h + gap_ar_ok
+        for osat in ok_satirlar:
+            o_bb = draw.textbbox((0, 0), osat, font=font_okunus)
+            o_w = o_bb[2] - o_bb[0]
+            draw.text(((w - o_w) // 2, ok_y_cur), osat, font=font_okunus, fill=secili_palet["c_sub"])
+            ok_y_cur += ok_line_h
+        ust_son_y = ok_y_cur
+    else:
+        ust_son_y = ar_base_y + total_ar_h
+
+    # C) Ara Zarif Altın Ayraç
+    mid_ayrac_y = ust_son_y + gap_ar_tr // 2
+    draw.line([(w // 2 - 50, mid_ayrac_y), (w // 2 + 50, mid_ayrac_y)], fill=secili_palet["c_divider"], width=1)
+    draw.ellipse([w // 2 - 3, mid_ayrac_y - 3, w // 2 + 3, mid_ayrac_y + 3], fill=secili_palet["c_accent"])
+
+    # D) Türkçe Dua Anlamı
+    tr_y = ust_son_y + gap_ar_tr
+
+    # Saten altın tırnak filigranı
+    font_fili_pt = int(font_anlam_boyut * 2.2)
+    font_fili = font_al(FONT_BASLIK, font_fili_pt, agirlik=700)
+    draw.text((w // 2 - 120, tr_y - int(font_fili_pt * 0.44)), "“", font=font_fili, fill=secili_palet["fili_rgba"])
+
+    for line_tokens, line_w in tr_wrapped_lines:
+        cur_x = (w - line_w) // 2
+        for word, is_bold, word_w in line_tokens:
+            f = font_anlam_bold if is_bold else font_anlam_reg
+            fill_c = secili_palet["c_body_bold"] if is_bold else secili_palet["c_body_reg"]
+            draw.text((cur_x, tr_y), word, font=f, fill=fill_c)
+            cur_x += word_w + space_w
+        tr_y += tr_line_h
+
+    # E) Kaynak Referansı
+    tr_y += gap_tr_kaynak
+    draw.text(((w - kw) // 2, tr_y), kaynak_metni, font=font_kaynak, fill=secili_palet["c_accent"])
+
+    if not cikti_dosya_adi:
+        cikti_dosya_adi = f"dua_{format_tipi.replace(':', '_')}.png"
+    cikti_yolu = CIKTI_DIZINI / cikti_dosya_adi
+    im.save(str(cikti_yolu), quality=96)
+    return cikti_yolu
 
 
 # 5 Belirgin ve Zengin Renk Paleti (Ezan Plus Kur'an Sözlüğü)
@@ -1772,76 +1751,6 @@ KELIME_PALET_ALIASES: Dict[str, str] = {
     "plum": "asil_murdum",
     "ametist": "asil_murdum",
 }
-
-
-def _kelime_cta_butonu_ciz(im: Image.Image, format_tipi: str = "9:16") -> int:
-    """Ezan Plus İndirin alt butonunu çizer ve butonun üst Y koordinatını döner (İncelen zarif yükseklik)."""
-    draw = ImageDraw.Draw(im)
-    w, h = im.size
-    is_916 = (format_tipi == "9:16")
-
-    nav_w = 710 if is_916 else 650
-    nav_h = 72 if is_916 else 62
-    nav_x1 = (w - nav_w) // 2
-    nav_x2 = nav_x1 + nav_w
-    nav_y1 = (h - 130) if is_916 else (h - 96)
-    nav_y2 = nav_y1 + nav_h
-    btn_y = nav_y1 + nav_h // 2
-
-    # Lüks yumuşak gölge
-    shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    s_draw = ImageDraw.Draw(shadow)
-    s_draw.rounded_rectangle([nav_x1 + 2, nav_y1 + 3, nav_x2 - 2, nav_y2 + 6], radius=24 if is_916 else 20, fill=(15, 3, 6, 45))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(10))
-    im.paste(shadow, (0, 0), shadow)
-
-    draw = ImageDraw.Draw(im)
-    # Beyaz Buton Gövdesi
-    draw.rounded_rectangle([nav_x1, nav_y1, nav_x2, nav_y2], radius=22 if is_916 else 18, fill="#FFFFFF", outline="#EFE8DC", width=1)
-
-    # 1. Logo
-    logo_path = IKONLAR / "logo.png"
-    logo_size = 40 if is_916 else 34
-    logo_x = nav_x1 + (18 if is_916 else 14)
-    if logo_path.exists():
-        logo = Image.open(logo_path).convert("RGBA").resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-        mask = Image.new("L", (logo_size, logo_size), 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, logo_size, logo_size], radius=11, fill=255)
-        im.paste(logo, (logo_x, btn_y - logo_size // 2), mask)
-
-    # 2. CTA Yazısı (Dikeyde tam ortalı)
-    pt_cta = 22 if is_916 else 18
-    font_cta = font_al(FONT_UI, pt_cta, agirlik=700)
-    txt_x = logo_x + logo_size + (14 if is_916 else 12)
-    txt_bb = draw.textbbox((0, 0), "Ezan Plus • Ücretsiz İndirin", font=font_cta)
-    txt_h = txt_bb[3] - txt_bb[1]
-    draw.text((txt_x, btn_y - txt_h // 2 - txt_bb[1]), "Ezan Plus • Ücretsiz İndirin", font=font_cta, fill="#182230")
-
-    # 3. Store İkonları
-    ps_size = 22 if is_916 else 19
-    ps_x = nav_x2 - (48 if is_916 else 42)
-    ps_y = btn_y - ps_size // 2
-    _play_store_vektor_ciz(draw, ps_x, ps_y, ps_size)
-
-    # Apple İkonu
-    apple_path = IKONLAR / "apple.png"
-    ap_size = 20 if is_916 else 17
-    if apple_path.exists():
-        ap_img = Image.open(apple_path).convert("RGBA").resize((ap_size, ap_size), Image.Resampling.LANCZOS)
-        ap_x = ps_x - ap_size - (15 if is_916 else 12)
-        im.paste(ap_img, (ap_x, btn_y - ap_size // 2), ap_img)
-    else:
-        try:
-            font_apple = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 24 if is_916 else 20)
-            bbox_ap = draw.textbbox((0, 0), "", font=font_apple)
-            ap_w, ap_h = bbox_ap[2] - bbox_ap[0], bbox_ap[3] - bbox_ap[1]
-            ap_y = btn_y - ap_h // 2 - bbox_ap[1]
-            ap_x = ps_x - ap_w - 15
-            draw.text((ap_x, ap_y), "", font=font_apple, fill="#000000")
-        except Exception:
-            pass
-
-    return nav_y1
 
 
 def kelime_karti_ciz(

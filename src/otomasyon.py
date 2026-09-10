@@ -199,6 +199,11 @@ def gorsel_icerik_olustur_ve_gonder(
         arapca = icerik.get("arapca_metin")
         okunus = icerik.get("arapca_okunus")
         fazilet = icerik.get("okunus_veya_fazilet")
+        kimin_duasi = icerik.get("kimin_duasi")
+        ruh_hali = icerik.get("ruh_hali")
+        kaynak_ref = icerik.get("kaynak_ref")
+        fazilet_notu = icerik.get("fazilet_notu")
+        vurgulanan_kelime = icerik.get("vurgulanan_kelime")
         kaynak = baslik
         tefekkur = fazilet
         caption = icerik.get("instagram_caption", "")
@@ -211,6 +216,11 @@ def gorsel_icerik_olustur_ve_gonder(
             okunus_veya_fazilet=fazilet,
             cikti_dosya_adi=f"dua_4_5_{dosya_eki}.png",
             format_tipi="4:5",
+            ruh_hali=ruh_hali,
+            kimin_duasi=kimin_duasi,
+            kaynak_ref=kaynak_ref,
+            fazilet_notu=fazilet_notu,
+            vurgulanan_kelime=vurgulanan_kelime,
         )
         gorsel_9_16 = sablon_ciz.dua_karti_ciz(
             dua_basligi=baslik,
@@ -220,6 +230,11 @@ def gorsel_icerik_olustur_ve_gonder(
             okunus_veya_fazilet=fazilet,
             cikti_dosya_adi=f"dua_9_16_{dosya_eki}.png",
             format_tipi="9:16",
+            ruh_hali=ruh_hali,
+            kimin_duasi=kimin_duasi,
+            kaynak_ref=kaynak_ref,
+            fazilet_notu=fazilet_notu,
+            vurgulanan_kelime=vurgulanan_kelime,
         )
         gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
 
