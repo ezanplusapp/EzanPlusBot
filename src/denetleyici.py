@@ -502,8 +502,8 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
             duzeltmeler.append(f"Açıklama metninden yasaklı '{yasakli}' ibaresi temizlendi.")
 
     if not caption or len(caption) < 20:
-        baslik = kayit.get("baslik", "Ezan Plus")
-        metin = kayit.get("turkce_metin", "")
+        baslik = str(kayit.get("baslik") or "Ezan Plus")
+        metin = str(kayit.get("turkce_metin") or "")
         caption = f"“{metin}”\n\n{baslik}"
         caption_degisti = True
         duzeltmeler.append("Eksik açıklama metni tescilli külliyat içeriğinden otomatik oluşturuldu.")
@@ -526,24 +526,51 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
         guncellemeler["caption"] = caption
 
     # 2. Tescilli Külliyat ile Metin Eşitleme (Halüsinasyon Telafisi)
-    turkce_metin = kayit.get("turkce_metin", "")
+    turkce_metin = str(kayit.get("turkce_metin") or "")
     if kategori in ("ayet", "reels"):
         from . import kuran_db
         sure_no = kayit.get("sure_no")
         ayet_no = kayit.get("ayet_no")
         if not (sure_no and ayet_no):
-            m_s = re.search(r'(\d+)\.\s*(?:Sure|Sûre)', kayit.get("baslik", ""))
-            m_a = re.search(r'(\d+)\.\s*(?:Ayet|Âyet)', kayit.get("baslik", ""))
+            baslik_str = str(kayit.get("baslik") or "")
+            m_s = re.search(r'(\d+)\.\s*(?:Sure|Sûre)', baslik_str)
+            m_a = re.search(r'(\d+)\.\s*(?:Ayet|Âyet)', baslik_str)
             if m_s and m_a:
                 sure_no, ayet_no = int(m_s.group(1)), int(m_a.group(1))
+            else:
+                kaynak_str = str(kayit.get("kaynak") or "")
+                m_k = re.search(r'(\d+)[:\s]+(\d+)', kaynak_str)
+                if m_k:
+                    sure_no, ayet_no = int(m_k.group(1)), int(m_k.group(2))
+                else:
+                    m_k2 = re.search(r'([A-Za-zÇĞİÖŞÜçğıöşü\']+)\s*[:\s]+\s*(\d+)', kaynak_str)
+                    if m_k2:
+                        s_adi = m_k2.group(1).lower()
+                        for s in kuran_db.sure_listesi_getir():
+                            s_tr = (s.get("sure_adi_tr") or s.get("sure_adi") or "").lower()
+                            if s_tr.startswith(s_adi) or s_adi in s_tr:
+                                sure_no = s["sure_no"]
+                                ayet_no = int(m_k2.group(2))
+                                break
 
         if sure_no and ayet_no:
             db_ayet = kuran_db.ayet_getir(int(sure_no), int(ayet_no))
             if db_ayet:
+                sure_adi_str = db_ayet.get("sure_adi_tr") or db_ayet.get("sure_adi") or f"{sure_no}. Sûre"
+                if not kayit.get("baslik"):
+                    guncellemeler["baslik"] = f"{sure_adi_str} Sûresi • {ayet_no}. Âyet"
+                    duzeltmeler.append(f"Başlık güncellendi: {guncellemeler['baslik']}")
+                if not kayit.get("arapca_metin"):
+                    guncellemeler["arapca_metin"] = db_ayet["arapca_metin"]
+                    duzeltmeler.append("Eksik Arapça metin tescilli Kur'an veritabanından tamamlandı.")
+                if not kayit.get("tefekkur"):
+                    guncellemeler["tefekkur"] = "Kalpleri mutmain kılan yegâne hakikat Allah'ı anmaktır."
+                    duzeltmeler.append("Eksik tefekkür notu tamamlandı.")
+
                 c_turkce = _metin_temizle(turkce_metin)
                 c_elmalili = _metin_temizle(db_ayet.get("meal_elmalili", ""))
                 c_diyanet = _metin_temizle(db_ayet.get("meal_diyanet", ""))
-                if c_turkce != c_elmalili and c_turkce != c_diyanet:
+                if not turkce_metin or (c_turkce != c_elmalili and c_turkce != c_diyanet):
                     guncellemeler["turkce_metin"] = db_ayet["meal_elmalili"]
                     guncellemeler["arapca_metin"] = db_ayet["arapca_metin"]
                     turkce_metin = db_ayet["meal_elmalili"]
@@ -552,12 +579,22 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
     elif kategori == "hadis":
         from . import hadis_db
         hadis_id = kayit.get("hadis_id")
+        if not hadis_id:
+            kaynak_str = str(kayit.get("kaynak") or "")
+            m_h = re.search(r'(\d+)', kaynak_str)
+            if m_h:
+                hadis_id = int(m_h.group(1))
+
         if hadis_id:
             db_hadis = hadis_db.hadis_getir(int(hadis_id))
             if db_hadis:
+                if not kayit.get("baslik"):
+                    guncellemeler["baslik"] = f"Riyâzü's-Sâlihîn • {hadis_id}. Hadis"
+                if not kayit.get("tefekkur"):
+                    guncellemeler["tefekkur"] = "Peygamber Efendimiz (sallallahu aleyhi vesellem)'in sünnetine ittiba iki cihan saadetidir."
                 c_turkce = _metin_temizle(turkce_metin)
                 c_hadis = _metin_temizle(db_hadis.get("hadis_metni", ""))
-                if c_turkce != c_hadis:
+                if not turkce_metin or (c_turkce != c_hadis):
                     guncellemeler["turkce_metin"] = db_hadis["hadis_metni"]
                     turkce_metin = db_hadis["hadis_metni"]
                     duzeltmeler.append("Hadis metni tescilli Riyâzü's-Sâlihîn külliyatı ile eşitlendi.")
@@ -565,13 +602,13 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
     # 3. Reels Dikey Mizanpaj Çakışması Telafisi
     if format_tipi == "reels_9_16" and kategori in ("ayet", "reels"):
         r_hatalar, _, r_metrikler = denetle_reels_mizanpaj(
-            sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+            sure_ayet=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Ayeti"),
             turkce_meal=turkce_metin,
-            arapca_metin=kayit.get("arapca_metin", ""),
+            arapca_metin=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
             arapca_okunus=kayit.get("arapca_okunus"),
-            tefekkur_notu=kayit.get("tefekkur", ""),
-            s1=kayit.get("video_baslik_satir1", ""),
-            s2=kayit.get("video_baslik_satir2", ""),
+            tefekkur_notu=str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or ""),
+            s1=str(kayit.get("video_baslik_satir1") or ""),
+            s2=str(kayit.get("video_baslik_satir2") or ""),
         )
         if r_hatalar or (r_metrikler.get("serbest_alan_px", 999) < 10) or ("turkce_metin" in guncellemeler) or ("arapca_metin" in guncellemeler):
             log.warning("Mizanpaj taşması veya güncellenen tescilli metin tespit edildi, güvenli punto override ile video yeniden üretiliyor...")
@@ -582,15 +619,15 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
                 ayet_no = kayit.get("ayet_no", 5)
                 kelime_zamanlari = ayet_kelime_zamanlari_getir(int(sure_no), int(ayet_no)) if sure_no and ayet_no else None
                 yeni_video = reels_videosu_uret(
-                    sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                    sure_ayet=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Ayeti"),
                     turkce_meal=turkce_metin,
                     ses_yolu=kayit.get("ses_yolu"),
-                    arapca_metin=kayit.get("arapca_metin"),
+                    arapca_metin=guncellemeler.get("arapca_metin") or kayit.get("arapca_metin"),
                     arapca_okunus=kayit.get("arapca_okunus"),
                     video_baslik_satir1=kayit.get("video_baslik_satir1"),
                     video_baslik_satir2=kayit.get("video_baslik_satir2"),
-                    tefekkur_notu=kayit.get("tefekkur"),
-                    hafiz_adi=kayit.get("hafiz_adi", "Mişari Râşid el-Afâsî"),
+                    tefekkur_notu=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
+                    hafiz_adi=kayit.get("hafiz_adi") or "Mişari Râşid el-Afâsî",
                     pt_ar_override=76,
                     kelime_zamanlari=kelime_zamanlari,
                 )
@@ -614,36 +651,36 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
                     p_4_5 = sablon_ciz.hadis_karti_ciz(
                         hadis_metni=turkce_metin,
                         kaynak_ravi=kayit.get("kaynak"),
-                        tefekkur_notu=kayit.get("tefekkur"),
+                        tefekkur_notu=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
                         cikti_dosya_adi=f"hadis_4_5_fix_{dosya_eki}.png",
                         format_tipi="4:5",
-                        arapca_metin=kayit.get("arapca_metin"),
+                        arapca_metin=guncellemeler.get("arapca_metin") or kayit.get("arapca_metin"),
                     )
                     p_9_16 = sablon_ciz.hadis_karti_ciz(
                         hadis_metni=turkce_metin,
                         kaynak_ravi=kayit.get("kaynak"),
-                        tefekkur_notu=kayit.get("tefekkur"),
+                        tefekkur_notu=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
                         cikti_dosya_adi=f"hadis_9_16_fix_{dosya_eki}.png",
                         format_tipi="9:16",
-                        arapca_metin=kayit.get("arapca_metin"),
+                        arapca_metin=guncellemeler.get("arapca_metin") or kayit.get("arapca_metin"),
                     )
                     guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
                     duzeltmeler.append("Hadis kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
 
                 elif kategori == "ayet":
                     p_4_5 = sablon_ciz.ayet_karti_ciz(
-                        sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                        sure_ayet=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Ayeti"),
                         turkce_meal=turkce_metin,
-                        arapca_metin=kayit.get("arapca_metin"),
-                        tefekkur_notu=kayit.get("tefekkur"),
+                        arapca_metin=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
+                        tefekkur_notu=str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or ""),
                         cikti_dosya_adi=f"ayet_4_5_fix_{dosya_eki}.png",
                         format_tipi="4:5",
                     )
                     p_9_16 = sablon_ciz.ayet_karti_ciz(
-                        sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                        sure_ayet=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Ayeti"),
                         turkce_meal=turkce_metin,
-                        arapca_metin=kayit.get("arapca_metin"),
-                        tefekkur_notu=kayit.get("tefekkur"),
+                        arapca_metin=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
+                        tefekkur_notu=str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or ""),
                         cikti_dosya_adi=f"ayet_9_16_fix_{dosya_eki}.png",
                         format_tipi="9:16",
                     )
@@ -652,18 +689,18 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
 
                 elif kategori == "dua":
                     p_4_5 = sablon_ciz.dua_karti_ciz(
-                        dua_basligi=kayit.get("baslik", "Günün Duası"),
+                        dua_basligi=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Duası"),
                         turkce_anlam=turkce_metin,
                         arapca_metin=kayit.get("arapca_metin"),
-                        okunus_veya_fazilet=kayit.get("tefekkur"),
+                        okunus_veya_fazilet=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
                         cikti_dosya_adi=f"dua_4_5_fix_{dosya_eki}.png",
                         format_tipi="4:5",
                     )
                     p_9_16 = sablon_ciz.dua_karti_ciz(
-                        dua_basligi=kayit.get("baslik", "Günün Duası"),
+                        dua_basligi=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Duası"),
                         turkce_anlam=turkce_metin,
                         arapca_metin=kayit.get("arapca_metin"),
-                        okunus_veya_fazilet=kayit.get("tefekkur"),
+                        okunus_veya_fazilet=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
                         cikti_dosya_adi=f"dua_9_16_fix_{dosya_eki}.png",
                         format_tipi="9:16",
                     )
@@ -672,10 +709,10 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
 
                 elif kategori == "kelime":
                     p_4_5 = sablon_ciz.kelime_karti_ciz(
-                        kelime_tr=kayit.get("baslik", "Kur'an Sözlüğü"),
-                        kelime_ar=kayit.get("arapca_metin", ""),
+                        kelime_tr=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Kur'an Sözlüğü"),
+                        kelime_ar=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
                         lugat_anlami=turkce_metin,
-                        hayat_dersi=kayit.get("tefekkur", ""),
+                        hayat_dersi=str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or ""),
                         cikti_dosya_adi=f"kelime_4_5_fix_{dosya_eki}.png",
                         format_tipi="4:5",
                     )
