@@ -17,12 +17,13 @@ from .uretim import ai as icerik_uret
 from .uretim import kart as sablon_ciz
 from .uretim import ses as ses_getir
 from .uretim import video as video_motoru
+from .ayar import KOK_DIZIN
 from .telegram import bot as telegram_bot
 
 log = logging.getLogger(__name__)
 
 
-def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
+def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None, auto_publish: bool = True) -> int:
     """
     1. Gemini ile ayet içeriği üretir.
     2. EveryAyah üzerinden sesini indirir.
@@ -104,14 +105,18 @@ def reels_icerigi_olustur_ve_gonder(tema: Optional[str] = None) -> int:
 
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
-    log.info("5/5: Kur'an tilaveti otomatik yayınlanıyor ve Telegram'a yayın detay kartı iletiliyor...")
-    sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
-    try:
-        telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
-    except Exception as e:
-        log.error(f"Reels #{paylasim_id} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+    if auto_publish:
+        log.info("5/5: Kur'an tilaveti otomatik yayınlanıyor ve Telegram'a yayın detay kartı iletiliyor...")
+        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
+        try:
+            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
+        except Exception as e:
+            log.error(f"Reels #{paylasim_id} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+        log.info(f"Reels tilaveti başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
+    else:
+        telegram_bot.onay_istegi_gonder(paylasim_id)
+        log.info(f"Reels #{paylasim_id} Telegram grubuna onaya sunuldu!")
 
-    log.info(f"Reels tilaveti başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
     return paylasim_id
 
 
@@ -315,7 +320,7 @@ def gorsel_icerik_olustur_ve_gonder(
 
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
-    if auto_publish or kategori == "kelime":
+    if auto_publish:
         log.info(f"Görsel post ({kategori.upper()}) doğrudan tüm platformlara otomatik yayınlanıyor...")
         sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
         try:
@@ -329,34 +334,229 @@ def gorsel_icerik_olustur_ve_gonder(
     return paylasim_id
 
 
-def hadis_postu_olustur_ve_gonder(tema: Optional[str] = None, format_tipi: str = "4:5") -> int:
-    """Sahih Hadis-i Şerif kartı üretip Telegram grubuna onay için iletir."""
-    return gorsel_icerik_olustur_ve_gonder(kategori="hadis", tema=tema, format_tipi=format_tipi)
+def hadis_videosu_olustur_ve_gonder(tema: Optional[str] = None, auto_publish: bool = False) -> int:
+    """
+    Riyâzü's-Sâlihîn hadisinden V20 Çok Sayfalı Dinamik Video üretir:
+    - 100% Bold Ibarra Real Nova Türkçe meal karaoke takibi.
+    - Arka planda telifsiz Segâh Ney fon müziği.
+    - Çok sayfalı 0.45s sinematik crossfade geçişi.
+    - Telegram grubuna videolu onay butonuyla iletir.
+    """
+    dosya_eki = int(time.time())
+    log.info("1/5: Tescilli külliyattan Sahih Hadis içeriği seçiliyor...")
+    icerik = icerik_uret.hadis_icerigi_uret(tema=tema)
+
+    hadis_id = icerik.get("hadis_id")
+    turkce_metin = icerik.get("hadis_metni", "")
+    kaynak_ravi = icerik.get("kaynak_ravi", "Hadis-i Şerif")
+    tefekkur_notu = icerik.get("tefekkur_notu")
+    caption = icerik.get("instagram_caption", "")
+    arapca_metin = icerik.get("arapca_metin")
+    arapca_okunus = icerik.get("arapca_okunus")
+    ravi = icerik.get("ravi")
+
+    log.info(f"2/5: Mazlum Kiper spiker sesi ve kelime zaman damgaları üretiliyor ({kaynak_ravi})...")
+    ses_id_etiketi = f"hadis_{hadis_id}" if hadis_id else f"hadis_{dosya_eki}"
+    ses_yolu = ses_getir.turkce_tts_uret(
+        metin=turkce_metin,
+        kategori="hadis",
+        icerik_id=ses_id_etiketi,
+        ton_promptu="[vakur, manevi ve sakin bir tefekkür tonuyla]",
+        zaman_damgasi_al=True
+    )
+
+    words_data = ses_getir.turkce_kelime_zamanlari_getir(ses_yolu)
+    log.info(f"Kelime zaman damgaları yüklendi: {len(words_data)} kelime")
+
+    log.info("3/5: V20 Çok Sayfalı Dinamik Hadis Videosu render ediliyor...")
+    video_yolu = video_motoru.hadis_videosu_uret(
+        hadis_metni=turkce_metin,
+        kaynak_ref=kaynak_ravi,
+        ses_yolu=ses_yolu,
+        words_data=words_data,
+        arapca_metin=arapca_metin,
+        arapca_okunus=arapca_okunus,
+        ravi=ravi,
+        tefekkur_notu=tefekkur_notu,
+        cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"hadis_video_{dosya_eki}.mp4",
+        ney_volume=0.48
+    )
+
+    log.info("4/5: Veritabanına kayıt ekleniyor...")
+    paylasim_id = db.paylasim_ekle(
+        kategori="hadis",
+        format_tipi="reels_9_16",
+        turkce_metin=turkce_metin,
+        baslik=kaynak_ravi,
+        arapca_metin=arapca_metin,
+        kaynak=kaynak_ravi,
+        tefekkur=tefekkur_notu,
+        caption=caption,
+        video_yolu=str(video_yolu),
+        gorsel_yollari=[str(video_yolu.with_suffix(".png"))],
+        ses_yolu=str(ses_yolu),
+        durum="taslak",
+    )
+
+    if hadis_id:
+        from . import hadis_db
+        hadis_db.hadisi_paylasildi_isaretle(hadis_id)
+
+    # Kalite Denetimi
+    from . import denetleyici
+    denetim = denetleyici.denetle_paylasim(paylasim_id)
+    if not denetim.gecerli:
+        log.warning(f"Hadis Videosu #{paylasim_id} kalite denetiminde eksikler tespit etti, otomatik onarım deneniyor...")
+        onarildi, duzeltmeler = denetleyici.otomatik_onar(paylasim_id)
+        if onarildi:
+            denetim = denetleyici.denetle_paylasim(paylasim_id)
+            log.info(f"Hadis Videosu #{paylasim_id} onarıldı: {duzeltmeler}")
+        else:
+            hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+            log.critical(f"Hadis Videosu #{paylasim_id} kalite denetiminden GEÇEMEDİ:\n{hata_metni}")
+            db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+            telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+            raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
+
+    log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
+
+    if auto_publish:
+        log.info(f"Hadis Videosu #{paylasim_id} otomatik olarak tüm platformlara yayınlanıyor...")
+        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
+        try:
+            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
+        except Exception as e:
+            log.error(f"Telegram yayın detay kartı iletilemedi: {e}")
+    else:
+        telegram_bot.onay_istegi_gonder(paylasim_id)
+        log.info(f"Hadis Videosu #{paylasim_id} Telegram grubuna onaya sunuldu!")
+
+    return paylasim_id
 
 
-def dua_postu_olustur_ve_gonder(ruh_hali: Optional[str] = None, format_tipi: str = "4:5") -> int:
-    """Günün Duası / Manevi Niyaz kartı üretip Telegram grubuna onay için iletir."""
-    return gorsel_icerik_olustur_ve_gonder(kategori="dua", tema=ruh_hali, format_tipi=format_tipi)
+def dua_videosu_olustur_ve_gonder(ruh_hali: Optional[str] = None, auto_publish: bool = False) -> int:
+    """
+    Tescilli Dua külliyatından V20 Çok Sayfalı Dinamik Video üretir:
+    - 100% Bold Ibarra Real Nova Türkçe meal karaoke takibi (Kehribar ton).
+    - Arka planda telifsiz Ferahfezâ Ney fon müziği.
+    - Çok sayfalı 0.45s sinematik crossfade geçişi.
+    - Telegram grubuna videolu onay butonuyla iletir.
+    """
+    dosya_eki = int(time.time())
+    log.info("1/5: Tescilli külliyattan Günün Duası içeriği seçiliyor...")
+    icerik = icerik_uret.dua_icerigi_uret(ruh_hali=ruh_hali)
+
+    baslik = icerik.get("dua_basligi", "Günün Duası")
+    turkce_anlam = icerik.get("turkce_anlam", "")
+    arapca_metin = icerik.get("arapca_metin")
+    arapca_okunus = icerik.get("arapca_okunus")
+    fazilet = icerik.get("okunus_veya_fazilet")
+    kaynak_ref = icerik.get("kaynak_ref") or baslik
+    caption = icerik.get("instagram_caption", "")
+
+    log.info(f"2/5: Mazlum Kiper spiker sesi ve kelime zaman damgaları üretiliyor ({baslik})...")
+    ses_yolu = ses_getir.turkce_tts_uret(
+        metin=turkce_anlam,
+        kategori="dua",
+        icerik_id=f"dua_{dosya_eki}",
+        ton_promptu="[huzurlu, samimi ve ulvi bir dua tonuyla]",
+        zaman_damgasi_al=True
+    )
+
+    words_data = ses_getir.turkce_kelime_zamanlari_getir(ses_yolu)
+    log.info(f"Kelime zaman damgaları yüklendi: {len(words_data)} kelime")
+
+    log.info("3/5: V20 Çok Sayfalı Dinamik Dua Videosu render ediliyor...")
+    video_yolu = video_motoru.dua_videosu_uret(
+        turkce_anlam=turkce_anlam,
+        dua_basligi=baslik,
+        ses_yolu=ses_yolu,
+        words_data=words_data,
+        arapca_metin=arapca_metin,
+        arapca_okunus=arapca_okunus,
+        tefekkur_notu=fazilet,
+        kaynak_ref=kaynak_ref,
+        cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"dua_video_{dosya_eki}.mp4",
+        ney_volume=0.48
+    )
+
+    log.info("4/5: Veritabanına kayıt ekleniyor...")
+    paylasim_id = db.paylasim_ekle(
+        kategori="dua",
+        format_tipi="reels_9_16",
+        turkce_metin=turkce_anlam,
+        baslik=baslik,
+        arapca_metin=arapca_metin,
+        kaynak=kaynak_ref,
+        tefekkur=fazilet,
+        caption=caption,
+        video_yolu=str(video_yolu),
+        gorsel_yollari=[str(video_yolu.with_suffix(".png"))],
+        ses_yolu=str(ses_yolu),
+        durum="taslak",
+    )
+
+    # Kalite Denetimi
+    from . import denetleyici
+    denetim = denetleyici.denetle_paylasim(paylasim_id)
+    if not denetim.gecerli:
+        log.warning(f"Dua Videosu #{paylasim_id} kalite denetiminde eksikler tespit etti, otomatik onarım deneniyor...")
+        onarildi, duzeltmeler = denetleyici.otomatik_onar(paylasim_id)
+        if onarildi:
+            denetim = denetleyici.denetle_paylasim(paylasim_id)
+            log.info(f"Dua Videosu #{paylasim_id} onarıldı: {duzeltmeler}")
+        else:
+            hata_metni = "\n".join(f"• {h}" for h in denetim.hatalar)
+            log.critical(f"Dua Videosu #{paylasim_id} kalite denetiminden GEÇEMEDİ:\n{hata_metni}")
+            db.durum_guncelle(paylasim_id, yeni_durum="iptal_edildi", hata_mesaji=hata_metni)
+            telegram_bot.mesaj_gonder(denetim.formatli_rapor())
+            raise RuntimeError(f"Yayın öncesi kalite kontrolü başarısız oldu: {denetim.hatalar}")
+
+    log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
+
+    if auto_publish:
+        log.info(f"Dua Videosu #{paylasim_id} otomatik olarak tüm platformlara yayınlanıyor...")
+        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
+        try:
+            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
+        except Exception as e:
+            log.error(f"Telegram yayın detay kartı iletilemedi: {e}")
+    else:
+        telegram_bot.onay_istegi_gonder(paylasim_id)
+        log.info(f"Dua Videosu #{paylasim_id} Telegram grubuna onaya sunuldu!")
+
+    return paylasim_id
 
 
-def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5", auto_publish: bool = True) -> int:
-    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip doğrudan tüm kanallara otomatik yayınlar."""
+def hadis_postu_olustur_ve_gonder(tema: Optional[str] = None, format_tipi: str = "video", auto_publish: bool = False) -> int:
+    """Sahih Hadis-i Şerif V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
+    return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=auto_publish)
+
+
+def dua_postu_olustur_ve_gonder(ruh_hali: Optional[str] = None, format_tipi: str = "video", auto_publish: bool = False) -> int:
+    """Günün Duası / Manevi Niyaz V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
+    return dua_videosu_olustur_ve_gonder(ruh_hali=ruh_hali, auto_publish=auto_publish)
+
+
+def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5", auto_publish: bool = False) -> int:
+    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip taslak veya yayın modunda iletir."""
     return gorsel_icerik_olustur_ve_gonder(kategori="kelime", tema=kavram, format_tipi=format_tipi, auto_publish=auto_publish)
 
 
 def icerik_olustur_ve_gonder(tur: str = "reels", tema: Optional[str] = None, format_tipi: str = "4:5") -> int:
     """
-    Belirtilen türe göre (reels, hadis, dua, kelime, ayet) içeriği üretip Telegram onayına sunar.
+    Belirtilen türe göre (reels, hadis, dua, kelime, ayet) içeriği üretip onay/yayına sunar.
+    Hadis ve Dua içerikleri standart olarak V20 Dinamik Video formatında üretilir.
     """
     tur_temiz = tur.lower().strip()
-    if tur_temiz in ("reels", "video"):
+    if tur_temiz in ("reels", "video", "ayet_video"):
         return reels_icerigi_olustur_ve_gonder(tema=tema)
-    elif tur_temiz == "hadis":
-        return hadis_postu_olustur_ve_gonder(tema=tema, format_tipi=format_tipi)
-    elif tur_temiz == "dua":
-        return dua_postu_olustur_ve_gonder(ruh_hali=tema, format_tipi=format_tipi)
+    elif tur_temiz in ("hadis", "hadis_video", "hadis_reels"):
+        return hadis_videosu_olustur_ve_gonder(tema=tema)
+    elif tur_temiz in ("dua", "dua_video", "dua_reels"):
+        return dua_videosu_olustur_ve_gonder(ruh_hali=tema)
     elif tur_temiz == "kelime":
-        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi, auto_publish=True)
+        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi, auto_publish=False)
     elif tur_temiz in ("ayet", "gorsel"):
         return gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=tema, format_tipi=format_tipi)
     else:
@@ -424,8 +624,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Ezan Plus Sosyal Medya Otomasyon Motoru")
-    parser.add_argument("komut", nargs="?", default=None, choices=["reels", "ayet", "hadis", "dua", "kelime", "gorsel"], help="Üretilecek içerik türü")
-    parser.add_argument("--tur", choices=["reels", "ayet", "hadis", "dua", "kelime", "gorsel"], default=None, help="İçerik türü")
+    parser.add_argument("komut", nargs="?", default=None, choices=["reels", "ayet", "hadis", "dua", "kelime", "gorsel", "hadis_video", "dua_video"], help="Üretilecek içerik türü")
+    parser.add_argument("--tur", choices=["reels", "ayet", "hadis", "dua", "kelime", "gorsel", "hadis_video", "dua_video"], default=None, help="İçerik türü")
     parser.add_argument("--format", choices=["4:5", "9:16"], default="4:5", help="Görsel formatı (4:5 feed veya 9:16 story)")
     parser.add_argument("--tema", type=str, default=None, help="Özel tema, sure:ayet veya arama terimi")
     parser.add_argument("--otomatik", action="store_true", help="Onay beklemeden doğrudan yayınla")

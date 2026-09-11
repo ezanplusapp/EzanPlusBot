@@ -84,15 +84,43 @@ def kok_latinize_et(kok: str) -> str:
     return "".join(sonuc)
 
 
+def arapca_glif_temizle(metin: str) -> str:
+    """
+    Amiri ve Uthmani fontlarında bulunmayan, render esnasında dikey dikdörtgen
+    (tofu / glif eksik kutusu) hatasına yol açan tüm Latin karakterleri temizler ve dönüştürür.
+    """
+    if not metin:
+        return ""
+    # 1. Latin noktalama işaretlerini resmi Arapça Unicode karşılıklarına dönüştür
+    metin = metin.replace(',', '،').replace(';', '؛').replace('?', '؟')
+    # 2. Amiri fontunda bulunmayan Latin tırnak, ayraç ve sembolleri temizle
+    metin = re.sub(r'[«»""\'\'“”‘’()\[\]{}<>]', '', metin)
+    # 3. İki nokta, tire, alt çizgi, artı vb. sembolleri temizle
+    metin = re.sub(r'[:：\-_–—+=/\\|*^~`]', ' ', metin)
+    # 4. Sadece geçerli Arapça blokları ve izin verilen noktalama karakterlerini muhafaza et
+    temiz = []
+    for ch in metin:
+        cp = ord(ch)
+        if (0x0600 <= cp <= 0x06FF or 
+            0x0750 <= cp <= 0x077F or 
+            0x08A0 <= cp <= 0x08FF or 
+            0xFB50 <= cp <= 0xFDFF or 
+            0xFE70 <= cp <= 0xFEFF or 
+            cp in (0x20, 0x00A0) or
+            ch in ('،', '؛', '؟')):
+            temiz.append(ch)
+    metin = "".join(temiz)
+    metin = re.sub(r'\s+', ' ', metin).strip()
+    return metin
+
+
 def arapca_hazirla(metin: str) -> str:
     """Arapça metni sağdan sola, harf bitişmelerine ve tam harekelerine göre düzenler."""
     if not metin:
         return ""
-    # Noktalama temizliği & Arapça hareke çakışması önleme (Amiri fontu glif kutusu [] koruması)
-    metin = metin.strip()
-    metin = re.sub(r'[:：\s-]+$', '', metin)  # Sonda kalan iki nokta veya tireyi temizle
-    metin = re.sub(r'([\u0600-\u06FF])\s*:\s*', r'\1 - ', metin)  # Hareke + : çakışmasını önle
-    metin = metin.replace(',', '،').replace(';', '؛')  # Latin noktalama işaretlerini Arapça karşılıklarına dönüştür
+    metin = arapca_glif_temizle(metin)
+    if not metin:
+        return ""
     yeniden_sekillendir = _reshaper.reshape(metin)
     return get_display(yeniden_sekillendir)
 
@@ -889,36 +917,127 @@ def _kelime_cta_butonu_ciz(im: Image.Image, format_tipi: str = "9:16") -> int:
 
 
 # ==============================================================================
-# V19 SABİT SOFT PASTEL RENK PALETLERİ (Hadis & Dua Standardı)
+# V19 SABİT SOFT PASTEL RENK PALETLERİ & KETEN PARŞÖMEN STANDARDI
 # ==============================================================================
+KETEN_CENTER = (244, 240, 232)
+KETEN_OUTER = (230, 224, 212)
+
+_DUA_HANDS_MASK_CACHE: Optional[Image.Image] = None
+
+def extract_dua_hands_mask() -> Optional[Image.Image]:
+    """Logo maskesinden dua eden eller silüetini narin filigran olarak çıkarır ve önbelleğe alır."""
+    global _DUA_HANDS_MASK_CACHE
+    if _DUA_HANDS_MASK_CACHE is not None:
+        return _DUA_HANDS_MASK_CACHE
+    logo_p = IKONLAR / "logo.png"
+    if not logo_p.exists():
+        return None
+    try:
+        logo = Image.open(logo_p)
+        arr = np.array(logo).astype(float)
+        gb_mean = (arr[:, :, 1] + arr[:, :, 2]) / 2.0
+        alpha = np.clip((gb_mean - 55) / (195 - 55) * 255.0, 0, 255).astype(np.uint8)
+        alpha[0:15, :] = 0
+        alpha[-15:, :] = 0
+        alpha[:, 0:15] = 0
+        alpha[:, -15:] = 0
+        mask_img = Image.fromarray(alpha)
+        bbox = mask_img.getbbox()
+        if bbox:
+            mask_img = mask_img.crop(bbox)
+        _DUA_HANDS_MASK_CACHE = mask_img
+        return _DUA_HANDS_MASK_CACHE
+    except Exception as e:
+        log.warning(f"Dua hands mask çıkarılamadı: {e}")
+        return None
+
+
+def draw_kart_header_bar(
+    im: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    cfg: Dict[str, Any],
+    top_y: int = 225,
+    rozet_text: str = "HADİS-İ ŞERİF",
+    sol_x: int = 65,
+    sag_x: int = 1080 - 65,
+) -> int:
+    """Kartlar için kurumsal simetrik 3'lü Header Künyesi çizer ve ayraç y koordinatını döner."""
+    w = 1080
+    mid_y = top_y + 35
+
+    # 1. Sol: 68x68 Yuvarlak Köşeli Logo
+    logo_size = 68
+    logo_p = IKONLAR / "logo.png"
+    if logo_p.exists():
+        try:
+            logo = Image.open(logo_p).convert("RGBA").resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (logo_size, logo_size), 0)
+            ImageDraw.Draw(mask).rounded_rectangle([0, 0, logo_size, logo_size], radius=18, fill=255)
+            im.paste(logo, (sol_x, mid_y - logo_size // 2), mask)
+        except Exception:
+            pass
+
+    # 2. Sağ: Kurumsal Künye
+    f_sub = font_al(FONT_UI, 13, agirlik=700)
+    s_txt = cfg.get("sub_txt", "SAHİH HADİS-İ ŞERİF REHBERİ")
+    s_bb = draw.textbbox((0, 0), s_txt, font=f_sub)
+    w_sub = s_bb[2] - s_bb[0]
+
+    f_marka = font_al(FONT_GOVDE, 39, agirlik=700)
+    m_txt = "Ezan Plus"
+    m_bb = draw.textbbox((0, 0), m_txt, font=f_marka)
+    w_m = m_bb[2] - m_bb[0]
+    h_m = m_bb[3] - m_bb[1]
+
+    start_y = mid_y - (h_m + 4 + s_bb[3] - s_bb[1]) // 2
+    draw.text((sag_x - w_m, start_y - m_bb[1]), m_txt, font=f_marka, fill="#FFFFFF")
+    draw.text((sag_x - w_sub, start_y + h_m + 8 - s_bb[1]), s_txt, font=f_sub, fill=cfg.get("sub_color", "#DCECE5"))
+
+    # 3. Orta: Baskerville Bold 42pt Fildişi Rozet
+    f_rozet = font_al(FONT_BASKERVILLE, 42, agirlik=700)
+    r_bb = draw.textbbox((0, 0), rozet_text, font=f_rozet)
+    rw, rh = r_bb[2] - r_bb[0], r_bb[3] - r_bb[1]
+    rozet_w = rw + 84
+    rozet_h = 70
+    rozet_x = (w - rozet_w) // 2
+    rozet_y = mid_y - rozet_h // 2
+    yuvarlak_kose_ciz(draw, (rozet_x, rozet_y, rozet_x + rozet_w, rozet_y + rozet_h), radius=rozet_h // 2, dolgu="#FFFDF9")
+    rx = rozet_x + (rozet_w - rw) // 2 - r_bb[0]
+    ry = rozet_y + (rozet_h - rh) // 2 - r_bb[1] + 1
+    draw.text((rx, ry), rozet_text, font=f_rozet, fill=cfg["badge_color"])
+
+    # İnce Altın Ayraç Çizgisi ve Merkez Nokta
+    ayrac_y = top_y + 88
+    line_col = f"#{int(cfg['center_rgb'][0]*1.4):02x}{int(cfg['center_rgb'][1]*1.4):02x}{int(cfg['center_rgb'][2]*1.4):02x}"
+    draw.line([(sol_x, ayrac_y), (sag_x, ayrac_y)], fill=line_col, width=1)
+    draw.ellipse([w // 2 - 4, ayrac_y - 4, w // 2 + 4, ayrac_y + 4], fill="#FFFDF9")
+    return ayrac_y
+
+
 HADIS_SABIT_PALET: Dict[str, Any] = {
     "ad": "Sisli Adaçayı Zümrüdü",
-    "center_rgb": (30, 64, 54),    # #1E4036 (Mat kadife adaçayı zümrüt)
-    "outer_rgb": (14, 34, 28),     # #0E221C
-    "c_divider": "#327560",
-    "c_hero": "#FFFFFF",
-    "c_arabic": "#FFF8EE",
-    "c_accent": "#FDE6BA",
-    "c_body_reg": "#DCEFE7",
-    "c_body_bold": "#FFFFFF",
-    "c_italic": "#EBF6F1",
-    "c_ref": "#FDE6BA",
-    "fili_rgba": (253, 230, 186, 15), # Düşük opaklık & sıfır harf örtmesi
+    "center_rgb": (34, 66, 52),     # #224234 (Sisli Adaçayı)
+    "outer_rgb": (18, 40, 32),      # #122820
+    "badge_color": "#224234",
+    "bold_color": "#1B4D38",
+    "accent_gold": "#D4AF37",
+    "sub_txt": "SAHİH HADİS-İ ŞERİF REHBERİ",
+    "sub_color": "#DCECE5",
+    "rozet_txt": "HADİS-İ ŞERİF",
+    "fili_txt": "قال رسول الله",
 }
 
 DUA_SABIT_PALET: Dict[str, Any] = {
-    "ad": "Soft Sisli Gece Mavisi",
-    "center_rgb": (34, 58, 80),    # #223A50 (Mat kadife sisli gece mavisi)
-    "outer_rgb": (16, 30, 44),     # #101E2C
-    "c_divider": "#3B6182",
-    "c_hero": "#FFFFFF",
-    "c_arabic": "#FFF8EE",
-    "c_accent": "#FDE6BA",
-    "c_body_reg": "#E2EDF7",
-    "c_body_bold": "#FFFFFF",
-    "c_italic": "#EDF4FB",
-    "c_ref": "#FDE6BA",
-    "fili_rgba": (253, 230, 186, 15), # Düşük opaklık & sıfır harf örtmesi
+    "ad": "Selçuklu Petrol Zümrüdü",
+    "center_rgb": (14, 48, 50),     # #0E3032 (Selçuklu Petrol Zümrüdü)
+    "outer_rgb": (6, 26, 28),       # #061A1C
+    "badge_color": "#0E3032",
+    "bold_color": "#0F4144",
+    "accent_gold": "#D4AF37",
+    "sub_txt": "GÜNÜN DUASI & MÜNACAT REHBERİ",
+    "sub_color": "#D2EAEB",
+    "rozet_txt": "GÜNÜN DUASI",
+    "fili_txt": "ادعوني استجب لكم",
 }
 
 
@@ -936,213 +1055,267 @@ def hadis_karti_ciz(
     vurgulanan_kelime: Optional[str] = None,
 ) -> Path:
     """
-    Ezan Plus Sahih Hadis şablonu (V19 Mimarisi - Sisli Adaçayı Zümrüdü & Devasa Tipografi).
+    Ezan Plus Sahih Hadis şablonu (V20 Mimarisi - Sisli Adaçayı & Keten Parşömen Flex Mizanpaj).
     1080x1350 (4:5 Feed) ve 1080x1920 (9:16 Story) tam destekler.
-    Mat kadife Sisli Adaçayı Zümrüdü zemin, devasa Uthmani hat ve hero Türkçe metin,
-    metne çarpmayan sol-üst filigran ve beyaz Ezan Plus CTA tabanı içerir.
+    Bounding-box garantili sıfır hareke çakışması, erimeden tamamen izole edilmiş tefekkür,
+    kısa metinlerde devasa 142pt/108pt tipografi, uzun metinlerde ise anlamı öne çıkaran geniş Keten bandı içerir.
     """
     w = 1080
     h = 1920 if format_tipi == "9:16" else 1350
     is_916 = (format_tipi == "9:16")
-    palet = HADIS_SABIT_PALET
+    cfg = HADIS_SABIT_PALET
+    max_w = 930 if is_916 else 920
 
-    im = create_paper_background(w, h, palet["center_rgb"], palet["outer_rgb"])
+    from .ses import turkce_kisaltmalari_genislet
+    hadis_metni = turkce_kisaltmalari_genislet(hadis_metni)
+    if ravi:
+        ravi = turkce_kisaltmalari_genislet(ravi)
+
+    # 1. Taban Kadife Parşömen
+    im = create_paper_background(w, h, cfg["center_rgb"], cfg["outer_rgb"]).convert("RGBA")
     draw = ImageDraw.Draw(im)
 
+    # 2. Header & CTA Butonu
+    top_header_y = 215 if is_916 else 55
+    ayrac_y = draw_kart_header_bar(im, draw, cfg, top_y=top_header_y, rozet_text=cfg["rozet_txt"])
     cta_ust_y = _kelime_cta_butonu_ciz(im, format_tipi)
 
-    max_text_w = 900 if is_916 else 860
-    top_y = 125 if is_916 else 75
-    bottom_safe_y = cta_ust_y - (40 if is_916 else 28)
-    usable_h = bottom_safe_y - top_y
-
-    # A) Kategori Tag
-    pt_tag = 17 if is_916 else 15
-    f_tag = font_al(FONT_UI, pt_tag, agirlik=700)
-    tag_txt = "SAHİH HADİS-İ ŞERİF  •  NEBEVÎ REHBER".upper()
-    tb = draw.textbbox((0, 0), tag_txt, font=f_tag)
-    tag_h = tb[3] - tb[1]
-
-    # B) Taç Başlık
-    pt_tac = 36 if is_916 else 29
+    # 3. Taç Başlık
+    pt_tac = 34 if is_916 else 28
     f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
     if ravi and ravi.strip():
         tac_txt = f"“ Resûlullah (s.a.v.) Buyurdu • {ravi.strip()} ”"
     else:
-        tac_txt = "“ Resûlullah sallallahu aleyhi ve sellem şöyle buyurdu: ”"
-    tcb = draw.textbbox((0, 0), tac_txt, font=f_tac)
-    tac_h = tcb[3] - tcb[1]
+        tac_txt = "“ Resûlullah (s.a.v.) Buyurdu ”"
+    t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+    tac_h = t_bb[3] - t_bb[1]
+    start_tac_y = ayrac_y + (30 if is_916 else 18)
+    tac_bottom_y = start_tac_y + tac_h
 
-    # C) DEVAZA ARAPÇA HAT
+    # 4. Üst Bölüm: Arapça ve Latin Okunuş Boyutlandırma
     secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
     ar_temiz = secavend_regex.sub("", arapca_metin).strip() if arapca_metin else ""
     words_ar = ar_temiz.split() if ar_temiz else []
+    ar_word_count = len(words_ar)
 
-    if words_ar:
-        if len(words_ar) <= 6:
-            pt_ar = 145 if is_916 else 118
-        elif len(words_ar) <= 12:
-            pt_ar = 126 if is_916 else 102
-        elif len(words_ar) <= 22:
-            pt_ar = 108 if is_916 else 86
-        else:
-            pt_ar = 92 if is_916 else 74
-        f_ar = font_al(FONT_ARAPCA, pt_ar)
-        ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_text_w, draw)
+    if ar_word_count <= 4:
+        pt_ar = 142 if is_916 else 120
+        pt_ok = 46 if is_916 else 36
+    elif ar_word_count <= 8:
+        pt_ar = 110 if is_916 else 94
+        pt_ok = 40 if is_916 else 32
+    elif ar_word_count <= 14:
+        pt_ar = 94 if is_916 else 80
+        pt_ok = 34 if is_916 else 28
     else:
-        pt_ar = 0
-        f_ar = font_al(FONT_ARAPCA, 74)
-        ar_satirlar = []
+        pt_ar = 84 if is_916 else 72
+        pt_ok = 30 if is_916 else 24
 
-    # D) Okunuş
     ok_ham = (arapca_okunus or "").strip("“”\"'{}[] ")
     ok_gosterim = f"“ {ok_ham} ”" if ok_ham else ""
-    if ok_gosterim:
-        pt_okunus = 25 if is_916 else 21
-        f_okunus = font_al(FONT_GOVDE, pt_okunus, agirlik=400)
-        okunus_lines = metin_satirla(ok_gosterim, f_okunus, max_text_w, draw)
-    else:
-        pt_okunus = 0
-        f_okunus = font_al(FONT_GOVDE, 21, agirlik=400)
-        okunus_lines = []
 
-    # E) DEVAZA TÜRKÇE HADİS METNİ (HERO)
+    # Dikey Emniyet Tavanı (Okunuş erimeye asla değemez)
+    hard_max_ok_bottom = 815 if is_916 else 595
+
+    while pt_ar >= 64:
+        f_ar = font_al(FONT_ARAPCA, pt_ar)
+        ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_w, draw) if ar_temiz else []
+        f_ok = font_al(FONT_GOVDE, pt_ok, agirlik=400)
+        ok_lines = metin_satirla(ok_gosterim, f_ok, max_w, draw) if ok_gosterim else []
+
+        gap_tac_ar = 34 if is_916 else 22
+        ar_line_gap = 18 if is_916 else 12
+        cur_calc_y = tac_bottom_y + gap_tac_ar
+        for s in ar_satirlar:
+            bb = draw.textbbox((0, 0), s, font=f_ar)
+            cur_calc_y += (bb[3] - bb[1]) + ar_line_gap
+        gap_ar_ok = 26 if is_916 else 16
+        cur_calc_y += gap_ar_ok
+        ok_line_step = int(pt_ok * 1.30)
+        cur_calc_y += len(ok_lines) * ok_line_step
+
+        if cur_calc_y <= hard_max_ok_bottom:
+            break
+        pt_ar -= 3
+        pt_ok = max(28 if is_916 else 22, int(pt_ar * 0.38))
+
+    f_ar = font_al(FONT_ARAPCA, pt_ar)
+    ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_w, draw) if ar_temiz else []
+    f_ok = font_al(FONT_GOVDE, pt_ok, agirlik=400)
+    ok_lines = metin_satirla(ok_gosterim, f_ok, max_w, draw) if ok_gosterim else []
+
+    gap_tac_ar = 34 if is_916 else 22
+    ar_line_gap = 18 if is_916 else 12
+    gap_ar_ok = 26 if is_916 else 16
+    ok_line_step = int(pt_ok * 1.30)
+
+    top_text_bottom = tac_bottom_y + gap_tac_ar
+    for s in ar_satirlar:
+        bb = draw.textbbox((0, 0), s, font=f_ar)
+        top_text_bottom += (bb[3] - bb[1]) + ar_line_gap
+    top_text_bottom += gap_ar_ok + len(ok_lines) * ok_line_step
+
+    # 5. Dinamik Flex Keten Bandı (Anlam Odaklı Genişleme)
+    if is_916:
+        fade_len = 70
+        fade_1_start = max(740, min(835, int(top_text_bottom + 38)))
+        fade_1_end = fade_1_start + fade_len
+        fade_2_start = 1430
+        fade_2_end = fade_2_start + fade_len
+        tefekkur_start_y = fade_2_end + 25
+    else:
+        fade_len = 55
+        fade_1_start = max(490, min(610, int(top_text_bottom + 28)))
+        fade_1_end = fade_1_start + fade_len
+        fade_2_start = 1040
+        fade_2_end = fade_2_start + fade_len
+        tefekkur_start_y = fade_2_end + 20
+
+    # 6. Keten Zemin & Cosine Tül Degrade
+    band_h = fade_2_end - fade_1_start
+    keten_img = create_paper_background(w, band_h, KETEN_CENTER, KETEN_OUTER).convert("RGBA")
+    mask_arr = np.ones((band_h, w), dtype=float) * 255.0
+
+    fade_top_len = fade_1_end - fade_1_start
+    fade_bot_len = fade_2_end - fade_2_start
+
+    for y_i in range(fade_top_len):
+        f = 0.5 * (1.0 - np.cos(np.pi * (y_i / fade_top_len)))
+        mask_arr[y_i, :] *= f
+
+    for y_i in range(fade_bot_len):
+        f = 0.5 * (1.0 - np.cos(np.pi * (y_i / fade_bot_len)))
+        mask_arr[band_h - 1 - y_i, :] *= f
+
+    mask_img = Image.fromarray(np.clip(mask_arr, 0, 255).astype(np.uint8), mode="L")
+    im.paste(keten_img, (0, fade_1_start), mask_img)
+
+    # 7. Odak Elmasları
+    draw = ImageDraw.Draw(im)
+    def draw_subtle_diamond(cx: int, cy: int, r: int = 7, fill: str = cfg["accent_gold"]):
+        draw.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=fill)
+
+    diamond_r = 7 if is_916 else 6
+    draw_subtle_diamond(w // 2, fade_1_start - 16, r=diamond_r, fill=cfg["accent_gold"])
+    draw_subtle_diamond(w // 2, fade_2_end + 16, r=diamond_r, fill=cfg["accent_gold"])
+
+    # 8. Üst Filigran (Arapça Arkası)
+    fili_top = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    fdraw = ImageDraw.Draw(fili_top)
+    font_size_fili = 290 if is_916 else 225
+    f_dev_ar = font_al(FONT_ARAPCA, font_size_fili)
+    fili_str = arapca_hazirla(cfg["fili_txt"])
+    dbb = fdraw.textbbox((0, 0), fili_str, font=f_dev_ar)
+    dw = dbb[2] - dbb[0]
+    fili_y = 350 if is_916 else 230
+    fdraw.text(((w - dw) / 2, fili_y), fili_str, font=f_dev_ar, fill=(255, 255, 255, 13))
+    im.paste(fili_top, (0, 0), fili_top)
+
+    # 9. Orta Filigran (Dua Eden Eller)
+    hands_mask = extract_dua_hands_mask()
+    if hands_mask is not None:
+        fili_meal = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        center_meal_y = (fade_1_end + fade_2_start) // 2
+        target_w = 480 if is_916 else 380
+        aspect = hands_mask.height / hands_mask.width
+        target_h = int(target_w * aspect)
+        hands_resized = hands_mask.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        color_layer = Image.new("RGBA", (target_w, target_h), (180, 83, 9, 20 if is_916 else 18))
+        fili_meal.paste(color_layer, ((w - target_w) // 2, center_meal_y - target_h // 2), hands_resized)
+        im.paste(fili_meal, (0, 0), fili_meal)
+
+    draw = ImageDraw.Draw(im)
+
+    # 10. Üst Metin Çizimi
+    draw.text(((w - (t_bb[2] - t_bb[0])) / 2, start_tac_y - t_bb[1]), tac_txt, font=f_tac, fill="#FFFDF9")
+
+    cur_y = tac_bottom_y + gap_tac_ar
+    for s in ar_satirlar:
+        bb = draw.textbbox((0, 0), s, font=f_ar)
+        sw = bb[2] - bb[0]
+        draw.text(((w - sw) / 2 - bb[0], cur_y - bb[1]), s, font=f_ar, fill="#FFFDF9")
+        cur_y += (bb[3] - bb[1]) + ar_line_gap
+
+    cur_y += gap_ar_ok
+    for ol in ok_lines:
+        ob = draw.textbbox((0, 0), ol, font=f_ok)
+        draw.text(((w - (ob[2] - ob[0])) / 2 - ob[0], cur_y - ob[1]), ol, font=f_ok, fill="#EADBC8")
+        cur_y += ok_line_step
+
+    # 11. Orta Bölüm: Hero Türkçe Hadis Metni (Anlam Odaklı İri Tipografi)
+    solid_meal_h = fade_2_start - fade_1_end
     temiz_hadis = hadis_metni.strip("“”\"' ")
     if vurgulanan_kelime and ("**" not in temiz_hadis) and (vurgulanan_kelime in temiz_hadis):
         temiz_hadis = temiz_hadis.replace(vurgulanan_kelime, f"**{vurgulanan_kelime}**")
 
     raw_tokens_hadis = re.sub(r'\*\*', '', temiz_hadis)
-    words_tr = raw_tokens_hadis.split()
-    if len(words_tr) <= 8:
-        pt_hero = 82 if is_916 else 68
-    elif len(words_tr) <= 16:
-        pt_hero = 70 if is_916 else 58
-    elif len(words_tr) <= 28:
-        pt_hero = 60 if is_916 else 48
+    tr_len = len(temiz_hadis)
+    tr_words = raw_tokens_hadis.split()
+
+    if len(tr_words) <= 5 or tr_len <= 35:
+        pt_hero = 108 if is_916 else 90
+    elif len(tr_words) <= 10 or tr_len <= 65:
+        pt_hero = 96 if is_916 else 78
+    elif len(tr_words) <= 18 or tr_len <= 115:
+        pt_hero = 84 if is_916 else 70
+    elif len(tr_words) <= 26 or tr_len <= 160:
+        pt_hero = 78 if is_916 else 64
     else:
-        pt_hero = 50 if is_916 else 40
+        pt_hero = 70 if is_916 else 56
+
+    while pt_hero >= 44:
+        f_hero_b = font_al(FONT_BASLIK, pt_hero, agirlik=700)
+        f_hero_r = font_al(FONT_BASLIK, pt_hero, agirlik=400)
+        tokens = parse_markdown_bold(temiz_hadis)
+        hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens, f_hero_r, f_hero_b, max_w - 40, draw)
+        step_hero = int(pt_hero * 1.30)
+        hero_h = len(hero_wrapped) * step_hero
+        if hero_h <= solid_meal_h - (24 if is_916 else 14):
+            break
+        pt_hero -= 2
 
     f_hero_b = font_al(FONT_BASLIK, pt_hero, agirlik=700)
     f_hero_r = font_al(FONT_BASLIK, pt_hero, agirlik=400)
-    tokens_hadis = parse_markdown_bold(temiz_hadis)
-    hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens_hadis, f_hero_r, f_hero_b, max_text_w, draw)
+    tokens = parse_markdown_bold(temiz_hadis)
+    hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens, f_hero_r, f_hero_b, max_w - 40, draw)
+    step_hero = int(pt_hero * 1.30)
+    hero_h = len(hero_wrapped) * step_hero
 
-    # F) Tefekkür
-    clean_tef = (tefekkur_notu or "Müslümanın basiretli, uyanık ve tecrübelerinden ders çıkaran bir duruşu olmalıdır.").strip().strip('“”" ')
-    pt_tef = 32 if is_916 else 26
-    f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
-    tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_text_w - 40, draw)
+    cur_meal_y = fade_1_end + (solid_meal_h - hero_h) // 2
 
-    # G) Kaynak
-    kaynak_txt = (kaynak_ravi or kaynak or "Riyâzü's-Sâlihîn").strip().upper()
-    pt_kaynak = 19 if is_916 else 15
-    f_kaynak = font_al(FONT_UI, pt_kaynak, agirlik=700)
-    kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
-    kaynak_h = kb[3] - kb[1]
-
-    # --- AUTO-FIT LOOP: Asla taşmaz, CTA'ya çarpmaz ---
-    while True:
-        lh_ar = int(pt_ar * 1.46) if ar_satirlar else 0
-        ar_total_h = len(ar_satirlar) * lh_ar
-        lh_ok = int(pt_okunus * 1.36) if okunus_lines else 0
-        ok_total_h = len(okunus_lines) * lh_ok
-        lh_hero = int(pt_hero * 1.36)
-        hero_total_h = len(hero_wrapped) * lh_hero
-        lh_tef = int(pt_tef * 1.42)
-        tef_total_h = len(tef_lines) * lh_tef
-
-        fixed_h = tag_h + tac_h + ar_total_h + ok_total_h + hero_total_h + tef_total_h + kaynak_h + 30
-        if fixed_h <= usable_h - 40 or (pt_hero <= 34 and pt_ar <= 50):
-            break
-
-        # Küçült
-        if pt_hero > 34:
-            pt_hero -= 2
-            f_hero_b = font_al(FONT_BASLIK, pt_hero, agirlik=700)
-            f_hero_r = font_al(FONT_BASLIK, pt_hero, agirlik=400)
-            hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens_hadis, f_hero_r, f_hero_b, max_text_w, draw)
-        if pt_ar > 50 and ar_satirlar:
-            pt_ar -= 3
-            f_ar = font_al(FONT_ARAPCA, pt_ar)
-            ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_text_w, draw)
-        if pt_tef > 22:
-            pt_tef -= 1
-            f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
-            tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_text_w - 40, draw)
-
-    free_space = max(25, usable_h - fixed_h)
-
-    pad_top_tac = int(free_space * 0.10)
-    pad_tac_ar = int(free_space * 0.15) if ar_satirlar else 0
-    pad_ar_ok = int(free_space * 0.12) if okunus_lines else 0
-    pad_ok_div = int(free_space * 0.16)
-    pad_div_hero = int(free_space * 0.18)
-    pad_hero_tef = int(free_space * 0.16)
-    pad_tef_kaynak = int(free_space * 0.13)
-
-    cur_y = top_y
-    draw.text(((w - (tb[2] - tb[0])) / 2, cur_y), tag_txt, font=f_tag, fill=palet["c_accent"])
-    cur_y += tag_h + pad_top_tac
-
-    draw.text(((w - (tcb[2] - tcb[0])) / 2, cur_y), tac_txt, font=f_tac, fill="#FFF8EE")
-    cur_y += tac_h
-
-    if ar_satirlar:
-        cur_y += pad_tac_ar
-        for s in ar_satirlar:
-            sb = draw.textbbox((0, 0), s, font=f_ar)
-            draw.text(((w - (sb[2] - sb[0])) / 2, cur_y), s, font=f_ar, fill=palet["c_arabic"])
-            cur_y += lh_ar
-
-    if okunus_lines:
-        cur_y += pad_ar_ok
-        for ol in okunus_lines:
-            ob = draw.textbbox((0, 0), ol, font=f_okunus)
-            draw.text(((w - (ob[2] - ob[0])) / 2, cur_y), ol, font=f_okunus, fill=palet["c_accent"])
-            cur_y += lh_ok
-
-    cur_y += pad_ok_div
-    div_w = 460 if is_916 else 390
-    draw.line([(w / 2 - div_w / 2, cur_y), (w / 2 + div_w / 2, cur_y)], fill=palet["c_divider"], width=1)
-    draw.ellipse([(w / 2 - 4, cur_y - 4), (w / 2 + 4, cur_y + 4)], fill=palet["c_accent"])
-    cur_y += pad_div_hero
-
-    # --- TIRNAK FİLİGRANI: METNİN ÜST-SOLUNA KONUMLANDIRILMIŞ, SIFIR ÇAKIŞMA ---
-    fili_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    fili_draw = ImageDraw.Draw(fili_layer)
-    pt_fili = 260 if is_916 else 210
-    f_fili = font_al(FONT_GOVDE, pt_fili, agirlik=700)
-    first_lw = hero_wrapped[0][1] if hero_wrapped else max_text_w
-    first_x = (w - first_lw) // 2
-    fili_x = max(25, first_x - (75 if is_916 else 60))
-    fili_y = cur_y - (140 if is_916 else 115)
-    fili_draw.text((fili_x, fili_y), "“", font=f_fili, fill=palet["fili_rgba"])
-    im.paste(fili_layer, (0, 0), fili_layer)
-
-    # Türkçe Metin
-    draw = ImageDraw.Draw(im)
     for line_tokens, line_w in hero_wrapped:
-        line_cur_x = (w - line_w) // 2
+        line_x = (w - line_w) // 2
         for word, is_b, word_w in line_tokens:
             f = f_hero_b if is_b else f_hero_r
-            c = palet["c_body_bold"] if is_b else palet["c_body_reg"]
-            draw.text((line_cur_x, cur_y), word, font=f, fill=c)
-            line_cur_x += word_w + hero_space_w
-        cur_y += lh_hero
+            c = cfg["bold_color"] if is_b else "#1C1917"
+            draw.text((line_x, cur_meal_y), word, font=f, fill=c)
+            line_x += word_w + hero_space_w
+        cur_meal_y += step_hero
 
-    cur_y += pad_hero_tef
+    # 12. Alt Bölüm: Tefekkür & Tescilli Kaynak (Erime Dışında Sabit Kadife Zemin)
+    bot_y = tefekkur_start_y
+    clean_tef = (tefekkur_notu or "Müslümanın basiretli, uyanık ve tecrübelerinden ders çıkaran bir duruşu olmalıdır.").strip().strip('“”" ')
+    pt_tef = 30 if is_916 else 25
+    f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
+    tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_w - 40, draw)
+
+    step_tef = int(pt_tef * 1.34)
     for tl in tef_lines:
         tlb = draw.textbbox((0, 0), tl, font=f_tef)
-        draw.text(((w - (tlb[2] - tlb[0])) / 2, cur_y), tl, font=f_tef, fill=palet["c_italic"])
-        cur_y += lh_tef
+        draw.text(((w - (tlb[2] - tlb[0])) / 2, bot_y), tl, font=f_tef, fill="#FFF5F2")
+        bot_y += step_tef
+    bot_y += 16 if is_916 else 10
 
-    cur_y += pad_tef_kaynak
-    draw.text(((w - (kb[2] - kb[0])) / 2, cur_y), kaynak_txt, font=f_kaynak, fill=palet["c_ref"])
+    kaynak_txt = (kaynak_ravi or kaynak or "Riyâzü's-Sâlihîn").strip().upper()
+    pt_kaynak = 17 if is_916 else 15
+    f_kaynak = font_al(FONT_UI, pt_kaynak, agirlik=700)
+    kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
+    draw.text(((w - (kb[2] - kb[0])) / 2, bot_y), kaynak_txt, font=f_kaynak, fill="#EADBC8")
 
     if not cikti_dosya_adi:
         cikti_dosya_adi = f"hadis_{format_tipi.replace(':', '_')}.png"
     cikti_yolu = CIKTI_DIZINI / cikti_dosya_adi
-    im.save(str(cikti_yolu), quality=96)
+    im.convert("RGB").save(str(cikti_yolu), quality=98)
     return cikti_yolu
 
 
@@ -1305,223 +1478,268 @@ def dua_karti_ciz(
     palet_adi: Optional[str] = None,
 ) -> Path:
     """
-    Ezan Plus Günün Duası şablonu (V19 Mimarisi - Soft Sisli Gece Mavisi & Devasa Tipografi).
+    Ezan Plus Günün Duası şablonu (V20 Mimarisi - Selçuklu Petrol Zümrüdü & Keten Parşömen Flex Mizanpaj).
     1080x1350 (4:5 Feed) ve 1080x1920 (9:16 Story) tam destekler.
-    Mat kadife Soft Sisli Gece Mavisi zemin, devasa Uthmani hat ve hero Türkçe niyaz,
-    metne çarpmayan sol-üst filigran ve beyaz Ezan Plus CTA tabanı içerir.
+    Bounding-box emniyetli sıfır çakışma, erimeden izole edilmiş fazilet notu,
+    kısa dualarda devasa 142pt/108pt tipografi, uzun münacatlarda ise anlamı öne çıkaran geniş Keten bandı içerir.
     """
     w = 1080
     h = 1920 if format_tipi == "9:16" else 1350
     is_916 = (format_tipi == "9:16")
+    cfg = DUA_SABIT_PALET
+    max_w = 930 if is_916 else 920
 
-    # Sabit Soft Sisli Gece Mavisi (Özel palet belirtilmişse kullanılır, aksi takdirde varsayılan sabit palet)
-    if palet_adi and palet_adi in DUA_RENK_PALETLERI:
-        palet = DUA_RENK_PALETLERI[palet_adi]
-    else:
-        palet = DUA_SABIT_PALET
+    from .ses import turkce_kisaltmalari_genislet
+    turkce_anlam = turkce_kisaltmalari_genislet(turkce_anlam)
+    dua_basligi = turkce_kisaltmalari_genislet(dua_basligi)
+    if kimin_duasi:
+        kimin_duasi = turkce_kisaltmalari_genislet(kimin_duasi)
 
-    im = create_paper_background(w, h, palet["center_rgb"], palet["outer_rgb"])
+    # 1. Taban Kadife Parşömen
+    im = create_paper_background(w, h, cfg["center_rgb"], cfg["outer_rgb"]).convert("RGBA")
     draw = ImageDraw.Draw(im)
 
+    # 2. Header & CTA Butonu
+    top_header_y = 215 if is_916 else 55
+    ayrac_y = draw_kart_header_bar(im, draw, cfg, top_y=top_header_y, rozet_text=cfg["rozet_txt"])
     cta_ust_y = _kelime_cta_butonu_ciz(im, format_tipi)
 
-    max_text_w = 900 if is_916 else 860
-    top_y = 125 if is_916 else 75
-    bottom_safe_y = cta_ust_y - (40 if is_916 else 28)
-    usable_h = bottom_safe_y - top_y
+    # 3. Taç Başlık (Niyaz Künyesi)
+    pt_tac = 34 if is_916 else 28
+    f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
+    tac_txt = f"“ {(kimin_duasi or dua_basligi).strip()} ”"
+    t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+    tac_h = t_bb[3] - t_bb[1]
+    start_tac_y = ayrac_y + (30 if is_916 else 18)
+    tac_bottom_y = start_tac_y + tac_h
 
-    # A) Kategori Tag
-    pt_tag = 17 if is_916 else 15
-    f_tag = font_al(FONT_UI, pt_tag, agirlik=700)
-    tag_txt = "GÜNÜN DUASI  •  MANEVÎ ŞİFA VE NİYAZ".upper()
-    tb = draw.textbbox((0, 0), tag_txt, font=f_tag)
-    tag_h = tb[3] - tb[1]
-
-    # B) Dua Başlığı
-    pt_baslik = 52 if is_916 else 44
-    f_baslik = font_al(FONT_GOVDE, pt_baslik, agirlik=700)
-    baslik_txt = (kimin_duasi or dua_basligi).strip()
-    lines_baslik = metin_satirla(baslik_txt, f_baslik, max_text_w, draw)
-
-    # C) DEVAZA ARAPÇA HAT
+    # 4. Üst Bölüm: Arapça ve Latin Okunuş Boyutlandırma
     secavend_regex = re.compile(r"[\u06D6-\u06DA\u06D8\u06D9\u06DB\u06DE\u06E9\s]*[ۚۖۗۘۙۚۜؕ۞۩۝]")
     ar_temiz = secavend_regex.sub("", arapca_metin).strip() if arapca_metin else ""
     words_ar = ar_temiz.split() if ar_temiz else []
+    ar_word_count = len(words_ar)
 
-    if words_ar:
-        if len(words_ar) <= 6:
-            pt_ar = 140 if is_916 else 115
-        elif len(words_ar) <= 12:
-            pt_ar = 120 if is_916 else 98
-        elif len(words_ar) <= 22:
-            pt_ar = 104 if is_916 else 84
-        else:
-            pt_ar = 88 if is_916 else 72
-        f_ar = font_al(FONT_ARAPCA, pt_ar)
-        ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_text_w, draw)
+    if ar_word_count <= 4:
+        pt_ar = 142 if is_916 else 120
+        pt_ok = 46 if is_916 else 36
+    elif ar_word_count <= 8:
+        pt_ar = 110 if is_916 else 94
+        pt_ok = 40 if is_916 else 32
+    elif ar_word_count <= 14:
+        pt_ar = 94 if is_916 else 80
+        pt_ok = 34 if is_916 else 28
     else:
-        pt_ar = 0
-        f_ar = font_al(FONT_ARAPCA, 72)
-        ar_satirlar = []
+        pt_ar = 84 if is_916 else 72
+        pt_ok = 30 if is_916 else 24
 
-    # D) Okunuş
     ok_ham = (arapca_okunus or "").strip("“”\"'{}[] ")
     ok_gosterim = f"“ {ok_ham} ”" if ok_ham else ""
-    if ok_gosterim:
-        pt_okunus = 25 if is_916 else 21
-        f_okunus = font_al(FONT_GOVDE, pt_okunus, agirlik=400)
-        okunus_lines = metin_satirla(ok_gosterim, f_okunus, max_text_w, draw)
-    else:
-        pt_okunus = 0
-        f_okunus = font_al(FONT_GOVDE, 21, agirlik=400)
-        okunus_lines = []
 
-    # E) DEVAZA TÜRKÇE DUÂ ANLAMI (HERO)
+    # Dikey Emniyet Tavanı (Okunuş erimeye asla değemez)
+    hard_max_ok_bottom = 815 if is_916 else 595
+
+    while pt_ar >= 64:
+        f_ar = font_al(FONT_ARAPCA, pt_ar)
+        ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_w, draw) if ar_temiz else []
+        f_ok = font_al(FONT_GOVDE, pt_ok, agirlik=400)
+        ok_lines = metin_satirla(ok_gosterim, f_ok, max_w, draw) if ok_gosterim else []
+
+        gap_tac_ar = 34 if is_916 else 22
+        ar_line_gap = 18 if is_916 else 12
+        cur_calc_y = tac_bottom_y + gap_tac_ar
+        for s in ar_satirlar:
+            bb = draw.textbbox((0, 0), s, font=f_ar)
+            cur_calc_y += (bb[3] - bb[1]) + ar_line_gap
+        gap_ar_ok = 26 if is_916 else 16
+        cur_calc_y += gap_ar_ok
+        ok_line_step = int(pt_ok * 1.30)
+        cur_calc_y += len(ok_lines) * ok_line_step
+
+        if cur_calc_y <= hard_max_ok_bottom:
+            break
+        pt_ar -= 3
+        pt_ok = max(28 if is_916 else 22, int(pt_ar * 0.38))
+
+    f_ar = font_al(FONT_ARAPCA, pt_ar)
+    ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_w, draw) if ar_temiz else []
+    f_ok = font_al(FONT_GOVDE, pt_ok, agirlik=400)
+    ok_lines = metin_satirla(ok_gosterim, f_ok, max_w, draw) if ok_gosterim else []
+
+    gap_tac_ar = 34 if is_916 else 22
+    ar_line_gap = 18 if is_916 else 12
+    gap_ar_ok = 26 if is_916 else 16
+    ok_line_step = int(pt_ok * 1.30)
+
+    top_text_bottom = tac_bottom_y + gap_tac_ar
+    for s in ar_satirlar:
+        bb = draw.textbbox((0, 0), s, font=f_ar)
+        top_text_bottom += (bb[3] - bb[1]) + ar_line_gap
+    top_text_bottom += gap_ar_ok + len(ok_lines) * ok_line_step
+
+    # 5. Dinamik Flex Keten Bandı (Anlam Odaklı Genişleme)
+    if is_916:
+        fade_len = 70
+        fade_1_start = max(740, min(835, int(top_text_bottom + 38)))
+        fade_1_end = fade_1_start + fade_len
+        fade_2_start = 1430
+        fade_2_end = fade_2_start + fade_len
+        tefekkur_start_y = fade_2_end + 25
+    else:
+        fade_len = 55
+        fade_1_start = max(490, min(610, int(top_text_bottom + 28)))
+        fade_1_end = fade_1_start + fade_len
+        fade_2_start = 1040
+        fade_2_end = fade_2_start + fade_len
+        tefekkur_start_y = fade_2_end + 20
+
+    # 6. Keten Zemin & Cosine Tül Degrade
+    band_h = fade_2_end - fade_1_start
+    keten_img = create_paper_background(w, band_h, KETEN_CENTER, KETEN_OUTER).convert("RGBA")
+    mask_arr = np.ones((band_h, w), dtype=float) * 255.0
+
+    fade_top_len = fade_1_end - fade_1_start
+    fade_bot_len = fade_2_end - fade_2_start
+
+    for y_i in range(fade_top_len):
+        f = 0.5 * (1.0 - np.cos(np.pi * (y_i / fade_top_len)))
+        mask_arr[y_i, :] *= f
+
+    for y_i in range(fade_bot_len):
+        f = 0.5 * (1.0 - np.cos(np.pi * (y_i / fade_bot_len)))
+        mask_arr[band_h - 1 - y_i, :] *= f
+
+    mask_img = Image.fromarray(np.clip(mask_arr, 0, 255).astype(np.uint8), mode="L")
+    im.paste(keten_img, (0, fade_1_start), mask_img)
+
+    # 7. Odak Elmasları
+    draw = ImageDraw.Draw(im)
+    def draw_subtle_diamond(cx: int, cy: int, r: int = 7, fill: str = cfg["accent_gold"]):
+        draw.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=fill)
+
+    diamond_r = 7 if is_916 else 6
+    draw_subtle_diamond(w // 2, fade_1_start - 16, r=diamond_r, fill=cfg["accent_gold"])
+    draw_subtle_diamond(w // 2, fade_2_end + 16, r=diamond_r, fill=cfg["accent_gold"])
+
+    # 8. Üst Filigran (Arapça Arkası)
+    fili_top = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    fdraw = ImageDraw.Draw(fili_top)
+    font_size_fili = 290 if is_916 else 225
+    f_dev_ar = font_al(FONT_ARAPCA, font_size_fili)
+    fili_str = arapca_hazirla(cfg["fili_txt"])
+    dbb = fdraw.textbbox((0, 0), fili_str, font=f_dev_ar)
+    dw = dbb[2] - dbb[0]
+    fili_y = 350 if is_916 else 230
+    fdraw.text(((w - dw) / 2, fili_y), fili_str, font=f_dev_ar, fill=(255, 255, 255, 13))
+    im.paste(fili_top, (0, 0), fili_top)
+
+    # 9. Orta Filigran (Dua Eden Eller)
+    hands_mask = extract_dua_hands_mask()
+    if hands_mask is not None:
+        fili_meal = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        center_meal_y = (fade_1_end + fade_2_start) // 2
+        target_w = 480 if is_916 else 380
+        aspect = hands_mask.height / hands_mask.width
+        target_h = int(target_w * aspect)
+        hands_resized = hands_mask.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        color_layer = Image.new("RGBA", (target_w, target_h), (180, 83, 9, 20 if is_916 else 18))
+        fili_meal.paste(color_layer, ((w - target_w) // 2, center_meal_y - target_h // 2), hands_resized)
+        im.paste(fili_meal, (0, 0), fili_meal)
+
+    draw = ImageDraw.Draw(im)
+
+    # 10. Üst Metin Çizimi
+    draw.text(((w - (t_bb[2] - t_bb[0])) / 2, start_tac_y - t_bb[1]), tac_txt, font=f_tac, fill="#FFFDF9")
+
+    cur_y = tac_bottom_y + gap_tac_ar
+    for s in ar_satirlar:
+        bb = draw.textbbox((0, 0), s, font=f_ar)
+        sw = bb[2] - bb[0]
+        draw.text(((w - sw) / 2 - bb[0], cur_y - bb[1]), s, font=f_ar, fill="#FFFDF9")
+        cur_y += (bb[3] - bb[1]) + ar_line_gap
+
+    cur_y += gap_ar_ok
+    for ol in ok_lines:
+        ob = draw.textbbox((0, 0), ol, font=f_ok)
+        draw.text(((w - (ob[2] - ob[0])) / 2 - ob[0], cur_y - ob[1]), ol, font=f_ok, fill="#EADBC8")
+        cur_y += ok_line_step
+
+    # 11. Orta Bölüm: Hero Türkçe Dua Niyazı (Anlam Odaklı İri Tipografi)
+    solid_meal_h = fade_2_start - fade_1_end
     temiz_anlam = turkce_anlam.strip("“”\"' ")
     if vurgulanan_kelime and ("**" not in temiz_anlam) and (vurgulanan_kelime in temiz_anlam):
         temiz_anlam = temiz_anlam.replace(vurgulanan_kelime, f"**{vurgulanan_kelime}**")
 
     raw_tokens_dua = re.sub(r'\*\*', '', temiz_anlam)
-    words_dua = raw_tokens_dua.split()
-    if len(words_dua) <= 10:
-        pt_dua = 76 if is_916 else 64
-    elif len(words_dua) <= 18:
-        pt_dua = 66 if is_916 else 54
-    elif len(words_dua) <= 28:
-        pt_dua = 56 if is_916 else 46
+    tr_len = len(temiz_anlam)
+    tr_words = raw_tokens_dua.split()
+
+    if len(tr_words) <= 5 or tr_len <= 35:
+        pt_hero = 108 if is_916 else 90
+    elif len(tr_words) <= 10 or tr_len <= 65:
+        pt_hero = 96 if is_916 else 78
+    elif len(tr_words) <= 18 or tr_len <= 115:
+        pt_hero = 84 if is_916 else 70
+    elif len(tr_words) <= 26 or tr_len <= 160:
+        pt_hero = 78 if is_916 else 64
     else:
-        pt_dua = 48 if is_916 else 38
+        pt_hero = 70 if is_916 else 56
 
-    f_dua_b = font_al(FONT_BASLIK, pt_dua, agirlik=700)
-    f_dua_r = font_al(FONT_BASLIK, pt_dua, agirlik=400)
-    tokens_dua = parse_markdown_bold(temiz_anlam)
-    dua_wrapped, dua_space_w = wrap_mixed_tokens(tokens_dua, f_dua_r, f_dua_b, max_text_w, draw)
+    while pt_hero >= 44:
+        f_hero_b = font_al(FONT_BASLIK, pt_hero, agirlik=700)
+        f_hero_r = font_al(FONT_BASLIK, pt_hero, agirlik=400)
+        tokens = parse_markdown_bold(temiz_anlam)
+        hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens, f_hero_r, f_hero_b, max_w - 40, draw)
+        step_hero = int(pt_hero * 1.30)
+        hero_h = len(hero_wrapped) * step_hero
+        if hero_h <= solid_meal_h - (24 if is_916 else 14):
+            break
+        pt_hero -= 2
 
-    # F) Fazilet Notu
+    f_hero_b = font_al(FONT_BASLIK, pt_hero, agirlik=700)
+    f_hero_r = font_al(FONT_BASLIK, pt_hero, agirlik=400)
+    tokens = parse_markdown_bold(temiz_anlam)
+    hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens, f_hero_r, f_hero_b, max_w - 40, draw)
+    step_hero = int(pt_hero * 1.30)
+    hero_h = len(hero_wrapped) * step_hero
+
+    cur_meal_y = fade_1_end + (solid_meal_h - hero_h) // 2
+
+    for line_tokens, line_w in hero_wrapped:
+        line_x = (w - line_w) // 2
+        for word, is_b, word_w in line_tokens:
+            f = f_hero_b if is_b else f_hero_r
+            c = cfg["bold_color"] if is_b else "#1C1917"
+            draw.text((line_x, cur_meal_y), word, font=f, fill=c)
+            line_x += word_w + hero_space_w
+        cur_meal_y += step_hero
+
+    # 12. Alt Bölüm: Fazilet Notu & Kaynak (Erime Dışında Sabit Kadife Zemin)
+    bot_y = tefekkur_start_y
     clean_faz = (fazilet_notu or okunus_veya_fazilet or kaynak_fazilet or "Bu mübarek niyaz, kalbe ferahlık ve işlerde kolaylık için sabah-akşam ihlasla tekrar edilir.").strip().strip('“”" ')
-    pt_faz = 32 if is_916 else 26
+    pt_faz = 30 if is_916 else 25
     f_faz = font_al(FONT_GOVDE, pt_faz, agirlik=400)
-    faz_lines = metin_satirla(f"“{clean_faz}”", f_faz, max_text_w - 40, draw)
+    faz_lines = metin_satirla(f"“{clean_faz}”", f_faz, max_w - 40, draw)
 
-    # G) Kaynak Referansı
+    step_faz = int(pt_faz * 1.34)
+    for fl in faz_lines:
+        flb = draw.textbbox((0, 0), fl, font=f_faz)
+        draw.text(((w - (flb[2] - flb[0])) / 2, bot_y), fl, font=f_faz, fill="#FFF5F2")
+        bot_y += step_faz
+    bot_y += 16 if is_916 else 10
+
     raw_kaynak = (kaynak_ref or "Kur'an-ı Kerim").strip()
     ref_txt = re.split(r'[\.;,]?\s*Ayrıca bkz?[\.:]?', raw_kaynak, flags=re.IGNORECASE)[0].strip() or raw_kaynak
     ref_txt = ref_txt.upper()
 
-    pt_ref = 19 if is_916 else 15
+    pt_ref = 17 if is_916 else 15
     f_ref = font_al(FONT_UI, pt_ref, agirlik=700)
     rb = draw.textbbox((0, 0), ref_txt, font=f_ref)
-    ref_h = rb[3] - rb[1]
-
-    # --- AUTO-FIT LOOP ---
-    while True:
-        lh_baslik = int(pt_baslik * 1.25)
-        baslik_total_h = len(lines_baslik) * lh_baslik
-        lh_ar = int(pt_ar * 1.46) if ar_satirlar else 0
-        ar_total_h = len(ar_satirlar) * lh_ar
-        lh_ok = int(pt_okunus * 1.36) if okunus_lines else 0
-        ok_total_h = len(okunus_lines) * lh_ok
-        lh_dua = int(pt_dua * 1.36)
-        dua_total_h = len(dua_wrapped) * lh_dua
-        lh_faz = int(pt_faz * 1.42)
-        faz_total_h = len(faz_lines) * lh_faz
-
-        fixed_h = tag_h + baslik_total_h + ar_total_h + ok_total_h + dua_total_h + faz_total_h + ref_h + 30
-        if fixed_h <= usable_h - 40 or (pt_dua <= 34 and pt_ar <= 50):
-            break
-
-        if pt_dua > 34:
-            pt_dua -= 2
-            f_dua_b = font_al(FONT_BASLIK, pt_dua, agirlik=700)
-            f_dua_r = font_al(FONT_BASLIK, pt_dua, agirlik=400)
-            dua_wrapped, dua_space_w = wrap_mixed_tokens(tokens_dua, f_dua_r, f_dua_b, max_text_w, draw)
-        if pt_ar > 50 and ar_satirlar:
-            pt_ar -= 3
-            f_ar = font_al(FONT_ARAPCA, pt_ar)
-            ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_text_w, draw)
-        if pt_faz > 22:
-            pt_faz -= 1
-            f_faz = font_al(FONT_GOVDE, pt_faz, agirlik=400)
-            faz_lines = metin_satirla(f"“{clean_faz}”", f_faz, max_text_w - 40, draw)
-        if pt_baslik > 36:
-            pt_baslik -= 2
-            f_baslik = font_al(FONT_GOVDE, pt_baslik, agirlik=700)
-            lines_baslik = metin_satirla(baslik_txt, f_baslik, max_text_w, draw)
-
-    free_space = max(25, usable_h - fixed_h)
-
-    pad_top_b = int(free_space * 0.10)
-    pad_b_ar = int(free_space * 0.14) if ar_satirlar else 0
-    pad_ar_ok = int(free_space * 0.12) if okunus_lines else 0
-    pad_ok_div = int(free_space * 0.16)
-    pad_div_dua = int(free_space * 0.18)
-    pad_dua_faz = int(free_space * 0.16)
-    pad_faz_ref = int(free_space * 0.14)
-
-    cur_y = top_y
-    draw.text(((w - (tb[2] - tb[0])) / 2, cur_y), tag_txt, font=f_tag, fill=palet["c_accent"])
-    cur_y += tag_h + pad_top_b
-
-    for bl in lines_baslik:
-        bb = draw.textbbox((0, 0), bl, font=f_baslik)
-        draw.text(((w - (bb[2] - bb[0])) / 2, cur_y), bl, font=f_baslik, fill=palet["c_hero"])
-        cur_y += lh_baslik
-
-    if ar_satirlar:
-        cur_y += pad_b_ar
-        for s in ar_satirlar:
-            sb = draw.textbbox((0, 0), s, font=f_ar)
-            draw.text(((w - (sb[2] - sb[0])) / 2, cur_y), s, font=f_ar, fill=palet["c_arabic"])
-            cur_y += lh_ar
-
-    if okunus_lines:
-        cur_y += pad_ar_ok
-        for ol in okunus_lines:
-            ob = draw.textbbox((0, 0), ol, font=f_okunus)
-            draw.text(((w - (ob[2] - ob[0])) / 2, cur_y), ol, font=f_okunus, fill=palet["c_accent"])
-            cur_y += lh_ok
-
-    cur_y += pad_ok_div
-    div_w = 460 if is_916 else 390
-    draw.line([(w / 2 - div_w / 2, cur_y), (w / 2 + div_w / 2, cur_y)], fill=palet["c_divider"], width=1)
-    draw.ellipse([(w / 2 - 4, cur_y - 4), (w / 2 + 4, cur_y + 4)], fill=palet["c_accent"])
-    cur_y += pad_div_dua
-
-    # --- TIRNAK FİLİGRANI: METNİN ÜST-SOLUNA KONUMLANDIRILMIŞ, SIFIR ÇAKIŞMA ---
-    fili_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    fili_draw = ImageDraw.Draw(fili_layer)
-    pt_fili = 260 if is_916 else 210
-    f_fili = font_al(FONT_GOVDE, pt_fili, agirlik=700)
-    first_lw = dua_wrapped[0][1] if dua_wrapped else max_text_w
-    first_x = (w - first_lw) // 2
-    fili_x = max(25, first_x - (75 if is_916 else 60))
-    fili_y = cur_y - (140 if is_916 else 115)
-    fili_draw.text((fili_x, fili_y), "“", font=f_fili, fill=palet["fili_rgba"])
-    im.paste(fili_layer, (0, 0), fili_layer)
-
-    draw = ImageDraw.Draw(im)
-    for line_tokens, line_w in dua_wrapped:
-        line_cur_x = (w - line_w) // 2
-        for word, is_b, word_w in line_tokens:
-            f = f_dua_b if is_b else f_dua_r
-            c = palet["c_body_bold"] if is_b else palet["c_body_reg"]
-            draw.text((line_cur_x, cur_y), word, font=f, fill=c)
-            line_cur_x += word_w + dua_space_w
-        cur_y += lh_dua
-
-    cur_y += pad_dua_faz
-    for fl in faz_lines:
-        flb = draw.textbbox((0, 0), fl, font=f_faz)
-        draw.text(((w - (flb[2] - flb[0])) / 2, cur_y), fl, font=f_faz, fill=palet["c_italic"])
-        cur_y += lh_faz
-
-    cur_y += pad_faz_ref
-    draw.text(((w - (rb[2] - rb[0])) / 2, cur_y), ref_txt, font=f_ref, fill=palet["c_ref"])
+    draw.text(((w - (rb[2] - rb[0])) / 2, bot_y), ref_txt, font=f_ref, fill="#EADBC8")
 
     if not cikti_dosya_adi:
         cikti_dosya_adi = f"dua_{format_tipi.replace(':', '_')}.png"
     cikti_yolu = CIKTI_DIZINI / cikti_dosya_adi
-    im.save(str(cikti_yolu), quality=96)
+    im.convert("RGB").save(str(cikti_yolu), quality=98)
     return cikti_yolu
 
 

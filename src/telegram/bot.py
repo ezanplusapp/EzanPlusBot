@@ -796,10 +796,9 @@ def yardim_metni_olustur() -> str:
     """Kullanılabilir komutların yardım metnini döner."""
     return (
         f"🕌 <b>EZAN PLUS YÖNETİM & SORUN GİDERME REHBERİ</b>\n\n"
-        f"Aşağıdaki komutları bu gruba yazarak anında içerik üretebilir veya sistemi yönetebilirsiniz:\n\n"
         f"🎬 <b>/ayet</b> [sure:ayet veya tema] — 9:16 Kur'an Tilaveti Reels videosu üretir.\n"
-        f"📜 <b>/hadis</b> [konu veya hadis no] — Sahih Hadis-i Şerif kartı üretir (4:5 + 9:16).\n"
-        f"🌿 <b>/dua</b> [ruh hali veya dua adı] — Günün Duası kartı üretir (4:5 + 9:16).\n"
+        f"📜 <b>/hadis</b> [konu veya hadis no] — V20 Dinamik Hadis Videosu (Mazlum Kiper + Segâh Ney).\n"
+        f"🤲 <b>/dua</b> [ruh hali veya dua adı] — V20 Dinamik Dua Videosu (Mazlum Kiper + Ferahfezâ Ney).\n"
         f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (4:5 + 9:16).\n\n"
         f"🛠️ <b>HATA ÇÖZÜM & ONARIM KOMUTLARI:</b>\n"
         f"• <b>/onar &lt;ID&gt;</b> — Kalite veya mizanpaj hatası alan içeriği otonom onarır.\n"
@@ -882,33 +881,41 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
                 mesaj_gonder(f"❌ <b>Tilavet videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
         _arkaplanda_calistir(_gorev_ayet)
 
-    elif ana_komut == "/hadis":
+    elif ana_komut in ("/hadis", "/hadis_video", "/hadis_reels"):
         if not _coklu_komut_engeli("/hadis", chat_id):
-            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Hadis kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Hadis videosu hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
-        mesaj_gonder("⏳ <b>Sahih Hadis-i Şerif Kartı Hazırlanıyor...</b>\n\nRiyâzü's-Sâlihîn külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çiziliyor...", chat_id=str(chat_id))
-        def _gorev_hadis():
+        # Parametrede 'video' kelimesi varsa temizle
+        param_temiz = (parametre or "").strip()
+        if param_temiz.lower().startswith("video"):
+            param_temiz = param_temiz[5:].strip() or None
+        mesaj_gonder("⏳ <b>V20 Dinamik Hadis Videosu Hazırlanıyor...</b>\n\nRiyâzü's-Sâlihîn külliyatından seçilerek Mazlum Kiper spiker sesi (0.8x), kelime karaoke takibi ve Segâh Ney fonuyla 1080x1920 dikey video render ediliyor...", chat_id=str(chat_id))
+        def _gorev_hadis_video():
             try:
                 from .. import otomasyon
-                otomasyon.hadis_postu_olustur_ve_gonder(tema=parametre)
+                otomasyon.hadis_videosu_olustur_ve_gonder(tema=param_temiz)
             except Exception as e:
                 log.error(f"/hadis komutu hatası: {e}")
-                mesaj_gonder(f"❌ <b>Hadis kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
-        _arkaplanda_calistir(_gorev_hadis)
+                mesaj_gonder(f"❌ <b>Hadis videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_hadis_video)
 
-    elif ana_komut == "/dua":
+    elif ana_komut in ("/dua", "/dua_video", "/dua_reels"):
         if not _coklu_komut_engeli("/dua", chat_id):
-            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Dua kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Dua videosu hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
-        mesaj_gonder("⏳ <b>Günün Duası Kartı Hazırlanıyor...</b>\n\nTescilli dualar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çiziliyor...", chat_id=str(chat_id))
-        def _gorev_dua():
+        # Parametrede 'video' kelimesi varsa temizle
+        param_temiz = (parametre or "").strip()
+        if param_temiz.lower().startswith("video"):
+            param_temiz = param_temiz[5:].strip() or None
+        mesaj_gonder("⏳ <b>V20 Dinamik Dua Videosu Hazırlanıyor...</b>\n\nTescilli dualar külliyatından seçilerek Mazlum Kiper spiker sesi (0.8x), kelime karaoke takibi ve Ferahfezâ Ney fonuyla 1080x1920 dikey video render ediliyor...", chat_id=str(chat_id))
+        def _gorev_dua_video():
             try:
                 from .. import otomasyon
-                otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=parametre)
+                otomasyon.dua_videosu_olustur_ve_gonder(ruh_hali=param_temiz)
             except Exception as e:
                 log.error(f"/dua komutu hatası: {e}")
-                mesaj_gonder(f"❌ <b>Dua kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
-        _arkaplanda_calistir(_gorev_dua)
+                mesaj_gonder(f"❌ <b>Dua videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>", chat_id=str(chat_id))
+        _arkaplanda_calistir(_gorev_dua_video)
 
     elif ana_komut == "/kelime":
         if not _coklu_komut_engeli("/kelime", chat_id):

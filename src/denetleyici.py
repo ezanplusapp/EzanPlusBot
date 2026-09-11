@@ -427,19 +427,20 @@ def denetle_paylasim(paylasim_id: int) -> DenetimSonucu:
         tum_uyarilar.extend(v_uyarilar)
         birlesik_metrikler.update(v_metrikler)
 
-        # Reels Mizanpaj Çakışma Denetimi
-        r_hatalar, r_uyarilar, r_metrikler = denetle_reels_mizanpaj(
-            sure_ayet=kayit.get("baslik", "Günün Ayeti"),
-            turkce_meal=kayit.get("turkce_metin", ""),
-            arapca_metin=kayit.get("arapca_metin", ""),
-            arapca_okunus=kayit.get("arapca_okunus"),
-            tefekkur_notu=kayit.get("tefekkur", ""),
-            s1=kayit.get("video_baslik_satir1", ""),
-            s2=kayit.get("video_baslik_satir2", ""),
-        )
-        tum_hatalar.extend(r_hatalar)
-        tum_uyarilar.extend(r_uyarilar)
-        birlesik_metrikler.update(r_metrikler)
+        # Reels Mizanpaj Çakışma Denetimi (Yalnızca Âyet tilavet şablonu için)
+        if kategori in ("ayet", "reels"):
+            r_hatalar, r_uyarilar, r_metrikler = denetle_reels_mizanpaj(
+                sure_ayet=kayit.get("baslik", "Günün Ayeti"),
+                turkce_meal=kayit.get("turkce_metin", ""),
+                arapca_metin=kayit.get("arapca_metin", ""),
+                arapca_okunus=kayit.get("arapca_okunus"),
+                tefekkur_notu=kayit.get("tefekkur", ""),
+                s1=kayit.get("video_baslik_satir1", ""),
+                s2=kayit.get("video_baslik_satir2", ""),
+            )
+            tum_hatalar.extend(r_hatalar)
+            tum_uyarilar.extend(r_uyarilar)
+            birlesik_metrikler.update(r_metrikler)
 
     else:
         # Görsel Kartlar (4:5 ve 9:16)
@@ -562,7 +563,7 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
                     duzeltmeler.append("Hadis metni tescilli Riyâzü's-Sâlihîn külliyatı ile eşitlendi.")
 
     # 3. Reels Dikey Mizanpaj Çakışması Telafisi
-    if format_tipi == "reels_9_16":
+    if format_tipi == "reels_9_16" and kategori in ("ayet", "reels"):
         r_hatalar, _, r_metrikler = denetle_reels_mizanpaj(
             sure_ayet=kayit.get("baslik", "Günün Ayeti"),
             turkce_meal=turkce_metin,

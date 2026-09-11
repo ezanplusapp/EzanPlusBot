@@ -1053,44 +1053,66 @@ class _SayfaVerisi:
             meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
         )
 
-        gap_ayrac_meal = max(28, int(self.pt_meal * 0.50))
         meal_blok_h = len(meal_wrapped_lines) * self.meal_h
-
         kalan_orta = ay_y - tr_bottom
-        self.net_serbest_meal = kalan_orta - (meal_blok_h + gap_ayrac_meal)
+        self.net_serbest_meal = kalan_orta - meal_blok_h
 
         # Dinamik Auto-Fit: Kalan alan daraldığında meal puntosunu kademeli küçülterek çakışmayı %100 önle
-        while self.net_serbest_meal < 20 and self.pt_meal > 32:
+        while self.net_serbest_meal < 30 and self.pt_meal > 32:
             self.pt_meal -= 2
             self.meal_h = int(self.pt_meal * 1.34)
             self.font_meal_reg = font_al(FONT_BASLIK, self.pt_meal, agirlik=400)
             self.font_meal_bold = font_al(FONT_BASLIK, self.pt_meal, agirlik=700)
-            gap_ayrac_meal = max(22, int(self.pt_meal * 0.46))
             meal_wrapped_lines, space_w = wrap_mixed_tokens(
                 meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
             )
             meal_blok_h = len(meal_wrapped_lines) * self.meal_h
-            self.net_serbest_meal = kalan_orta - (meal_blok_h + gap_ayrac_meal)
+            self.net_serbest_meal = kalan_orta - meal_blok_h
 
-        serbest_meal = max(16, self.net_serbest_meal)
+        serbest_meal = max(20, self.net_serbest_meal)
         self.serbest_meal = serbest_meal
-        ayrac_y = tr_bottom + int(serbest_meal * 0.40)
 
-        # Tırnak filigranı & Altın ayraç
-        font_giant_quote = font_al(FONT_BASLIK, 150, agirlik=700)
-        draw_t.text((54 + 40, ayrac_y + 6), "“", font=font_giant_quote, fill="#F6ECDA")
+        # Degrade Logo Kırmızısı Keten Bandı Sınırları (Cosine Yumuşatma)
+        band_x = 56
+        band_w = 968
+        fade_len = min(46, max(24, int(serbest_meal * 0.24)))
 
-        ayrac_w = getattr(self, "ayrac_w", 220)
-        draw_t.line([(GENISLIK_9_16 // 2 - ayrac_w // 2, ayrac_y), (GENISLIK_9_16 // 2 + ayrac_w // 2, ayrac_y)], fill=ALTIN, width=2)
-        draw_t.ellipse([GENISLIK_9_16 // 2 - 6, ayrac_y - 5, GENISLIK_9_16 // 2 + 6, ayrac_y + 7], fill=ALTIN)
+        # Latin okunuşun altına ferah ve kalıcı nefes payı (min 52px)
+        gap_okunus_alt = max(52, int(serbest_meal * 0.32))
+        fade_1_start = tr_bottom + gap_okunus_alt
+        fade_1_end = fade_1_start + fade_len
+        fade_2_end = ay_y - max(16, int(serbest_meal * 0.16))
+        fade_2_start = fade_2_end - fade_len
+        band_h = max(100, fade_2_end - fade_1_start)
 
-        # Meal Metni Çizimi (Ayracın hemen altından başlar - Mixed Bold)
-        my = ayrac_y + gap_ayrac_meal
+        RED_CENTER = (206, 52, 58)   # #CE343A Luminous Logo Kırmızısı (Canlı & Ferah)
+        RED_OUTER = (160, 30, 36)    # #A01E24 Sıcak Kadife Kırmızı
+        from .kart import create_paper_background
+        red_bg = create_paper_background(band_w, band_h, RED_CENTER, RED_OUTER).convert("RGBA")
+
+        mask_arr = np.ones((band_h, band_w), dtype=float) * 255.0
+        for y_i in range(fade_len):
+            f = 0.5 * (1.0 - np.cos(np.pi * (y_i / fade_len)))
+            mask_arr[y_i, :] *= f
+            mask_arr[band_h - 1 - y_i, :] *= f
+        mask_img = Image.fromarray(np.clip(mask_arr, 0, 255).astype(np.uint8), mode="L")
+
+        self.taban_img.paste(red_bg, (band_x, fade_1_start), mask_img)
+        draw_t = ImageDraw.Draw(self.taban_img)
+
+        # Alt Odak Elması (Meal bandı ile tefekkür ayraç çizgisi arasında zarif altın elmas)
+        def draw_subtle_diamond(cx: int, cy: int, r: int = 7, fill: str = ALTIN):
+            draw_t.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=fill)
+
+        draw_subtle_diamond(GENISLIK_9_16 // 2, fade_2_end + max(12, (ay_y - fade_2_end) // 2), r=7, fill=ALTIN)
+
+        # Meal Metni Çizimi (Kırmızı bant içinde ortalanır - Saf Beyaz Mixed Bold)
+        my = (fade_1_end + fade_2_start - meal_blok_h) // 2
         for satir_tokens, line_w in meal_wrapped_lines:
             cur_x = (GENISLIK_9_16 - line_w) // 2
             for tok_text, is_bold, word_w in satir_tokens:
                 f_tok = self.font_meal_bold if is_bold else self.font_meal_reg
-                f_color = "#111827" if is_bold else METIN_ANA
+                f_color = "#FFFFFF" if is_bold else "#FFFDF9"
                 draw_t.text((cur_x, my), tok_text, font=f_tok, fill=f_color)
                 cur_x += word_w + space_w
             my += self.meal_h
@@ -1488,3 +1510,8 @@ def reels_videosu_uret(
 
     log.info(f"Reels videosu başarıyla üretildi: {final_video}")
     return final_video
+
+
+# V20 Çok Sayfalı Hadis ve Dua Dinamik Video Motoru Dışa Aktarımları
+from .multipage import hadis_videosu_uret, dua_videosu_uret, V20Sayfa, V20MultiPageVideoEngine
+

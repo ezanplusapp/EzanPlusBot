@@ -91,6 +91,50 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
   - *Mixed Bold Tipografi (`wrap_mixed_tokens`):* Vurgulanan kelimeler Ibarra Real Nova Bold (700 weight, `#111827`) ile; diğer kısımlar Regular (400 weight, `#1C1917`) ile çizilir.
 * **Akıllı Noktalama & Tırnak Regexi:** `noktalama_regex = re.compile(r'^([,\.;:!?\)’”"]+)(.*)$')` kuralı sayesinde tek/çift tırnaklar ve noktalama işaretleri önceki kelimeye yapışık kalır; satır başlarında sarkan noktalama veya ayrık tırnak hatası oluşmaz.
 
+### F. Türkçe Hadis ve Dua Stüdyo Ses Motoru (Fish Audio S2.1 Mimarisi)
+* **Motor & Modül:** `src/uretim/ses.py` (`turkce_tts_uret`, `turkce_fonetik_temizle`, `turkce_kelime_zamanlari_getir`).
+* **Varsayılan Kurumsal Ses:** **Mazlum Kiper** (`a6d624c6b8de45d2b89eb0da9a691872`). Usta tiyatrocu ve efsanevi belgesel spikeri ses rengi; sentetik yapaylıktan tamamen arınmış, tok, vakur ve derin bir manevi otorite sunar.
+* **Hız Standartı (`hiz = 0.9`):** Hadis ve dua metinlerinin vakarını, akıcılığını ve tefekkür derinliğini korumak için konuşma hızı `0.9x` olarak tescillenmiştir.
+* **Akıllı Fonetik & Kısaltma Genişletme Standartları (`turkce_kisaltmalari_genislet` & `turkce_fonetik_temizle` & `dua_fonetik_ve_es_hazirla`):**
+  - **Sıfır "Hetz" Garantisi & Kısaltma Genişletme:** `Hz.` veya `Hz` kısaltması spikerin İngilizce/mekanik olarak "hetz" veya "h-z" okumasını engellemek amacıyla istisnasız **"Hazreti"** olarak genişletilir (`Hz. Peygamber` ➔ `Hazreti Peygamber`, `Hz. Âişe` ➔ `Hazreti Âişe`).
+  - **Hürmet ve Salavat Lafızları:**
+    * `(s.a.v.)`, `s.a.v.`, `(sav)`, `(s.a.s.)` ➔ `sallallahu aleyhi vesellem`
+    * `(r.a.)`, `r.a.`, `(ra)`, `(r.anh)` ➔ `radıyallahu anh` (ve ekli `radıyallahu anhâ` / `anhüm` / `anhüma`)
+    * `(a.s.)`, `a.s.`, `(as)` ➔ `aleyhisselam`
+    * `(c.c.)`, `c.c.`, `(cc)` ➔ `celle celaluhu`
+    * `(k.v.)` ➔ `kerremallahu vecheh`, `(k.s.)` ➔ `kaddesallahu sırrah`, `(rh.a.)` ➔ `rahmetullahi aleyh`
+    * `vb.` ➔ `ve benzeri`, `vs.` ➔ `ve saire`, `bkz.` ➔ `bakınız`
+  - **Ses ve Altyazı 1:1 Bütünlüğü:** Kısaltmalar hem TTS sese hem de ekrandaki meal mizanpajına (`multipage.py`) aynı anda yansıtılır; seslendirilen ile ekrandaki kelime sayısı ve sırası 1:1 eşlenerek karaoke indis kayması ve metin uyuşmazlığı %100 önlenir.
+  - **Şapkalı Harf Koruması:** `â`, `î`, `û` harfleri korunur; Fish Audio S2.1 modelinin uzun ünlüleri (`takvâ`, `hidâyet`, `ahlâk`) vakur ve asil şekilde uzatarak okuması sağlanır.
+  - **Es ve Nefes Durakları:** Dualarda seslendirmenin kalbe dokunması için nida ve münacat öbeklerinden sonra otomatik virgül durakları eklenir (`dua_fonetik_ve_es_hazirla`).
+  - Markdown kalın/italik işaretleri (`**`, `*`) temizlenir.
+* **Kelime Kelime Senkron Saniye Zaman Damgaları (`/v1/tts/stream/with-timestamp`):**
+  - Ses üretimi Fish Audio SSE akış API'si üzerinden gerçekleştirilir.
+  - Üretilen MP3 ses dosyası ile eşzamanlı olarak `.json` formatında her kelimenin kesin başlangıç ve bitiş saniye zaman damgaları yerel diske kaydedilir (`data/sesler/hadis/{id}_{hash}.json` / `data/sesler/dua/{id}_{hash}.json`).
+* **Metin Hash'li Kesin Önbellek Garantisi:**
+  - Ses ve zaman dosyaları `metin_hash` özetini içerir (`{id}_{hash}.mp3`). Metin veya hız değiştiğinde ses %100 sıfırdan tescillenir; ses-metin uyumsuzluğu mimari olarak imkansızdır.
+* **Sıfır Bozuk Glif Garantisi (`arapca_glif_temizle`):**
+  - Amiri fontunda karşılığı bulunmayan tüm Latin noktalama işaretleri (`:`, `-`, `?`, tırnaklar) temizlenir veya resmi Arapça Unicode karşılıklarına (`،`, `؛`, `؟`) dönüştürülür; dikey dikdörtgen (tofu kutusu) oluşması %100 engellenmiştir.
+
+### G. V20 Çok Sayfalı Hadis ve Dua Dinamik Video Motoru (`src/uretim/multipage.py`)
+* **100% Video Formatı:** Hadis ve Dua içerikleri yalnızca V20 Çok Sayfalı Dinamik Video olarak üretilir; statik kart formatı terk edilmiştir.
+* **1080x1920 (9:16) Tam Dikey 30 FPS MP4:** Instagram Reels, Story, YouTube Shorts ve TikTok için standart dikey format.
+* **100% Bold Serif Meal Tipografisi:** Türkçe meal metninin tamamı istisnasız `IbarraRealNova 700 Bold` ağırlığında işlenir. Soldan sağa akıcı renk dolumu (`#C0392B` Hadis / `#B45309` Dua) ile spot ışığı gibi takip edilir.
+* **Çok Sayfalı Sinematik Erime (0.45s Crossfade):** 14 kelimeyi aşan veya çok cümleli içeriklerde metinler otomatik olarak sayfalara bölünür. Sayfalar arasında 0.45 saniyelik `Image.blend` erimesi uygulanır; aktif sayfa seçimi zaman damgası pencerelerine kilitlidir.
+* **1:1 Arapça Hat & Türkçe Bütünlüğü:** Videoda okunan Türkçe metnin Arapça karşılığı sayfa sayfa 1:1 eşlenir; Arapça hat eksik kalmaz.
+* **Telifsiz Ulvi Ney Fon Müziği & Sıfır Gecikme Senkronizasyonu:**
+  - *Sahih Hadis:* Solo Segâh Ney Taksim (`assets/audio/fon/ney_segah.mp3`, 2.9s güçlü melodi başlangıç ofseti).
+  - *Günün Duası:* Solo Ferahfezâ Ney Taksim (`assets/audio/fon/ney_ferahfeza.mp3`, 2.6s güçlü melodi başlangıç ofseti).
+  - Miksaj oranı `volume=0.48` (2x dolgun tını) seviyesinde olup, video başlar başlamaz `0.15s` hızlı atak ile ney nağmesi ve spiker sesi aynı anda başlar; kapanışta `1.2s fade-out` uygulanır.
+* **Kur'an Tilaveti Meal Alanı Kırmızı Degrade Keten Bandı:** Ayet videolarında meal alanı, ferah ve canlı Logo Kırmızısı (`#CE343A` / `(206, 52, 58)` merkez ➔ `#A01E24` / `(160, 30, 36)` dış) Cosine-yumuşatmalı keten zemin bandı ve Saf Beyaz (`#FFFDF9`) / Bold (`#FFFFFF`) tipografiyle işlenir.
+* **Latin Okunuş Altı Ferah Nefes Payı Standardı:** Latin okunuşun altından kırmızı meal bandına geçişte en az 52px net nefes boşluğu (`gap_okunus_alt = max(52, int(serbest_meal * 0.32))`) bırakılır. Altın odak elması bu boşluğun tam ortasına (`tr_bottom + gap_okunus_alt // 2`) yerleştirilir; harflere veya banda yapışma %100 engellenir.
+* **Bağımsız Alt İlerleme Çubuğu:** $Y=1858$ koordinatında video boyunca kesintisiz akan ilerleme çubuğu.
+* **Telegram Botu & Otomasyon Erişimi:**
+  - `/hadis`: V20 dinamik hadis videosu üretir.
+  - `/dua`: V20 dinamik dua videosu üretir.
+  - `/ayet`: 9:16 Kur'an Tilaveti videosu üretir (kırmızı meal bantlı).
+  - CLI: `python -m src.otomasyon hadis` / `python -m src.otomasyon dua` / `python -m src.otomasyon reels`.
+
 ---
 
 ### 3. Görsel Kart Motoru Standartları (V16 Şablon Mimarisi)

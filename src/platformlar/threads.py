@@ -21,13 +21,22 @@ log = logging.getLogger(__name__)
 THREADS_API_URL = "https://graph.threads.net/v1.0"
 
 
+def threads_aktif_mi() -> bool:
+    """Threads entegrasyonunun aktif ve geçerli bir token'a sahip olup olmadığını denetler."""
+    user_id = get_env("THREADS_USER_ID", "").strip()
+    token = get_env("THREADS_ACCESS_TOKEN", "").strip()
+    if not user_id or not token:
+        return False
+    if token.startswith("TH_") or "TOKEN" in token or len(token) < 30:
+        return False
+    return True
+
+
 def get_threads_bilgileri() -> tuple[str, str]:
     """Threads User ID ve Access Token'ı .env'den alır."""
-    user_id = get_env("THREADS_USER_ID")
-    token = get_env("THREADS_ACCESS_TOKEN")
-    if not user_id or not token:
-        raise ValueError("THREADS_USER_ID veya THREADS_ACCESS_TOKEN .env içinde tanımlı değil!")
-    return user_id, token
+    if not threads_aktif_mi():
+        raise ValueError("THREADS_USER_ID veya THREADS_ACCESS_TOKEN geçerli değil veya .env içinde tanımlı değil!")
+    return get_env("THREADS_USER_ID").strip(), get_env("THREADS_ACCESS_TOKEN").strip()
 
 
 def code_ile_token_al(auth_code: str, redirect_uri: str = "https://ozbornstudio.com/") -> tuple[str, str]:

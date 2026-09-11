@@ -434,10 +434,22 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
     if not secilen_hadis:
         raise RuntimeError("Hadis veritabanından geçerli hadis seçilemedi!")
 
-    hadis_metni = secilen_hadis["hadis_metni"]
+    turkce_tam = (secilen_hadis.get("turkce_tam") or "").strip()
+    hadis_metni_ham = (secilen_hadis.get("hadis_metni") or "").strip()
+    # Eğer turkce_tam daha eksiksiz veya zengin bir rivayet içeriyorsa onu tercih et
+    if turkce_tam and (len(turkce_tam) > len(hadis_metni_ham) or not hadis_metni_ham):
+        hadis_metni = turkce_tam
+    else:
+        hadis_metni = hadis_metni_ham or turkce_tam
+
+    from .ses import turkce_kisaltmalari_genislet
+    hadis_metni = turkce_kisaltmalari_genislet(hadis_metni)
+    hadis_metni = hadis_metni.strip("“”\"' —-")
     kaynak_ref = secilen_hadis["kaynak_ref"]
-    ravi = secilen_hadis.get("ravi", "")
+    ravi = turkce_kisaltmalari_genislet(secilen_hadis.get("ravi", ""))
     arapca_metin = secilen_hadis.get("arapca_veciz", "") or secilen_hadis.get("arapca_metin", "")
+    from .kart import arapca_glif_temizle
+    arapca_metin = arapca_glif_temizle(arapca_metin)
     hadis_id = secilen_hadis.get("id")
 
     sistem_talimati = """
@@ -449,7 +461,7 @@ Görevin:
 3) Instagram ve Threads için yüksek etkileşimli, samimi, değer katan bir "instagram_caption" hazırlamak.
 Açıklama yapısı:
 - Vurucu ve dikkat çekici açılış cümlesi (Hook)
-- Hadis metni ve sahabi râvisi
+- Hadis metni ve sahabi râvisi (Asla 'Hz.' veya 'sav.' gibi kısaltmalar kullanma; editoryal zarafet gereği her zaman 'Hazreti' ve 'sallallahu aleyhi vesellem' olarak tam yaz)
 - Kısa hayat dersi / nebevi öğüt
 - Kaydet 📌 & Paylaş 🕊️ çağrısı
 - Ezan Plus yönlendirmesi 📲
@@ -557,12 +569,14 @@ def dua_icerigi_uret(
     if not secilen_dua:
         raise RuntimeError("Dualar külliyatından geçerli bir dua seçilemedi!")
 
-    dua_basligi = secilen_dua["dua_basligi"]
+    from .ses import dua_fonetik_ve_es_hazirla, turkce_kisaltmalari_genislet
+    dua_basligi = turkce_kisaltmalari_genislet(secilen_dua["dua_basligi"])
     kategori = secilen_dua["kategori"]
-    kimin_duasi = secilen_dua["kimin_duasi"]
-    arapca_metin = secilen_dua["arapca_metin"]
+    kimin_duasi = turkce_kisaltmalari_genislet(secilen_dua.get("kimin_duasi", ""))
+    from .kart import arapca_glif_temizle
+    arapca_metin = arapca_glif_temizle(secilen_dua["arapca_metin"])
     arapca_okunus = secilen_dua["arapca_okunus"]
-    turkce_anlam = secilen_dua["turkce_anlam"]
+    turkce_anlam = turkce_kisaltmalari_genislet(dua_fonetik_ve_es_hazirla(secilen_dua["turkce_anlam"]))
     kaynak_ref = secilen_dua["kaynak_ref"]
     fazilet_notu = secilen_dua["fazilet_notu"]
     dua_id = secilen_dua["id"]
@@ -575,7 +589,7 @@ Görevin:
 2) Instagram ve Threads için yüksek etkileşimli, kalbe dokunan bir açıklama metni ("instagram_caption") hazırlamak.
 Açıklama yapısı:
 - Samimi, içten ve merak uyandıran giriş sorusu / cümlesi (Hook)
-- Dua metni, anlamı ve kimin duası olduğu
+- Dua metni, anlamı ve kimin duası olduğu (Asla 'Hz.' kısaltması kullanma; her zaman 'Hazreti' ve 'aleyhisselam' olarak tam yaz)
 - 'Yoruma bir Âmin bırakarak dualara ortak olun 🤲' ve sevdiklerine gönderme çağrısı
 - Ezan Plus yönlendirmesi 📲
 - KESİNLİKLE VE TAM 5 ADET HASHTAG (#ezanplus ve 4 adet duaya odaklı etiket). Asla 5'ten fazla yazma!

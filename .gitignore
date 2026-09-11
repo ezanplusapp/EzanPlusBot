@@ -20,6 +20,10 @@ data/cikti/*
 !data/cikti/.gitkeep
 data/onbellek/*
 !data/onbellek/.gitkeep
+data/sesler/*
+!data/sesler/.gitkeep
+!data/sesler/hadis/.gitkeep
+!data/sesler/dua/.gitkeep
 
 # Sistem & Editör
 .DS_Store

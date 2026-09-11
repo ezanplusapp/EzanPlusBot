@@ -140,10 +140,45 @@
     "yayin_zamani": "2026-09-11 13:33:34"
   },
   {
+    "id": 174,
+    "kategori": "kelime",
+    "kaynak": "Kur'an Sözlüğü • İffet",
+    "baslik": "Kur'an Sözlüğü • İffet",
+    "yayin_zamani": "2026-09-11 15:37:22"
+  },
+  {
+    "id": 183,
+    "kategori": "ayet",
+    "kaynak": "Mü'minûn Sûresi • 100. Âyet",
+    "baslik": "Mü'minûn Sûresi • 100. Âyet",
+    "yayin_zamani": "2026-09-11 16:37:43"
+  },
+  {
+    "id": 182,
+    "kategori": "ayet",
+    "kaynak": "A'râf Sûresi • 6. Âyet",
+    "baslik": "A'râf Sûresi • 6. Âyet",
+    "yayin_zamani": "2026-09-11 16:39:07"
+  },
+  {
     "id": 1,
     "kategori": "ayet",
     "kaynak": "A'râf Sûresi • 152. Âyet",
     "baslik": "A'râf Sûresi • 152. Âyet",
     "yayin_zamani": "2026-09-11 17:34:06"
+  },
+  {
+    "id": 188,
+    "kategori": "hadis",
+    "kaynak": "Ebû Dâvûd, Edeb 101; Tirmizî, Daavât 116.",
+    "baslik": "Ebû Dâvûd, Edeb 101; Tirmizî, Daavât 116.",
+    "yayin_zamani": "2026-09-11 18:24:46"
+  },
+  {
+    "id": 189,
+    "kategori": "dua",
+    "kaynak": "Mü'minûn Sûresi, 97-98. Âyetler",
+    "baslik": "Vesvese ve Şeytanın Şerrinden Korunma",
+    "yayin_zamani": "2026-09-11 18:26:04"
   }
 ]

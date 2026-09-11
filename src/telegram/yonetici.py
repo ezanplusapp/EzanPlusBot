@@ -99,19 +99,22 @@ def yayinla_hepsi(paylasim_id: int) -> Dict[str, Any]:
         sonuclar["instagram_story_hata"] = str(e)
 
     # 2. Threads (Akıllı Parçalanmış Zincir Gönderi)
-    try:
-        log.info("Threads'e zincir gönderi yükleniyor...")
-        if format_tipi == "reels_9_16" and video_yolu:
-            th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=video_yolu)
-        elif gorsel_yolu:
-            th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=gorsel_yolu)
-        else:
-            th_res = threads.threads_zincir_paylas(caption)
-        sonuclar["threads"] = th_res.get("id")
-        sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
-    except Exception as e:
-        log.error(f"Threads yayınlama hatası: {e}")
-        sonuclar["threads_hata"] = str(e)
+    if threads.threads_aktif_mi():
+        try:
+            log.info("Threads'e zincir gönderi yükleniyor...")
+            if format_tipi == "reels_9_16" and video_yolu:
+                th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=video_yolu)
+            elif gorsel_yolu:
+                th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=gorsel_yolu)
+            else:
+                th_res = threads.threads_zincir_paylas(caption)
+            sonuclar["threads"] = th_res.get("id")
+            sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
+        except Exception as e:
+            log.error(f"Threads yayınlama hatası: {e}")
+            sonuclar["threads_hata"] = str(e)
+    else:
+        log.info("Threads API jetonu tanımlı değil veya geçersiz; Threads yayını güvenle atlandı (OAuth 190 riski sıfır).")
 
     # 3. Facebook Sayfası
     try:
@@ -244,7 +247,7 @@ def yayinla_telafi(paylasim_id: int, hedef_kanal: str = "hepsi") -> Dict[str, An
             sonuclar["instagram_story_hata"] = str(e)
 
     # 3. Threads
-    if (hedef in ("hepsi", "threads")) and not sonuclar.get("threads"):
+    if (hedef in ("hepsi", "threads")) and not sonuclar.get("threads") and threads.threads_aktif_mi():
         try:
             log.info(f"Telafi: Threads gönderisi yükleniyor (#{paylasim_id})...")
             if format_tipi == "reels_9_16" and video_yolu:
