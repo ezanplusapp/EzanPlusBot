@@ -203,3 +203,44 @@ def videoyu_sil(video_id: str) -> bool:
         log.error(f"YouTube video silme hatası ({video_id}): {e}")
         return False
 
+
+if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    print("\n" + "="*60)
+    print("🎥 EZAN PLUS - YOUTUBE KALICI OAUTH YETKİLENDİRMESİ")
+    print("="*60)
+
+    # Eski süresi dolmuş token varsa kaldıralım ki temiz consent açılsın
+    if TOKEN_DOSYASI.exists():
+        try:
+            c = Credentials.from_authorized_user_file(str(TOKEN_DOSYASI), SCOPES)
+            c.refresh(Request())
+            print("✅ Mevcut token yenilendi ve geçerli!")
+            creds = c
+        except Exception as e:
+            print(f"⚠️ Eski token geçersiz ({e}), tarayıcı açılarak sıfırdan yetki alınacak...")
+            TOKEN_DOSYASI.unlink(missing_ok=True)
+            creds = None
+    else:
+        creds = None
+
+    if not creds:
+        if not CLIENT_SECRET_DOSYASI.exists():
+            print(f"❌ '{CLIENT_SECRET_DOSYASI}' dosyası bulunamadı!")
+            sys.exit(1)
+
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(CLIENT_SECRET_DOSYASI), SCOPES
+        )
+        print("🌐 Varsayılan tarayıcınızda Google oturum açma sayfası açılıyor...")
+        creds = flow.run_local_server(port=0, prompt="consent")
+        TOKEN_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
+        with open(TOKEN_DOSYASI, "w", encoding="utf-8") as f:
+            f.write(creds.to_json())
+        print(f"🎉 Yetki başarıyla alındı ve kaydedildi: {TOKEN_DOSYASI}")
+
+    if creds and creds.valid:
+        print("\n✅ YouTube bağlantısı %100 BAŞARILI ve KALICI olarak hazır!")
+        print("="*60 + "\n")
+
