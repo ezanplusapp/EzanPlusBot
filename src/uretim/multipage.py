@@ -90,7 +90,7 @@ def build_v20_base_layout(
     # 2. Header & CTA Butonu
     top_header_y = 215 if is_916 else 55
     ayrac_y = draw_kart_header_bar(im, draw, cfg, top_y=top_header_y, rozet_text=cfg["rozet_txt"])
-    _kelime_cta_butonu_ciz(im, format_tipi)
+    cta_ust_y = _kelime_cta_butonu_ciz(im, format_tipi)
 
     # 3. Taç Başlık
     pt_tac = 34 if is_916 else 28
@@ -112,6 +112,12 @@ def build_v20_base_layout(
         kaynak_txt = custom_kaynak or "TESCİLLİ DUALAR KÜLLİYATI"
 
     t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+    tac_w = t_bb[2] - t_bb[0]
+    while tac_w > (max_w - 40) and pt_tac > 20:
+        pt_tac -= 2
+        f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
+        t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+        tac_w = t_bb[2] - t_bb[0]
     tac_h = t_bb[3] - t_bb[1]
     start_tac_y = ayrac_y + (30 if is_916 else 18)
     tac_bottom_y = start_tac_y + tac_h
@@ -265,21 +271,40 @@ def build_v20_base_layout(
         cur_y += ok_line_step
 
     # 11. Alt Bölüm: Tefekkür & Tescilli Kaynak
-    bot_y = tefekkur_start_y
     clean_tef = tef_txt.strip().strip('“”" ')
+    if not is_hadis and "•" in clean_tef:
+        parcalar = clean_tef.split("•", 1)
+        if len(parcalar[0].strip()) < 45:
+            clean_tef = parcalar[1].strip()
+
     pt_tef = 30 if is_916 else 25
     f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
     tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_w - 40, draw)
-
     step_tef = int(pt_tef * 1.34)
+    tef_block_h = len(tef_lines) * step_tef
+    gap_tef_kaynak = 16 if is_916 else 10
+
+    f_kaynak = font_al(FONT_UI, 17 if is_916 else 15, agirlik=700)
+    kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
+    kaynak_w = kb[2] - kb[0]
+    pt_k = 17 if is_916 else 15
+    while kaynak_w > (max_w - 40) and pt_k > 13:
+        pt_k -= 1
+        f_kaynak = font_al(FONT_UI, pt_k, agirlik=700)
+        kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
+        kaynak_w = kb[2] - kb[0]
+
+    total_bot_h = tef_block_h + gap_tef_kaynak + (kb[3] - kb[1])
+    usable_top = fade_2_end + (30 if is_916 else 22)
+    usable_bot = cta_ust_y - (18 if is_916 else 12)
+    bot_y = usable_top + max(0, (usable_bot - usable_top - total_bot_h) // 2)
+
     for tl in tef_lines:
         tlb = draw.textbbox((0, 0), tl, font=f_tef)
         draw.text(((w - (tlb[2] - tlb[0])) / 2, bot_y), tl, font=f_tef, fill="#FFF5F2")
         bot_y += step_tef
-    bot_y += 16 if is_916 else 10
+    bot_y += gap_tef_kaynak
 
-    f_kaynak = font_al(FONT_UI, 17 if is_916 else 15, agirlik=700)
-    kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
     draw.text(((w - (kb[2] - kb[0])) / 2, bot_y), kaynak_txt, font=f_kaynak, fill="#EADBC8")
 
     # 12. Orta Bölüm: 100% Bold Ibarra Real Nova Türkçe Meal
@@ -804,10 +829,14 @@ def hadis_videosu_uret(
     if cikti_yolu is None:
         cikti_yolu = KOK_DIZIN / "data" / "cikti" / f"hadis_v20_{int(Path(ses_yolu).stem.split('_')[-1] if '_' in Path(ses_yolu).stem else 0)}.mp4"
 
-    tac_txt = f"“ Resûlullah (s.a.v.) Buyurdu{f' • {ravi}' if ravi else ''} ”"
+    tac_txt = "“ Resûlullah (s.a.v.) Buyurdu ”"
     tef_txt = tefekkur_notu or "İslam ahlakı; hayatın her anında şefkat, adalet ve samimiyetle yaşamayı öğütler."
     ar_txt = arapca_metin or "مَنْ لَا يَرْحَمِ النَّاسَ لَا يَرْحَمْهُ اللَّهُ"
     ok_txt = arapca_okunus or ""
+
+    kaynak_full = (kaynak_ref or "Riyâzü's-Sâlihîn").strip()
+    if ravi and ravi.strip() and ravi.strip().lower() not in kaynak_full.lower():
+        kaynak_full = f"{kaynak_full} • RÂVİ: {ravi.strip().upper()}"
 
     sayfalar = akilli_v20_sayfalari_olustur(
         kategori="hadis",
@@ -817,7 +846,7 @@ def hadis_videosu_uret(
         words_data=words_data,
         tac_txt=tac_txt,
         tef_txt=tef_txt,
-        kaynak_txt=kaynak_ref,
+        kaynak_txt=kaynak_full,
     )
 
     fon_ney = KOK_DIZIN / "assets" / "audio" / "fon" / "ney_segah.mp3"
@@ -852,7 +881,12 @@ def dua_videosu_uret(
         cikti_yolu = KOK_DIZIN / "data" / "cikti" / f"dua_v20_{int(Path(ses_yolu).stem.split('_')[-1] if '_' in Path(ses_yolu).stem else 0)}.mp4"
 
     tac_txt = f"“ {dua_basligi} ”"
-    tef_txt = tefekkur_notu or "Dua; kulun Rabbi ile en samimi, en derin ve en huzurlu buluşma anıdır."
+    clean_tef = tefekkur_notu or "Dua; kulun Rabbi ile en samimi, en derin ve en huzurlu buluşma anıdır."
+    if "•" in clean_tef:
+        parcalar = clean_tef.split("•", 1)
+        if len(parcalar[0].strip()) < 45:
+            clean_tef = parcalar[1].strip()
+    tef_txt = clean_tef
     ar_txt = arapca_metin or "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ"
     ok_txt = arapca_okunus or ""
     kaynak_txt = kaynak_ref or dua_basligi

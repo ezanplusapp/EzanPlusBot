@@ -150,40 +150,36 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
   - *Alt:* Merkezinde altın nokta bulunan zarif ayraç çizgisi.
 - **Video Başlık Tutarlılığı (Hook Standardı):** V12 video motorunda video hook başlığı **Lora 44pt/55pt (Serif)** olarak tırnak işaretleriyle (`“ ... ”`) sabitlenmiştir. Eski prototiplerdeki Manrope Sans-serif başlıklar tamamen terk edilmiştir.
 
-### B. V19 Sahih Hadis Kartı (`hadis_karti_ciz`) — Sabit Sisli Adaçayı Zümrüdü Mimarisi
+### B. V20 Sahih Hadis Kartı (`hadis_karti_ciz`) — Sisli Adaçayı Zümrüdü Mimarisi
 1. **Sabit Soft Pastel Zemin (Sisli Adaçayı Zümrüdü):**
-   - Merkez `(30, 64, 54)` (`#1E4036`) ➔ Dış kenar `(14, 34, 28)` (`#0E221C`) organik radyal gradyan parşömen dokusu.
-   - Kelime kartındaki gibi asil, mat, soft kadife bir derinlik; gözü yormayan kurumsal pastel İslam zümrüdü.
-2. **Devasa Uthmani Hat & Dinamik Ölçekleme:**
-   - 6 kelime ve altı ultra kısa hadislerde **145pt (9:16) / 118pt (4:5)** devasa hat.
-   - İpeksi Beyaz (`#FFF8EE`) Uthmani hat, tam hareke koruması (`MIN_VERTICAL_GAP = 28px` 9:16 / `24px` 4:5).
-   - Latin okunuş satırı Şampanya Altın (`#FDE6BA`) tonunda zarif akış.
-3. **Hero Türkçe Hadis Metni & Mixed Bold Tipografi:**
-   - Kısa hadislerde **82pt (9:16) / 68pt (4:5)** devasa hero punto.
-   - Mixed Bold: `**bold**` kelimeler Saf Beyaz (`#FFFFFF`) Ibarra Real Nova Bold, diğer kısımlar Açık Adaçayı (`#DCEFE7`) Regular.
-4. **Sıfır Çakışma Garantili Tırnak Filigranı:**
-   - Filigran `“` metnin üzerine bindirilmez; metnin ilk satırının solundaki negatif alana (`fili_x = first_x - 75/60`, `fili_y = cur_y - 140/115`) yerleştirilir.
-   - `alpha = 15` narin fildişi/altın gölgesi ile harfleri asla örtmez ve sıfır harf çarpışması sağlar.
-5. **Akıllı Auto-Fit & Beyaz Ezan Plus CTA:**
-   - Metin uzadıkça dinamik auto-fit döngüsü devreye girerek fontları dengeli küçültür; alttaki beyaz gölgeli Ezan Plus indirme butonuna (`_kelime_cta_butonu_ciz`) çarpma kesinlikle imkansızdır.
-   - Nebevî öğüt ve tescilli kaynak referansı altın ayraçlarla tabana bağlanır.
+   - Merkez `(34, 66, 52)` (`#224234`) ➔ Dış kenar `(18, 40, 32)` (`#122820`) organik radyal gradyan parşömen dokusu.
+   - Keten zemin bandı, Cosine tül degrade ve altın odak elmasları.
+2. **Taç Başlık Standardı:**
+   - Sabit, vakur ve taşma yapmayan Nebevî taç başlık: **`“ Resûlullah (s.a.v.) Buyurdu ”`** (Lora Bold 34pt 9:16 / 28pt 4:5 + auto-fit güvencesi).
+   - Sahabi râvisi taç başlığa eklenmez; ilmî usule uygun olarak alt kaynak bloğunda yer alır (`{KAYNAK} • RÂVİ: {RAVİ}`).
+3. **Arapça Hat & Mixed Bold Tipografi:**
+   - Kısa metinlerde 142pt (9:16) / 120pt (4:5) heybetli Uthmani hat ve Latin okunuş.
+   - Hero Türkçe meal: Keten bandı içinde Ibarra Real Nova Mixed Bold tipografi (`#1B4D38` bold, `#1C1917` regular).
+4. **Birebir Eşitlenmiş Alt Hiyerarşi & İndirin Butonu:**
+   - 1. Satır: Tefekkür Notu (Lora Italic `#FFF5F2`).
+   - 2. Satır: Kaynak ve Râvi (`#EADBC8` Manrope Bold All-caps).
+   - 3. Satır: Beyaz Ezan Plus CTA Butonu ($Y_{nav1}=1770$ 9:16 / $1254$ 4:5, alt ilerleme çubuğu ile 16px net nefes payı).
+   - Tefekkür ve Kaynak bloğu, Keten bandı altı ile CTA butonu arasında dikeyde dinamik ortalanır.
 
-### C. V19 Günün Duası Kartı (`dua_karti_ciz`) — Sabit Soft Sisli Gece Mavisi Mimarisi
-1. **Sabit Soft Pastel Zemin (Soft Sisli Gece Mavisi):**
-   - Merkez `(34, 58, 80)` (`#223A50`) ➔ Dış kenar `(16, 30, 44)` (`#101E2C`) organik radyal gradyan parşömen dokusu.
-   - Gecenin sükunetini yansıtan mat kadife gece mavisi; İnşirah ve ferahlık hissi veren sakinleştirici kontrast.
-2. **Devasa Uthmani Hat & Niyaz Başlığı:**
-   - Taç başlık: Lora Bold 52pt (9:16) / 44pt (4:5) Saf Beyaz (`#FFFFFF`).
-   - Arapça dua metni: İpeksi Beyaz (`#FFF8EE`), kısa dualarda **140pt (9:16) / 115pt (4:5)** devasa punto.
-   - Latin okunuş: Şampanya Altın (`#FDE6BA`).
-3. **Hero Türkçe Dua Anlamı:**
-   - Kısa dualarda **76pt (9:16) / 64pt (4:5)** devasa hero punto.
-   - Mixed bold: `**bold**` kelimeler Saf Beyaz (`#FFFFFF`), diğer kısımlar Buz Mavisi (`#E2EDF7`).
-4. **Sıfır Çakışma Garantili Tırnak Filigranı:**
-   - Sol-üst negatif alana kilitlenmiş `alpha = 15` saten altın tırnak filigranı; harflere binmez.
-5. **Açık Fazilet Notu ve Beyaz Ezan Plus CTA:**
-   - Solunda narin altın ayraç bulunan açık fazilet bloğu (`#EDF4FB` Italic).
-   - Taban alanında zemin rengine kusursuz kontrast sağlayan gölgeli Beyaz Ezan Plus CTA Butonu (`_kelime_cta_butonu_ciz`).
+### C. V20 Günün Duası Kartı (`dua_karti_ciz`) — Selçuklu Petrol Zümrüdü Mimarisi
+1. **Sabit Soft Pastel Zemin (Selçuklu Petrol Zümrüdü):**
+   - Merkez `(14, 48, 50)` (`#0E3032`) ➔ Dış kenar `(6, 26, 28)` (`#061A1C`) organik radyal gradyan parşömen dokusu.
+   - Keten zemin bandı, Cosine tül degrade ve narin dua eden eller filigranı.
+2. **Taç Başlık Standardı:**
+   - Dua başlığı veya künyesi: **`“ {dua_basligi} ”`** (Lora Bold 34pt 9:16 / 28pt 4:5 + auto-fit güvencesi).
+3. **Arapça Hat & Mixed Bold Tipografi:**
+   - Heybetli Uthmani hat ve Şampanya Altın Latin okunuş.
+   - Hero Türkçe anlam: Keten bandı içinde Ibarra Real Nova Mixed Bold tipografi (`#0F4144` bold, `#1C1917` regular).
+4. **Birebir Eşitlenmiş Alt Hiyerarşi (Sıfır Çift Kaynak Hatası):**
+   - 1. Satır: Fazilet Notu (Lora Italic `#FFF5F2`, içinde kaynak tekrarı olmadan saf edebi not).
+   - 2. Satır: Kaynak Künyesi (`#EADBC8` Manrope Bold All-caps).
+   - 3. Satır: Beyaz Ezan Plus CTA Butonu ($Y_{nav1}=1770$ 9:16 / $1254$ 4:5).
+   - Hadis kartı ile milimetrik aynı dikey hiza, öğe sırası ve nefes payı standardı.
 
 ### D. V17 Kur'an Sözlüğü & İslamî Kavram Kartı (`kelime_karti_ciz`)
 - **Yalınlık & Editoryal Duruş:** Ağır kutular ve çerçeveler terk edilmiş; nefes alan ferah, asil bir editoryal sayfa hissi benimsenmiştir.

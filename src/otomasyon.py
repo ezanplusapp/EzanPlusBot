@@ -203,11 +203,15 @@ def gorsel_icerik_olustur_ve_gonder(
         turkce = icerik.get("turkce_anlam", "")
         arapca = icerik.get("arapca_metin")
         okunus = icerik.get("arapca_okunus")
-        fazilet = icerik.get("okunus_veya_fazilet")
+        fazilet = icerik.get("fazilet_notu") or icerik.get("okunus_veya_fazilet")
+        if fazilet and "•" in fazilet:
+            parcalar = fazilet.split("•", 1)
+            if len(parcalar[0].strip()) < 45:
+                fazilet = parcalar[1].strip()
         kimin_duasi = icerik.get("kimin_duasi")
         ruh_hali = icerik.get("ruh_hali")
         kaynak_ref = icerik.get("kaynak_ref")
-        fazilet_notu = icerik.get("fazilet_notu")
+        fazilet_notu = fazilet
         vurgulanan_kelime = icerik.get("vurgulanan_kelime")
         kaynak = baslik
         tefekkur = fazilet
@@ -449,8 +453,11 @@ def dua_videosu_olustur_ve_gonder(ruh_hali: Optional[str] = None, auto_publish: 
     baslik = icerik.get("dua_basligi", "Günün Duası")
     turkce_anlam = icerik.get("turkce_anlam", "")
     arapca_metin = icerik.get("arapca_metin")
-    arapca_okunus = icerik.get("arapca_okunus")
-    fazilet = icerik.get("okunus_veya_fazilet")
+    fazilet = icerik.get("fazilet_notu") or icerik.get("okunus_veya_fazilet")
+    if fazilet and "•" in fazilet:
+        parcalar = fazilet.split("•", 1)
+        if len(parcalar[0].strip()) < 45:
+            fazilet = parcalar[1].strip()
     kaynak_ref = icerik.get("kaynak_ref") or baslik
     caption = icerik.get("instagram_caption", "")
 

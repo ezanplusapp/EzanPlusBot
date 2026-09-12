@@ -856,7 +856,7 @@ def _kelime_cta_butonu_ciz(im: Image.Image, format_tipi: str = "9:16") -> int:
     nav_h = 72 if is_916 else 62
     nav_x1 = (w - nav_w) // 2
     nav_x2 = nav_x1 + nav_w
-    nav_y1 = (h - 130) if is_916 else (h - 96)
+    nav_y1 = (h - 150) if is_916 else (h - 96)
     nav_y2 = nav_y1 + nav_h
     btn_y = nav_y1 + nav_h // 2
 
@@ -1083,11 +1083,14 @@ def hadis_karti_ciz(
     # 3. Taç Başlık
     pt_tac = 34 if is_916 else 28
     f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
-    if ravi and ravi.strip():
-        tac_txt = f"“ Resûlullah (s.a.v.) Buyurdu • {ravi.strip()} ”"
-    else:
-        tac_txt = "“ Resûlullah (s.a.v.) Buyurdu ”"
+    tac_txt = "“ Resûlullah (s.a.v.) Buyurdu ”"
     t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+    tac_w = t_bb[2] - t_bb[0]
+    while tac_w > (max_w - 40) and pt_tac > 20:
+        pt_tac -= 2
+        f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
+        t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+        tac_w = t_bb[2] - t_bb[0]
     tac_h = t_bb[3] - t_bb[1]
     start_tac_y = ayrac_y + (30 if is_916 else 18)
     tac_bottom_y = start_tac_y + tac_h
@@ -1293,23 +1296,45 @@ def hadis_karti_ciz(
         cur_meal_y += step_hero
 
     # 12. Alt Bölüm: Tefekkür & Tescilli Kaynak (Erime Dışında Sabit Kadife Zemin)
-    bot_y = tefekkur_start_y
     clean_tef = (tefekkur_notu or "Müslümanın basiretli, uyanık ve tecrübelerinden ders çıkaran bir duruşu olmalıdır.").strip().strip('“”" ')
     pt_tef = 30 if is_916 else 25
     f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
     tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_w - 40, draw)
-
     step_tef = int(pt_tef * 1.34)
+    tef_block_h = len(tef_lines) * step_tef
+    gap_tef_kaynak = 16 if is_916 else 10
+
+    kaynak_ana = (kaynak or kaynak_ravi or "Riyâzü's-Sâlihîn").strip()
+    if ravi and ravi.strip():
+        temiz_ravi = ravi.strip()
+        if temiz_ravi.lower() not in kaynak_ana.lower():
+            kaynak_txt = f"{kaynak_ana} • RÂVİ: {temiz_ravi}".upper()
+        else:
+            kaynak_txt = kaynak_ana.upper()
+    else:
+        kaynak_txt = kaynak_ana.upper()
+
+    pt_kaynak = 17 if is_916 else 15
+    f_kaynak = font_al(FONT_UI, pt_kaynak, agirlik=700)
+    kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
+    kaynak_w = kb[2] - kb[0]
+    while kaynak_w > (max_w - 40) and pt_kaynak > 13:
+        pt_kaynak -= 1
+        f_kaynak = font_al(FONT_UI, pt_kaynak, agirlik=700)
+        kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
+        kaynak_w = kb[2] - kb[0]
+
+    total_bot_h = tef_block_h + gap_tef_kaynak + (kb[3] - kb[1])
+    usable_top = fade_2_end + (30 if is_916 else 22)
+    usable_bot = cta_ust_y - (18 if is_916 else 12)
+    bot_y = usable_top + max(0, (usable_bot - usable_top - total_bot_h) // 2)
+
     for tl in tef_lines:
         tlb = draw.textbbox((0, 0), tl, font=f_tef)
         draw.text(((w - (tlb[2] - tlb[0])) / 2, bot_y), tl, font=f_tef, fill="#FFF5F2")
         bot_y += step_tef
-    bot_y += 16 if is_916 else 10
+    bot_y += gap_tef_kaynak
 
-    kaynak_txt = (kaynak_ravi or kaynak or "Riyâzü's-Sâlihîn").strip().upper()
-    pt_kaynak = 17 if is_916 else 15
-    f_kaynak = font_al(FONT_UI, pt_kaynak, agirlik=700)
-    kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
     draw.text(((w - (kb[2] - kb[0])) / 2, bot_y), kaynak_txt, font=f_kaynak, fill="#EADBC8")
 
     if not cikti_dosya_adi:
@@ -1509,6 +1534,12 @@ def dua_karti_ciz(
     f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
     tac_txt = f"“ {(kimin_duasi or dua_basligi).strip()} ”"
     t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+    tac_w = t_bb[2] - t_bb[0]
+    while tac_w > (max_w - 40) and pt_tac > 20:
+        pt_tac -= 2
+        f_tac = font_al(FONT_GOVDE, pt_tac, agirlik=700)
+        t_bb = draw.textbbox((0, 0), tac_txt, font=f_tac)
+        tac_w = t_bb[2] - t_bb[0]
     tac_h = t_bb[3] - t_bb[1]
     start_tac_y = ayrac_y + (30 if is_916 else 18)
     tac_bottom_y = start_tac_y + tac_h
@@ -1714,18 +1745,18 @@ def dua_karti_ciz(
         cur_meal_y += step_hero
 
     # 12. Alt Bölüm: Fazilet Notu & Kaynak (Erime Dışında Sabit Kadife Zemin)
-    bot_y = tefekkur_start_y
     clean_faz = (fazilet_notu or okunus_veya_fazilet or kaynak_fazilet or "Bu mübarek niyaz, kalbe ferahlık ve işlerde kolaylık için sabah-akşam ihlasla tekrar edilir.").strip().strip('“”" ')
+    if "•" in clean_faz:
+        parcalar = clean_faz.split("•", 1)
+        if len(parcalar[0].strip()) < 45:
+            clean_faz = parcalar[1].strip()
+
     pt_faz = 30 if is_916 else 25
     f_faz = font_al(FONT_GOVDE, pt_faz, agirlik=400)
     faz_lines = metin_satirla(f"“{clean_faz}”", f_faz, max_w - 40, draw)
-
     step_faz = int(pt_faz * 1.34)
-    for fl in faz_lines:
-        flb = draw.textbbox((0, 0), fl, font=f_faz)
-        draw.text(((w - (flb[2] - flb[0])) / 2, bot_y), fl, font=f_faz, fill="#FFF5F2")
-        bot_y += step_faz
-    bot_y += 16 if is_916 else 10
+    faz_block_h = len(faz_lines) * step_faz
+    gap_faz_kaynak = 16 if is_916 else 10
 
     raw_kaynak = (kaynak_ref or "Kur'an-ı Kerim").strip()
     ref_txt = re.split(r'[\.;,]?\s*Ayrıca bkz?[\.:]?', raw_kaynak, flags=re.IGNORECASE)[0].strip() or raw_kaynak
@@ -1734,6 +1765,24 @@ def dua_karti_ciz(
     pt_ref = 17 if is_916 else 15
     f_ref = font_al(FONT_UI, pt_ref, agirlik=700)
     rb = draw.textbbox((0, 0), ref_txt, font=f_ref)
+    ref_w = rb[2] - rb[0]
+    while ref_w > (max_w - 40) and pt_ref > 13:
+        pt_ref -= 1
+        f_ref = font_al(FONT_UI, pt_ref, agirlik=700)
+        rb = draw.textbbox((0, 0), ref_txt, font=f_ref)
+        ref_w = rb[2] - rb[0]
+
+    total_bot_h = faz_block_h + gap_faz_kaynak + (rb[3] - rb[1])
+    usable_top = fade_2_end + (30 if is_916 else 22)
+    usable_bot = cta_ust_y - (18 if is_916 else 12)
+    bot_y = usable_top + max(0, (usable_bot - usable_top - total_bot_h) // 2)
+
+    for fl in faz_lines:
+        flb = draw.textbbox((0, 0), fl, font=f_faz)
+        draw.text(((w - (flb[2] - flb[0])) / 2, bot_y), fl, font=f_faz, fill="#FFF5F2")
+        bot_y += step_faz
+    bot_y += gap_faz_kaynak
+
     draw.text(((w - (rb[2] - rb[0])) / 2, bot_y), ref_txt, font=f_ref, fill="#EADBC8")
 
     if not cikti_dosya_adi:
