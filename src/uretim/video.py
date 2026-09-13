@@ -682,7 +682,7 @@ class _SayfaVerisi:
     Reels videosundaki tek bir sayfanın mizanpaj, font, slot ve taban görselini yönetir.
     """
     @staticmethod
-    def uygun_pt_bul(page_ar: List[str], max_text_w: int = 840) -> int:
+    def uygun_pt_bul(page_ar: List[str], max_text_w: int = 840, meal_satir_sayisi: int = 1) -> int:
         """Belirtilen kelime grubu için en heybetli ve taşmayan Arapça puntoyu belirler."""
         n_kelime = len(page_ar)
         if n_kelime <= 4:
@@ -712,8 +712,15 @@ class _SayfaVerisi:
                 return pt
 
         # 2. Çoklu Satır Arama: 2 ve 3 satır dengeli mizanpaj
-        # 2 ve üzeri satıra bölünen âyetlerde dikey taşmayı önlemek için tavan 114pt'dir
-        multiline_start_pt = min(114, start_pt)
+        # 2 ve üzeri satıra bölünen âyetlerde dikey taşmayı önlemek için tavan normalde 114pt'dir.
+        # Meal satır sayısına göre Arapça alanı dinamik daraltılır (Meal fontunu korumak esastır):
+        if meal_satir_sayisi >= 4:
+            multiline_start_pt = min(80, start_pt)
+        elif meal_satir_sayisi == 3:
+            multiline_start_pt = min(92, start_pt)
+        else:
+            multiline_start_pt = min(114, start_pt)
+
         for max_l in [2, 3]:
             for pt in range(multiline_start_pt, 48, -2):
                 font = font_al(FONT_ARAPCA_NORMAL, pt)
@@ -850,25 +857,50 @@ class _SayfaVerisi:
         else:
             page_title = sure_ayet
 
-        # Dinamik Orantılı Tipografi ve Mizanpaj Ölçekleme (Piksel Genişliği ve Satır Sınırı Analizi)
+        # 1. Türkçe Meal Ölçeği ve Satır Sayısı Analizi (Hero Element: Okunaklı, tok ve asil editoryal punto)
+        temiz_meal = page_meal.strip("“”\"' ")
+        meal_metinsiz = temiz_meal.replace("**", "")
+        meal_len = len(meal_metinsiz)
+        if meal_len < 45:
+            self.pt_meal = 66
+        elif meal_len < 80:
+            self.pt_meal = 58
+        elif meal_len < 130:
+            self.pt_meal = 50
+        elif meal_len < 185:
+            self.pt_meal = 44
+        else:
+            self.pt_meal = 38
+        self.meal_h = int(self.pt_meal * 1.36)
+
+        # Meal kaç satır kaplıyor tespit et (Arapça alanını daraltma ihtiyacını belirler)
+        im_temp = Image.new("RGB", (100, 100))
+        d_temp = ImageDraw.Draw(im_temp)
+        f_meal_reg_test = font_al(FONT_BASLIK, self.pt_meal, agirlik=400)
+        f_meal_bold_test = font_al(FONT_BASLIK, self.pt_meal, agirlik=700)
+        meal_tokens_test = parse_markdown_bold(f"“{temiz_meal}”")
+        meal_wrapped_test, _ = wrap_mixed_tokens(
+            meal_tokens_test, f_meal_reg_test, f_meal_bold_test, 972 - 60, d_temp
+        )
+        meal_satir_sayisi = len(meal_wrapped_test)
+
+        # 2. Dinamik Orantılı Tipografi ve Mizanpaj Ölçekleme (Arapça Alanı Dinamik Daraltma)
         # Kart: 54..1026 = 972px. MAX_TEXT_W = 840px seçilerek ferah nefes alanı ve asil büyük punto sağlanır.
         MAX_TEXT_W = 840
 
         if pt_ar_override is not None:
             chosen_pt = pt_ar_override
         else:
-            chosen_pt = _SayfaVerisi.uygun_pt_bul(page_ar, MAX_TEXT_W)
+            chosen_pt = _SayfaVerisi.uygun_pt_bul(page_ar, MAX_TEXT_W, meal_satir_sayisi=meal_satir_sayisi)
 
         chosen_lines = _SayfaVerisi.satirlari_dengeli_bol(page_ar, chosen_pt, MAX_TEXT_W)
 
         self.pt_ar = chosen_pt
 
-        # Latin okunuş puntosu (okunaklı, heybetli ve orantılı: ~%44 tavan, en az 32pt)
-        self.pt_okunus = max(32, int(self.pt_ar * 0.44))
+        # Latin okunuş puntosu (okunaklı, heybetli ve orantılı: ~%44 tavan, en az 30pt)
+        self.pt_okunus = max(30, int(self.pt_ar * 0.44))
 
         # Auto-fit kontrolü: Latin satırları MAX_TEXT_W sınırını aşarsa kademeli küçült
-        im_temp = Image.new("RGB", (100, 100))
-        d_temp = ImageDraw.Draw(im_temp)
         while self.pt_okunus > 26:
             f_temp = font_al(FONT_UI, self.pt_okunus, agirlik=500)
             max_line_w = 0
@@ -885,22 +917,6 @@ class _SayfaVerisi:
 
         self.ar_h = int(self.pt_ar * 1.44)
         self.tr_h = int(self.pt_okunus * 1.34)
-
-        # 2. Türkçe Meal Ölçeği (Hero Element: Okunaklı, tok ve asil editoryal punto)
-        temiz_meal = page_meal.strip("“”\"' ")
-        meal_metinsiz = temiz_meal.replace("**", "")
-        meal_len = len(meal_metinsiz)
-        if meal_len < 45:
-            self.pt_meal = 66
-        elif meal_len < 80:
-            self.pt_meal = 58
-        elif meal_len < 130:
-            self.pt_meal = 50
-        elif meal_len < 185:
-            self.pt_meal = 44
-        else:
-            self.pt_meal = 38
-        self.meal_h = int(self.pt_meal * 1.36)
 
         # 3. Günün Hikmeti & Tefekkür Ölçeği
         tef_len = len(tef)
@@ -1008,10 +1024,9 @@ class _SayfaVerisi:
 
         # Arapça satırların Y koordinatlarını dinamik bounding box ile hesapla
         # Her satırın gerçek piksel mürekkep sınırları (harfler ve alt/üst harekeler) ölçülür.
-        # İki satır arasında MUTLAKA en az MIN_VERTICAL_GAP (28px) net boşluk bırakılır.
-        # Böylece alt satırın şedde/fethaları ile üst satırın kesra/tenvinleri ASLA çakışmaz!
+        # Arapça alanı daraltıldığında dikey boşluk daha derli toplu ayarlanır:
         self.ar_satir_y_list = []
-        MIN_VERTICAL_GAP = 28
+        MIN_VERTICAL_GAP = 22 if self.pt_ar <= 96 else 28
         prev_ink_bottom = self.ar_y_start
 
         for s_idx, satir in enumerate(self.ar_satir_bilgileri):
@@ -1040,7 +1055,7 @@ class _SayfaVerisi:
 
         # B) LATİN OKUNUŞ: TİLAVET BÜTÜNLÜĞÜ İÇİN DOĞRUDAN ARAPÇA METNİN HEMEN ALTINA YERLEŞTİRİLİR
         # (Arapça ile okunuş arasında kopukluk / devasa boşluk kalmaması sağlanır)
-        gap_ar_tr = max(24, int(self.pt_ar * 0.24))
+        gap_ar_tr = max(18, int(self.pt_ar * 0.20)) if self.pt_ar <= 96 else max(24, int(self.pt_ar * 0.24))
         self.tr_y_start = prev_ink_bottom + gap_ar_tr
         okunus_blok_h = len(self.tr_satir_bilgileri) * self.tr_h
         tr_bottom = self.tr_y_start + okunus_blok_h
@@ -1056,9 +1071,9 @@ class _SayfaVerisi:
         meal_blok_h = len(meal_wrapped_lines) * self.meal_h
         kalan_orta = ay_y - tr_bottom
 
-        # Dinamik Auto-Fit: Kalan alan daraldığında meal puntosunu kademeli küçülterek çakışmayı %100 önle
-        # Bandın ve nefes paylarının konforlu sığması için en az 105px pay gözetilir
-        min_gerekli_pay = 105
+        # Meal Fontu Koruması: Alan daraldığında meal küçültülmez, Arapça alanı yukarıda daraltılmıştır.
+        # Yalnızca aşırı istisnai durumlarda acil durum payı (35px) kontrolü:
+        min_gerekli_pay = 35
         while (kalan_orta - meal_blok_h < min_gerekli_pay) and self.pt_meal > 34:
             self.pt_meal -= 2
             self.meal_h = int(self.pt_meal * 1.34)
