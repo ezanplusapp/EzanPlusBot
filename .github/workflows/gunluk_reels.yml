@@ -89,6 +89,8 @@ jobs:
             TIKTOK_CLIENT_KEY=${{ secrets.TIKTOK_CLIENT_KEY }}
             TIKTOK_CLIENT_SECRET=${{ secrets.TIKTOK_CLIENT_SECRET }}
             TIKTOK_REFRESH_TOKEN=${{ secrets.TIKTOK_REFRESH_TOKEN }}
+            FISH_AUDIO_API_KEY=${{ secrets.FISH_AUDIO_API_KEY }}
+            FISH_AUDIO_VOICE_ID=${{ secrets.FISH_AUDIO_VOICE_ID }}
             IMGBB_API_KEY=${{ secrets.IMGBB_API_KEY }}
           YT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN_JSON }}
@@ -142,11 +144,26 @@ jobs:
         run: |
           git config user.name "Ezan Plus Bot"
           git config user.email "bot@ezanplus.com"
-          git pull --rebase origin main || (git rebase --abort || true)
+          python - <<'PY'
+          import sqlite3
+          for db in ["data/kuran/kuran.db", "data/hadisler/hadisler.db"]:
+              try:
+                  with sqlite3.connect(db) as con:
+                      con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+              except Exception:
+                  pass
+          PY
           git add data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json data/kuran/kuran.db data/hadisler/hadisler.db || true
           if ! git diff --staged --quiet; then
             git commit -m "chore: Günlük yayın geçmişi ve külliyat güncellendi [skip ci]"
-            git pull --rebase origin main || (git rebase --abort || true)
+            git fetch origin main || true
+            git stash --include-untracked || true
+            if ! git rebase origin/main; then
+              git checkout --theirs -- data/kuran/kuran.db data/hadisler/hadisler.db 2>/dev/null || true
+              git add data/kuran/kuran.db data/hadisler/hadisler.db 2>/dev/null || true
+              git -c core.editor=true rebase --continue 2>/dev/null || git rebase --abort || true
+            fi
+            git stash pop 2>/dev/null || true
             git push origin HEAD:main
           fi
 
