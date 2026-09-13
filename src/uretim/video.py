@@ -1045,7 +1045,7 @@ class _SayfaVerisi:
         okunus_blok_h = len(self.tr_satir_bilgileri) * self.tr_h
         tr_bottom = self.tr_y_start + okunus_blok_h
 
-        # C) ORTA ALAN: OKUNUŞ BİTİŞİ İLE TEFEKKÜR ARASINDA ALTIN AYRAÇ VE MEAL DENGELİ ORTALANIR
+        # C) ORTA ALAN: METİN SATIRLARINA GÖRE DİNAMİK BÜYÜYEN KIRMIZI KETEN BANDI VE MEAL
         temiz_meal = page_meal.strip("“”\"' ")
         meal_metin = f"“{temiz_meal}”"
         meal_tokens = parse_markdown_bold(meal_metin)
@@ -1055,10 +1055,11 @@ class _SayfaVerisi:
 
         meal_blok_h = len(meal_wrapped_lines) * self.meal_h
         kalan_orta = ay_y - tr_bottom
-        self.net_serbest_meal = kalan_orta - meal_blok_h
 
         # Dinamik Auto-Fit: Kalan alan daraldığında meal puntosunu kademeli küçülterek çakışmayı %100 önle
-        while self.net_serbest_meal < 30 and self.pt_meal > 32:
+        # Bandın ve nefes paylarının konforlu sığması için en az 105px pay gözetilir
+        min_gerekli_pay = 105
+        while (kalan_orta - meal_blok_h < min_gerekli_pay) and self.pt_meal > 34:
             self.pt_meal -= 2
             self.meal_h = int(self.pt_meal * 1.34)
             self.font_meal_reg = font_al(FONT_BASLIK, self.pt_meal, agirlik=400)
@@ -1067,23 +1068,61 @@ class _SayfaVerisi:
                 meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
             )
             meal_blok_h = len(meal_wrapped_lines) * self.meal_h
-            self.net_serbest_meal = kalan_orta - meal_blok_h
 
-        serbest_meal = max(20, self.net_serbest_meal)
+        serbest_meal = max(20, kalan_orta - meal_blok_h)
         self.serbest_meal = serbest_meal
 
-        # Degrade Logo Kırmızısı Keten Bandı Sınırları (Cosine Yumuşatma)
+        # 1. Metin satır sayısına ve puntocuğuna göre dinamik dolgular (Dinamik Keten Bandı)
+        pad_y = min(36, max(20, int(self.pt_meal * 0.40)))
+        fade_len = min(32, max(18, int(serbest_meal * 0.16)))
+        min_gap_okunus = 22
+        min_gap_tef = 24
+
+        # Sıkışık alanlarda dolguları orantılı dengele
+        toplam_ekler = 2 * fade_len + 2 * pad_y + min_gap_okunus + min_gap_tef
+        if toplam_ekler > serbest_meal:
+            oran = max(0.6, (serbest_meal - min_gap_okunus - min_gap_tef) / max(1, 2 * fade_len + 2 * pad_y))
+            pad_y = max(14, int(pad_y * oran))
+            fade_len = max(14, int(fade_len * oran))
+
+        # 2. Meal metnini kalan alanda optik olarak ortala (alt elmas için hafif 4px yukarı kaldır)
+        center_y = (tr_bottom + ay_y) // 2
+        my = center_y - (meal_blok_h // 2) - 4
+
+        # 3. Katı kırmızı (solid) sınırları: Metin satırlarını DOĞRUDAN ve TAMAMEN sarar!
+        solid_top = my - pad_y
+        solid_bottom = my + meal_blok_h + pad_y
+
+        # 4. Yumuşak Cosine degrade sınırları (Katı bölgenin DIŞINDA yer alır, metne ASLA değmez)
+        fade_1_start = solid_top - fade_len
+        fade_1_end = solid_top
+        fade_2_start = solid_bottom
+        fade_2_end = solid_bottom + fade_len
+
+        # 5. Güvenli sınır kilitleri (Okunuş ve tefekkür ayracına taşmayı kesin engeller)
+        if fade_1_start < tr_bottom + min_gap_okunus:
+            shift_down = (tr_bottom + min_gap_okunus) - fade_1_start
+            fade_1_start += shift_down
+            fade_1_end += shift_down
+            solid_top += shift_down
+            my += shift_down
+            solid_bottom += shift_down
+            fade_2_start += shift_down
+            fade_2_end += shift_down
+
+        if fade_2_end > ay_y - min_gap_tef:
+            shift_up = fade_2_end - (ay_y - min_gap_tef)
+            fade_1_start -= shift_up
+            fade_1_end -= shift_up
+            solid_top -= shift_up
+            my -= shift_up
+            solid_bottom -= shift_up
+            fade_2_start -= shift_up
+            fade_2_end -= shift_up
+
+        band_h = max(100, fade_2_end - fade_1_start)
         band_x = 56
         band_w = 968
-        fade_len = min(46, max(24, int(serbest_meal * 0.24)))
-
-        # Latin okunuşun altına ferah ve kalıcı nefes payı (min 52px)
-        gap_okunus_alt = max(52, int(serbest_meal * 0.32))
-        fade_1_start = tr_bottom + gap_okunus_alt
-        fade_1_end = fade_1_start + fade_len
-        fade_2_end = ay_y - max(16, int(serbest_meal * 0.16))
-        fade_2_start = fade_2_end - fade_len
-        band_h = max(100, fade_2_end - fade_1_start)
 
         RED_CENTER = (206, 52, 58)   # #CE343A Luminous Logo Kırmızısı (Canlı & Ferah)
         RED_OUTER = (160, 30, 36)    # #A01E24 Sıcak Kadife Kırmızı
@@ -1104,10 +1143,10 @@ class _SayfaVerisi:
         def draw_subtle_diamond(cx: int, cy: int, r: int = 7, fill: str = ALTIN):
             draw_t.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=fill)
 
-        draw_subtle_diamond(GENISLIK_9_16 // 2, fade_2_end + max(12, (ay_y - fade_2_end) // 2), r=7, fill=ALTIN)
+        diamond_y = (fade_2_end + ay_y) // 2
+        draw_subtle_diamond(GENISLIK_9_16 // 2, diamond_y, r=7, fill=ALTIN)
 
         # Meal Metni Çizimi (Kırmızı bant içinde ortalanır - Saf Beyaz Mixed Bold)
-        my = (fade_1_end + fade_2_start - meal_blok_h) // 2
         for satir_tokens, line_w in meal_wrapped_lines:
             cur_x = (GENISLIK_9_16 - line_w) // 2
             for tok_text, is_bold, word_w in satir_tokens:
