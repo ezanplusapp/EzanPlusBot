@@ -129,7 +129,7 @@ jobs:
           fi
 
           ARGS="--tur $TUR --bekleme 2700"
-          if [ "$AUTO" = "true" ]; then
+          if [ "$AUTO" = "true" ] || [ "$TUR" = "kelime" ]; then
             ARGS="$ARGS --otomatik"
           fi
           if [ -n "$TEMA" ]; then

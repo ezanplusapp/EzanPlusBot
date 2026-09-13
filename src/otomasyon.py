@@ -645,27 +645,33 @@ def dua_postu_olustur_ve_gonder(ruh_hali: Optional[str] = None, format_tipi: str
     return dua_videosu_olustur_ve_gonder(ruh_hali=ruh_hali, auto_publish=auto_publish)
 
 
-def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5", auto_publish: bool = False) -> int:
-    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip taslak veya yayın modunda iletir."""
+def kelime_postu_olustur_ve_gonder(kavram: Optional[str] = None, format_tipi: str = "4:5", auto_publish: bool = True) -> int:
+    """Kur'an Sözlüğü & İslami Kavramlar kartı üretip doğrudan otomatik yayınlar (onay beklemez)."""
     return gorsel_icerik_olustur_ve_gonder(kategori="kelime", tema=kavram, format_tipi=format_tipi, auto_publish=auto_publish)
 
 
-def icerik_olustur_ve_gonder(tur: str = "reels", tema: Optional[str] = None, format_tipi: str = "4:5") -> int:
+def icerik_olustur_ve_gonder(tur: str = "reels", tema: Optional[str] = None, format_tipi: str = "4:5", auto_publish: Optional[bool] = None) -> int:
     """
     Belirtilen türe göre (reels, hadis, dua, kelime, ayet) içeriği üretip onay/yayına sunar.
-    Hadis ve Dua içerikleri standart olarak V20 Dinamik Video formatında üretilir.
+    Kur'an Tilaveti (reels) ve Kur'an Sözlüğü (kelime) varsayılan olarak doğrudan otomatik yayınlanır (onay beklemez).
+    Hadis ve Dua içerikleri standart olarak V20 Dinamik Video formatında üretilir ve Telegram onayına sunulur.
     """
     tur_temiz = tur.lower().strip()
     if tur_temiz in ("reels", "video", "ayet_video"):
-        return reels_icerigi_olustur_ve_gonder(tema=tema)
+        oto = True if auto_publish is None else auto_publish
+        return reels_icerigi_olustur_ve_gonder(tema=tema, auto_publish=oto)
     elif tur_temiz in ("hadis", "hadis_video", "hadis_reels"):
-        return hadis_videosu_olustur_ve_gonder(tema=tema)
+        oto = False if auto_publish is None else auto_publish
+        return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=oto)
     elif tur_temiz in ("dua", "dua_video", "dua_reels"):
-        return dua_videosu_olustur_ve_gonder(ruh_hali=tema)
+        oto = False if auto_publish is None else auto_publish
+        return dua_videosu_olustur_ve_gonder(ruh_hali=tema, auto_publish=oto)
     elif tur_temiz == "kelime":
-        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi, auto_publish=False)
+        oto = True if auto_publish is None else auto_publish
+        return kelime_postu_olustur_ve_gonder(kavram=tema, format_tipi=format_tipi, auto_publish=oto)
     elif tur_temiz in ("ayet", "gorsel"):
-        return gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=tema, format_tipi=format_tipi)
+        oto = False if auto_publish is None else auto_publish
+        return gorsel_icerik_olustur_ve_gonder(kategori="ayet", tema=tema, format_tipi=format_tipi, auto_publish=oto)
     else:
         raise ValueError(f"Geçersiz içerik türü: {tur}")
 
@@ -752,8 +758,10 @@ if __name__ == "__main__":
         sys.exit(0)
 
     tur = args.komut or args.tur or "reels"
+    oto_varsayilan = True if tur in ("reels", "video", "kelime") else False
+    oto_yayin = True if args.otomatik else oto_varsayilan
     try:
-        pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format)
+        pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format, auto_publish=oto_yayin)
     except Exception as e:
         log.error(f"İçerik üretim hatası ({tur}): {e}")
         from . import hata_bildir

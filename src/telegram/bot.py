@@ -933,7 +933,7 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         if not _coklu_komut_engeli("/kelime", chat_id):
             mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Kelime kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
-        mesaj_gonder("⏳ <b>Kur'an Sözlüğü Kartı Hazırlanıyor...</b>\n\nİslami kavramlar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çiziliyor...", chat_id=str(chat_id))
+        mesaj_gonder("⏳ <b>Kur'an Sözlüğü Kartı Hazırlanıyor...</b>\n\nİslami kavramlar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çizilip otomatik yayınlanacak, lütfen bekleyin...", chat_id=str(chat_id))
         def _gorev_kelime():
             try:
                 from .. import otomasyon
