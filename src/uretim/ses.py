@@ -349,6 +349,44 @@ def dua_fonetik_ve_es_hazirla(metin: str) -> str:
     return metin
 
 
+IMAMLAR_REGEX = r'Buhârî|Müslim|Ebû Dâvûd|Tirmizî|Nesâî|İbni Mâce|İbn Mâce|Muvatta|Ahmed(?:\s+b\.\s+Hanbel)?|Dârimî'
+
+
+def hadis_metninden_kaynaklari_temizle(metin: str) -> str:
+    """
+    Hadis metnindeki kitap, râvi veya fıkıh kaynağı atıflarını (Buhârî, Müslim, dipnotlar vb.)
+    metinden ayıklar. Mazlum Kiper spiker sesinin ASLA kaynak referansı (Örn: 'Müslim, Birr 129')
+    okumamasını, yalnızca hadisin edebi ve nebevî mealini seslendirmesini garanti eder.
+    """
+    if not metin:
+        return ""
+    import re
+    m = metin.strip()
+
+    # 1. Köşeli ve normal parantez içindeki kaynak atıfları:
+    # (Buhârî, Merdâ 6; Müslim, Birr 54) veya [Tevbe sûresi (9), 79]
+    m = re.sub(r'\s*\[[^\]]*\]', '', m)
+    m = re.sub(r'\s*\(\s*(?:Ayrıca\s+)?(?:bkz?\.?\s*)?(?:' + IMAMLAR_REGEX + r')\b[^\)]*\)', '', m, flags=re.IGNORECASE)
+
+    # 2. Metin sonundaki çıplak kaynak atıfları:
+    # Örneğin '. Buhârî, Edeb 2; Müslim, Birr 1.' veya 'Buhârî, Teheccüd 9'
+    pat_son = re.compile(
+        r'(?:[\s\.,;—\-]+|\b)(?:(?:Ayrıca\s+)?bkz?\.?\s*)?(?:' + IMAMLAR_REGEX + r')\s*[,:]\s*[^.!?\n]+(?:[\.;,]\s*(?:' + IMAMLAR_REGEX + r')\s*[,:]\s*[^.!?\n]+)*(?:[\s\.,;—\-]+(?:Ayrıca\s+)?bkz?\.?.*)?$',
+        re.IGNORECASE
+    )
+    for _ in range(5):
+        m2 = pat_son.sub('', m).strip()
+        if m2 == m:
+            break
+        m = m2
+
+    # 3. Metin sonunda kalmış 'Ayrıca bkz?...' kuyrukları
+    m = re.sub(r'[\s\.,;—\-]+(?:Ayrıca\s+)?bkz?\.?.*$', '', m, flags=re.IGNORECASE).strip()
+
+    # 4. Tırnak, çizgi ve fazla boşlukları temizle
+    return m.strip('“”\"\' —-')
+
+
 def turkce_tts_uret(
     metin: str,
     cikti_yolu: Optional[Path] = None,
@@ -377,6 +415,8 @@ def turkce_tts_uret(
     # 1. Metni fonetik ve duraklama açısından hazırla
     if kategori == "dua":
         temiz_metin = turkce_fonetik_temizle(dua_fonetik_ve_es_hazirla(metin))
+    elif kategori == "hadis":
+        temiz_metin = turkce_fonetik_temizle(hadis_metninden_kaynaklari_temizle(metin))
     else:
         temiz_metin = turkce_fonetik_temizle(metin)
 

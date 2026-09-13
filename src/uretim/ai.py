@@ -434,15 +434,9 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
     if not secilen_hadis:
         raise RuntimeError("Hadis veritabanından geçerli hadis seçilemedi!")
 
-    turkce_tam = (secilen_hadis.get("turkce_tam") or "").strip()
-    hadis_metni_ham = (secilen_hadis.get("hadis_metni") or "").strip()
-    # Eğer turkce_tam daha eksiksiz veya zengin bir rivayet içeriyorsa onu tercih et
-    if turkce_tam and (len(turkce_tam) > len(hadis_metni_ham) or not hadis_metni_ham):
-        hadis_metni = turkce_tam
-    else:
-        hadis_metni = hadis_metni_ham or turkce_tam
-
-    from .ses import turkce_kisaltmalari_genislet
+    hadis_metni = (secilen_hadis.get("hadis_metni") or secilen_hadis.get("turkce_tam") or "").strip()
+    from .ses import turkce_kisaltmalari_genislet, hadis_metninden_kaynaklari_temizle
+    hadis_metni = hadis_metninden_kaynaklari_temizle(hadis_metni)
     hadis_metni = turkce_kisaltmalari_genislet(hadis_metni)
     hadis_metni = hadis_metni.strip("“”\"' —-")
     kaynak_ref = secilen_hadis["kaynak_ref"]
@@ -493,10 +487,10 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
     vurgulu = str(veri.get("hadis_vurgulu") or "").strip()
     # Metin bütünlüğü kontrolü: Gemini tek bir harf/kelime dahi değiştirdiyse orijinal tescilli metne geri dön
     if vurgulu and re.sub(r'[\*\s\.,;!?:“"\'”]', '', vurgulu.lower()) == re.sub(r'[\*\s\.,;!?:“"\'”]', '', hadis_metni.lower()):
-        veri["hadis_metni"] = vurgulu
+        veri["hadis_metni"] = hadis_metninden_kaynaklari_temizle(vurgulu)
     else:
-        veri["hadis_metni"] = hadis_metni
-    veri["hadis_metni_orijinal"] = hadis_metni
+        veri["hadis_metni"] = hadis_metninden_kaynaklari_temizle(hadis_metni)
+    veri["hadis_metni_orijinal"] = hadis_metninden_kaynaklari_temizle(hadis_metni)
     veri["kaynak_ravi"] = kaynak_ref
     veri["kaynak"] = kaynak_ref
     veri["ravi"] = ravi

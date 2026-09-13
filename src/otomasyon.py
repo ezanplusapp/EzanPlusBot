@@ -352,6 +352,8 @@ def hadis_videosu_olustur_ve_gonder(tema: Optional[str] = None, auto_publish: bo
 
     hadis_id = icerik.get("hadis_id")
     turkce_metin = icerik.get("hadis_metni", "")
+    from .uretim.ses import hadis_metninden_kaynaklari_temizle
+    turkce_metin = hadis_metninden_kaynaklari_temizle(turkce_metin)
     kaynak_ravi = icerik.get("kaynak_ravi", "Hadis-i Şerif")
     tefekkur_notu = icerik.get("tefekkur_notu")
     caption = icerik.get("instagram_caption", "")
@@ -551,6 +553,9 @@ def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
         raise ValueError(f"Yalnızca Hadis ve Dua video içeriklerinin sesi yenilenebilir. Kategori: {kategori}")
 
     turkce_metin = kayit.get("turkce_metin", "")
+    if kategori == "hadis":
+        from .uretim.ses import hadis_metninden_kaynaklari_temizle
+        turkce_metin = hadis_metninden_kaynaklari_temizle(turkce_metin)
     baslik = kayit.get("baslik") or ""
     kaynak = kayit.get("kaynak") or baslik
     arapca_metin = kayit.get("arapca_metin")

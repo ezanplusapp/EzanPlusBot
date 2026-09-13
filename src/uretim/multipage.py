@@ -829,6 +829,9 @@ def hadis_videosu_uret(
     if cikti_yolu is None:
         cikti_yolu = KOK_DIZIN / "data" / "cikti" / f"hadis_v20_{int(Path(ses_yolu).stem.split('_')[-1] if '_' in Path(ses_yolu).stem else 0)}.mp4"
 
+    from .ses import hadis_metninden_kaynaklari_temizle
+    hadis_metni = hadis_metninden_kaynaklari_temizle(hadis_metni)
+
     tac_txt = "“ Resûlullah (s.a.v.) Buyurdu ”"
     tef_txt = tefekkur_notu or "İslam ahlakı; hayatın her anında şefkat, adalet ve samimiyetle yaşamayı öğütler."
     ar_txt = arapca_metin or "مَنْ لَا يَرْحَمِ النَّاسَ لَا يَرْحَمْهُ اللَّهُ"
