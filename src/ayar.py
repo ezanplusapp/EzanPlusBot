@@ -41,4 +41,8 @@ def get_renk(renk_adi: str, varsayilan: str = "#000000") -> str:
 
 def get_env(anahtar: str, varsayilan: str = "") -> str:
     """Ortam değişkenini döner."""
-    return os.getenv(anahtar, varsayilan).strip()
+    deger = os.getenv(anahtar)
+    if (deger is None or deger.strip() == "") and ENV_YOLU.exists():
+        load_dotenv(dotenv_path=ENV_YOLU, override=True)
+        deger = os.getenv(anahtar)
+    return (deger or varsayilan).strip()
