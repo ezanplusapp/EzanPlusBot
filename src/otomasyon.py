@@ -535,6 +535,97 @@ def dua_videosu_olustur_ve_gonder(ruh_hali: Optional[str] = None, auto_publish: 
     return paylasim_id
 
 
+def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
+    """
+    Mevcut Hadis veya Dua paylaşımının tescilli metin ve külliyat verisini koruyarak,
+    Mazlum Kiper seslendirmesini alternatif bir manevi ton direktifi ile sıfırdan yeniden üretir,
+    videoyu kelime kelime senkronize ederek tekrar render eder.
+    """
+    import random
+    kayit = db.paylasim_getir(paylasim_id)
+    if not kayit:
+        raise ValueError(f"Paylaşım bulunamadı: ID #{paylasim_id}")
+
+    kategori = kayit.get("kategori", "").lower()
+    if kategori not in ("hadis", "dua"):
+        raise ValueError(f"Yalnızca Hadis ve Dua video içeriklerinin sesi yenilenebilir. Kategori: {kategori}")
+
+    turkce_metin = kayit.get("turkce_metin", "")
+    baslik = kayit.get("baslik") or ""
+    kaynak = kayit.get("kaynak") or baslik
+    arapca_metin = kayit.get("arapca_metin")
+    tefekkur = kayit.get("tefekkur")
+    dosya_eki = int(time.time())
+
+    # Alternatif Manevi Ton Direktifleri (Fish Audio S2.1 için)
+    HADIS_TONLARI = [
+        "[vakur, manevi ve sakin bir tefekkür tonuyla]",
+        "[derin, etkileyici, yavaş ve tane tane bir hitabetle]",
+        "[samimi, vakur ve hikmet dolu bir edayla]",
+        "[tok, asil ve etkileyici bir spiker ses tonuyla]",
+        "[kalbe dokunan, huzurlu ve vakur bir tonda]",
+    ]
+    DUA_TONLARI = [
+        "[huzurlu, samimi ve ulvi bir dua tonuyla]",
+        "[kalbe dokunan, içten, duygusal ve yalvarış dolu bir nida ile]",
+        "[derin bir huşu, sükunet ve tevazu içinde]",
+        "[yavaş, tane tane, vakur ve kalbi titreten bir niyazla]",
+        "[içten bir münacat ve teslimiyet edasıyla]",
+    ]
+
+    secilen_ton = random.choice(HADIS_TONLARI if kategori == "hadis" else DUA_TONLARI)
+    log.info(f"🎙️ Yeniden seslendirme başlatılıyor (#{paylasim_id} - {kategori}). Ton: {secilen_ton}")
+
+    # 1. Yeni ses üret (overwrite=True ve yeni içerik id'si ile önbellek baypas edilir)
+    yeni_icerik_id = f"{kategori}_{paylasim_id}_v{dosya_eki}"
+    yeni_ses_yolu = ses_getir.turkce_tts_uret(
+        metin=turkce_metin,
+        kategori=kategori,
+        icerik_id=yeni_icerik_id,
+        ton_promptu=secilen_ton,
+        zaman_damgasi_al=True,
+        overwrite=True,
+    )
+
+    words_data = ses_getir.turkce_kelime_zamanlari_getir(yeni_ses_yolu)
+    log.info(f"Yeni kelime zaman damgaları yüklendi: {len(words_data)} kelime")
+
+    # 2. Videoyu yeniden render et
+    if kategori == "hadis":
+        yeni_video_yolu = video_motoru.hadis_videosu_uret(
+            hadis_metni=turkce_metin,
+            kaynak_ref=kaynak,
+            ses_yolu=yeni_ses_yolu,
+            words_data=words_data,
+            arapca_metin=arapca_metin,
+            tefekkur_notu=tefekkur,
+            cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"hadis_video_{dosya_eki}.mp4",
+            ney_volume=0.48,
+        )
+    else:  # dua
+        yeni_video_yolu = video_motoru.dua_videosu_uret(
+            turkce_anlam=turkce_metin,
+            dua_basligi=baslik or "Günün Duası",
+            ses_yolu=yeni_ses_yolu,
+            words_data=words_data,
+            arapca_metin=arapca_metin,
+            tefekkur_notu=tefekkur,
+            kaynak_ref=kaynak,
+            cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"dua_video_{dosya_eki}.mp4",
+            ney_volume=0.48,
+        )
+
+    # 3. Veritabanını güncelle
+    db.paylasim_guncelle(
+        paylasim_id,
+        video_yolu=str(yeni_video_yolu),
+        ses_yolu=str(yeni_ses_yolu),
+        gorsel_yollari=[str(yeni_video_yolu.with_suffix(".png"))],
+    )
+    log.info(f"✅ Paylaşım #{paylasim_id} yeni ses ve video ile güncellendi: {yeni_video_yolu}")
+    return yeni_video_yolu
+
+
 def hadis_postu_olustur_ve_gonder(tema: Optional[str] = None, format_tipi: str = "video", auto_publish: bool = False) -> int:
     """Sahih Hadis-i Şerif V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
     return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=auto_publish)

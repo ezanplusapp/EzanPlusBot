@@ -208,12 +208,23 @@ def onay_istegi_gonder(paylasim_id: int) -> int:
             f"👇 <b>Lütfen yayını onaylayın veya iptal edin:</b>"
         )
 
-    butonlar = [
-        [
-            {"text": "✅ Onayla ve Yayınla", "callback_data": f"onay_{paylasim_id}"},
-            {"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"},
+    if kategori in ("HADIS", "DUA") and format_tipi == "reels_9_16":
+        butonlar = [
+            [
+                {"text": "✅ Onayla ve Yayınla", "callback_data": f"onay_{paylasim_id}"},
+            ],
+            [
+                {"text": "🎙️ Sesi Yeniden Üret", "callback_data": f"sesyenile_{paylasim_id}"},
+                {"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"},
+            ]
         ]
-    ]
+    else:
+        butonlar = [
+            [
+                {"text": "✅ Onayla ve Yayınla", "callback_data": f"onay_{paylasim_id}"},
+                {"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"},
+            ]
+        ]
 
     # Medya Gönderimi
     if format_tipi == "reels_9_16" and kayit.get("video_yolu"):
@@ -801,6 +812,7 @@ def yardim_metni_olustur() -> str:
         f"🤲 <b>/dua</b> [ruh hali veya dua adı] — V20 Dinamik Dua Videosu (Mazlum Kiper + Ferahfezâ Ney).\n"
         f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (4:5 + 9:16).\n\n"
         f"🛠️ <b>HATA ÇÖZÜM & ONARIM KOMUTLARI:</b>\n"
+        f"• <b>/sesyenile &lt;ID&gt;</b> — Hadis veya Dua videosunun sesini alternatif manevi tonla yeniden üretir.\n"
         f"• <b>/onar &lt;ID&gt;</b> — Kalite veya mizanpaj hatası alan içeriği otonom onarır.\n"
         f"• <b>/yeniden_uret &lt;ID&gt;</b> — Belirtilen paylaşımı tescilli kaynaktan sıfırdan yeniden üretir.\n"
         f"• <b>/hata</b> — En son sistem hatasını ve doğrudan çözüm butonlarını gösterir.\n"
@@ -979,6 +991,29 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         pid = int(parametre)
         db.durum_guncelle(pid, yeni_durum="iptal_edildi")
         mesaj_gonder(f"❌ <b>Paylaşım #{pid} iptal edildi.</b>", chat_id=str(chat_id))
+
+    elif ana_komut in ("/sesyenile", "/ses_yenile"):
+        p_id = None
+        if parametre and parametre.isdigit():
+            p_id = int(parametre)
+        else:
+            with db.baglanti_al() as con:
+                row = con.execute("SELECT id FROM paylasimlar WHERE durum = 'onay_bekliyor' AND LOWER(kategori) IN ('hadis', 'dua') ORDER BY id DESC LIMIT 1").fetchone()
+                if row:
+                    p_id = row[0]
+        if not p_id:
+            mesaj_gonder("⚠️ <b>Geçerli bir onay bekleyen Hadis veya Dua videosu bulunamadı.</b>\n<i>Kullanım: <code>/sesyenile [paylasim_id]</code></i>", chat_id=str(chat_id))
+            return
+        mesaj_gonder(f"⏳ <b>Paylaşım #{p_id} için ses ve video yenileniyor...</b>\nMazlum Kiper spiker sesi alternatif bir tonla yeniden sentezleniyor, lütfen bekleyin...", chat_id=str(chat_id))
+        def _gorev_komut_sesyenile(pid=p_id, cid=chat_id):
+            try:
+                from .. import otomasyon
+                otomasyon.hadis_veya_dua_sesi_yenile(pid)
+                onay_istegi_gonder(pid)
+            except Exception as e:
+                log.error(f"/sesyenile hatası (#{pid}): {e}")
+                mesaj_gonder(f"❌ <b>Ses yenileme hatası:</b> <code>{html.escape(str(e))}</code>", chat_id=str(cid))
+        _arkaplanda_calistir(_gorev_komut_sesyenile)
 
     elif ana_komut == "/hata":
         son_h = hata_bildir.son_hata_getir()
@@ -1349,6 +1384,41 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                             )
 
                     _arkaplanda_calistir(_gorev_yeniden_uret_btn)
+
+                elif data.startswith("sesyenile_"):
+                    p_id = int(data.split("_")[1])
+                    callback_cevapla(cq_id, f"🎙️ Paylaşım #{p_id} için yeni ses üretiliyor...", alert=False)
+                    caption_ve_buton_guncelle(
+                        chat_id,
+                        msg_id,
+                        f"⏳ <b>SES VE VİDEO YENİLENİYOR (#{p_id})...</b>\n\nMazlum Kiper spiker sesi alternatif tonlama ile yeniden sentezleniyor ve video render ediliyor, lütfen bekleyin...",
+                        butonlar=[]
+                    )
+
+                    def _gorev_ses_yenile_btn(paylasim_id=p_id, c_id=chat_id, m_id=msg_id):
+                        try:
+                            from .. import otomasyon
+                            otomasyon.hadis_veya_dua_sesi_yenile(paylasim_id)
+                            caption_ve_buton_guncelle(
+                                c_id,
+                                m_id,
+                                f"🔄 <b>Paylaşım #{paylasim_id} için yeni ses ve video üretildi!</b>\n\n<i>Aşağıda paylaşılan yeni videoyu dinleyip onaylayabilirsiniz.</i>",
+                                butonlar=[]
+                            )
+                            onay_istegi_gonder(paylasim_id)
+                        except Exception as e:
+                            log.error(f"Sesi yenileme hatası (#{paylasim_id}): {e}")
+                            caption_ve_buton_guncelle(
+                                c_id,
+                                m_id,
+                                f"❌ <b>Ses Yenilenemedi:</b> <code>{html.escape(str(e))}</code>",
+                                butonlar=[
+                                    [{"text": "🎙️ Tekrar Dene", "callback_data": f"sesyenile_{paylasim_id}"}],
+                                    [{"text": "❌ İptal Et", "callback_data": f"red_{paylasim_id}"}],
+                                ]
+                            )
+
+                    _arkaplanda_calistir(_gorev_ses_yenile_btn)
 
                 elif data == "cmd_saglik":
                     callback_cevapla(cq_id, "🩺 Sağlık testi yapılıyor...", alert=False)
