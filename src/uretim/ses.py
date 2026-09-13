@@ -10,7 +10,7 @@ import re
 import logging
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 import requests
 import imageio_ffmpeg
 
@@ -125,7 +125,6 @@ def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[int, f
     114 sûrenin tamamı yerel repoda saklandığı için harici API bağımlılığı ve gecikmesi yoktur.
     Dönen her eleman: (kelime_indeksi_0_tabanli, baslangic_sn, bitis_sn)
     """
-    global _ZAMAN_CACHE
     if sure_no in _ZAMAN_CACHE:
         data = _ZAMAN_CACHE[sure_no]
     else:

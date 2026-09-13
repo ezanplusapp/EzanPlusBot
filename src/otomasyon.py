@@ -455,6 +455,7 @@ def dua_videosu_olustur_ve_gonder(ruh_hali: Optional[str] = None, auto_publish: 
     baslik = icerik.get("dua_basligi", "Günün Duası")
     turkce_anlam = icerik.get("turkce_anlam", "")
     arapca_metin = icerik.get("arapca_metin")
+    arapca_okunus = icerik.get("arapca_okunus")
     fazilet = icerik.get("fazilet_notu") or icerik.get("okunus_veya_fazilet")
     if fazilet and "•" in fazilet:
         parcalar = fazilet.split("•", 1)
@@ -559,6 +560,7 @@ def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
     baslik = kayit.get("baslik") or ""
     kaynak = kayit.get("kaynak") or baslik
     arapca_metin = kayit.get("arapca_metin")
+    arapca_okunus = kayit.get("arapca_okunus")
     tefekkur = kayit.get("tefekkur")
     dosya_eki = int(time.time())
 
@@ -603,6 +605,7 @@ def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
             ses_yolu=yeni_ses_yolu,
             words_data=words_data,
             arapca_metin=arapca_metin,
+            arapca_okunus=arapca_okunus,
             tefekkur_notu=tefekkur,
             cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"hadis_video_{dosya_eki}.mp4",
             ney_volume=0.48,
@@ -614,6 +617,7 @@ def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
             ses_yolu=yeni_ses_yolu,
             words_data=words_data,
             arapca_metin=arapca_metin,
+            arapca_okunus=arapca_okunus,
             tefekkur_notu=tefekkur,
             kaynak_ref=kaynak,
             cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"dua_video_{dosya_eki}.mp4",
