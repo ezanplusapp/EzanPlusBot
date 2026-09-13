@@ -562,7 +562,20 @@ h1, h2, h3, .serif-font {
     border-radius: 50%;
 }
 
-/* Mockup İçerik Ekranları */
+/* Mockup İçerik Ekranları (Gerçek Uygulama Görüntüleri) */
+.mockup-screen-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: none;
+    animation: fadeInScreen 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mockup-screen-img.active {
+    display: block;
+}
+
 .mockup-screen-content {
     flex: 1;
     padding: 44px 16px 20px;
@@ -1619,9 +1632,545 @@ h1, h2, h3, .serif-font {
 }
 
 /* ==========================================================================
+   3.5. 3D Uygulama İçi Keşif Galerisi (Coverflow Mimarisi)
+   ========================================================================== */
+.gallery-section {
+    padding: 100px 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.gallery-carousel-scene {
+    position: relative;
+    max-width: 1200px;
+    margin: 50px auto 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1400px;
+    min-height: 640px;
+}
+
+.gallery-cards-track {
+    position: relative;
+    width: 320px;
+    height: 620px;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gallery-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 320px;
+    height: 620px;
+    border-radius: 36px;
+    background: #FFFFFF;
+    box-shadow: 0 25px 50px -12px rgba(28, 25, 23, 0.18), 0 0 0 1px rgba(234, 228, 213, 0.9);
+    overflow: hidden;
+    cursor: pointer;
+    transform-origin: center center;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+    display: flex;
+    flex-direction: column;
+}
+
+.gallery-card .card-device-frame {
+    width: 100%;
+    height: 480px;
+    overflow: hidden;
+    background: #000;
+    position: relative;
+}
+
+.gallery-card .card-device-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+.gallery-card:hover .card-device-frame img {
+    transform: scale(1.02);
+}
+
+.gallery-card .card-caption {
+    padding: 18px 20px;
+    background: #FFFDF9;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-top: 1px solid var(--kenarlik);
+}
+
+.gallery-card .card-badge {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--kirmizi);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.gallery-card .card-caption h4 {
+    font-size: 16px;
+    color: var(--metin-ana);
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+
+.gallery-card .card-caption p {
+    font-size: 12px;
+    color: var(--metin-ikincil);
+    line-height: 1.4;
+    margin: 0;
+}
+
+.gallery-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 1px solid var(--kenarlik);
+    color: var(--metin-ana);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    z-index: 40;
+}
+
+.gallery-nav-btn:hover {
+    background: var(--kirmizi);
+    color: #FFFFFF;
+    border-color: var(--kirmizi);
+    transform: translateY(-50%) scale(1.08);
+}
+
+.gallery-nav-btn.prev {
+    left: 40px;
+}
+
+.gallery-nav-btn.next {
+    right: 40px;
+}
+
+.gallery-dots-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 36px;
+}
+
+.gallery-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--kenarlik);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.gallery-dot.active {
+    width: 28px;
+    border-radius: 6px;
+    background: var(--kirmizi);
+}
+
+/* ==========================================================================
+   5.5. iOS 17/18 Widgets & Canlı Etkinlikler Bölümü
+   ========================================================================== */
+.widgets-section {
+    padding: 100px 0;
+    background: linear-gradient(180deg, #FBF9F4 0%, #F5F0E6 100%);
+    border-top: 1px solid var(--kenarlik);
+    border-bottom: 1px solid var(--kenarlik);
+    position: relative;
+}
+
+.widgets-split-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+}
+
+.widget-feature-items {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    margin-top: 36px;
+}
+
+.w-item {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.w-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: #FFFDF9;
+    border: 1px solid var(--kenarlik);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.w-text-box h4 {
+    font-size: 18px;
+    color: var(--metin-ana);
+    margin-bottom: 6px;
+}
+
+.w-text-box p {
+    font-size: 14px;
+    color: var(--metin-ikincil);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.widget-interactive-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    max-width: 440px;
+    margin: 0 auto;
+}
+
+.live-widget-card {
+    width: 100%;
+    background: rgba(255, 253, 249, 0.92);
+    border: 1px solid rgba(234, 228, 213, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 28px;
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(28, 25, 23, 0.08);
+    transition: transform 0.3s ease;
+}
+
+.live-widget-card:hover {
+    transform: translateY(-4px);
+}
+
+.w-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.w-brand-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: var(--metin-soluk);
+}
+
+.w-dot-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--kirmizi);
+    animation: pulse 2s infinite;
+}
+
+.w-badge-time {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--metin-ana);
+}
+
+.w-card-main {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.w-countdown-val {
+    font-family: 'Lora', serif;
+    font-size: 44px;
+    font-weight: 700;
+    color: var(--kirmizi);
+    line-height: 1;
+}
+
+.w-countdown-desc strong {
+    display: block;
+    font-size: 15px;
+    color: var(--metin-ana);
+}
+
+.w-countdown-desc span {
+    font-size: 12px;
+    color: var(--metin-soluk);
+}
+
+.w-progress-line {
+    width: 100%;
+    height: 6px;
+    background: #EAE4D5;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.w-progress-active {
+    height: 100%;
+    background: var(--kirmizi);
+    border-radius: 3px;
+}
+
+.dynamic-island-preview {
+    width: 90%;
+    background: #000000;
+    color: #FFFFFF;
+    border-radius: 28px;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.island-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.island-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #A7F3D0;
+}
+
+.island-live-dot {
+    width: 6px;
+    height: 6px;
+    background: #10B981;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+.widget-ayah-compact {
+    padding: 18px 24px;
+}
+
+.w-ayah-quote {
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--metin-ana);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.w-ayah-ref {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: var(--altin);
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   6.5. Testimonials (Kullanıcı Deneyimleri)
+   ========================================================================== */
+.testimonials-section {
+    padding: 100px 0;
+    position: relative;
+}
+
+.testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    margin-top: 50px;
+}
+
+.testimonial-card {
+    background: #FFFDF9;
+    border: 1px solid var(--kenarlik);
+    border-radius: 24px;
+    padding: 36px 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 10px 25px rgba(28, 25, 23, 0.04);
+    transition: all 0.3s ease;
+}
+
+.testimonial-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(28, 25, 23, 0.08);
+}
+
+.testimonial-card.featured-testimonial {
+    border-color: rgba(180, 83, 9, 0.3);
+    background: linear-gradient(180deg, #FFFDF9 0%, #FAF5EC 100%);
+}
+
+.testi-stars {
+    color: #D97706;
+    font-size: 18px;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+}
+
+.testi-quote {
+    font-family: 'Lora', serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--metin-ana);
+    margin-bottom: 24px;
+}
+
+.testi-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-top: 1px solid var(--kenarlik);
+    padding-top: 16px;
+}
+
+.author-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--kirmizi);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.author-details strong {
+    display: block;
+    font-size: 14px;
+    color: var(--metin-ana);
+}
+
+.author-details span {
+    font-size: 12px;
+    color: var(--metin-soluk);
+}
+
+/* ==========================================================================
+   6.8. SSS (Sıkça Sorulan Sorular / Accordion)
+   ========================================================================== */
+.faq-section {
+    padding: 100px 0;
+    background: #FBF9F4;
+    border-top: 1px solid var(--kenarlik);
+}
+
+.faq-accordion-box {
+    max-width: 800px;
+    margin: 50px auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.faq-item {
+    background: #FFFDF9;
+    border: 1px solid var(--kenarlik);
+    border-radius: 18px;
+    overflow: hidden;
+    transition: all 0.25s ease;
+}
+
+.faq-item.active {
+    border-color: rgba(155, 27, 27, 0.4);
+    box-shadow: 0 8px 20px rgba(155, 27, 27, 0.06);
+}
+
+.faq-question-btn {
+    width: 100%;
+    padding: 22px 26px;
+    background: none;
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--metin-ana);
+    cursor: pointer;
+    gap: 16px;
+}
+
+.faq-chevron {
+    font-size: 18px;
+    color: var(--metin-soluk);
+    transition: transform 0.3s ease;
+}
+
+.faq-item.active .faq-chevron {
+    transform: rotate(180deg);
+    color: var(--kirmizi);
+}
+
+.faq-answer-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 0 26px;
+}
+
+.faq-answer-panel p {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--metin-ikincil);
+    padding-bottom: 22px;
+    margin: 0;
+}
+
+/* ==========================================================================
    Responsive Medya Sorguları
    ========================================================================== */
 @media (max-width: 1024px) {
+    .widgets-split-layout {
+        grid-template-columns: 1fr;
+        gap: 48px;
+        text-align: center;
+    }
+
+    .widget-feature-items {
+        text-align: left;
+    }
+
+    .testimonials-grid {
+        grid-template-columns: 1fr;
+    }
     .hero-grid {
         grid-template-columns: 1fr;
         text-align: center;

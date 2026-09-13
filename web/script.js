@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     init3dMockupTilt();
     init3dCardTilt();
     initMockupTabs();
+    initGalleryCarousel();
+    initFaqAccordion();
     initInteractiveDhikr();
     initLivePrayerTimes();
     initAudioPlayer();
@@ -37,11 +39,11 @@ function initHeaderScroll() {
 }
 
 /* ==========================================================================
-   2. İnteraktif iPhone Mockup Sekmeleri
+   2. İnteraktif iPhone Mockup Sekmeleri (Gerçek Ekranlar)
    ========================================================================== */
 function initMockupTabs() {
     const tabButtons = document.querySelectorAll('.mockup-tab-btn');
-    const screens = document.querySelectorAll('.mockup-screen-content');
+    const screens = document.querySelectorAll('.mockup-screen-img, .mockup-screen-content');
 
     tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -633,6 +635,203 @@ function init3dCardTilt() {
 
         card.addEventListener('mouseleave', () => {
             card.style.transform = `perspective(800px) rotateX(0deg) rotateY(0deg) translateY(0)`;
+        });
+    });
+}
+
+/* ==========================================================================
+   11. 3D Uygulama İçi Keşif Galerisi (Coverflow Motoru)
+   ========================================================================== */
+function initGalleryCarousel() {
+    const track = document.getElementById('galleryCardsTrack');
+    const cards = document.querySelectorAll('.gallery-card');
+    const prevBtn = document.getElementById('galleryPrev');
+    const nextBtn = document.getElementById('galleryNext');
+    const dotsContainer = document.getElementById('galleryDots');
+    const scene = document.querySelector('.gallery-carousel-scene');
+
+    if (!track || cards.length === 0) return;
+
+    let activeIdx = 0;
+    const total = cards.length;
+    let autoInterval = null;
+
+    // Sayfa Noktalarını (Dots) Oluştur
+    if (dotsContainer) {
+        dotsContainer.innerHTML = '';
+        cards.forEach((_, i) => {
+            const dot = document.createElement('button');
+            dot.className = `gallery-dot ${i === 0 ? 'active' : ''}`;
+            dot.setAttribute('aria-label', `Ekran ${i + 1}`);
+            dot.addEventListener('click', () => {
+                activeIdx = i;
+                updateCoverflow();
+                resetAutoPlay();
+            });
+            dotsContainer.appendChild(dot);
+        });
+    }
+
+    function updateCoverflow() {
+        const dots = document.querySelectorAll('.gallery-dot');
+        dots.forEach((d, i) => d.classList.toggle('active', i === activeIdx));
+
+        const isMobile = window.innerWidth <= 768;
+        const xOffset1 = isMobile ? 160 : 260;
+        const xOffset2 = isMobile ? 260 : 440;
+        const zOffset1 = isMobile ? -100 : -160;
+        const zOffset2 = isMobile ? -180 : -300;
+
+        cards.forEach((card, i) => {
+            let diff = i - activeIdx;
+            if (diff > total / 2) diff -= total;
+            if (diff < -total / 2) diff += total;
+
+            if (diff === 0) {
+                card.style.transform = 'translateX(0) translateZ(0) rotateY(0deg) scale(1)';
+                card.style.opacity = '1';
+                card.style.zIndex = '15';
+                card.style.pointerEvents = 'auto';
+                card.style.filter = 'none';
+            } else if (diff === 1) {
+                card.style.transform = `translateX(${xOffset1}px) translateZ(${zOffset1}px) rotateY(-24deg) scale(0.86)`;
+                card.style.opacity = '0.85';
+                card.style.zIndex = '10';
+                card.style.pointerEvents = 'auto';
+                card.style.filter = 'brightness(0.92)';
+            } else if (diff === -1) {
+                card.style.transform = `translateX(-${xOffset1}px) translateZ(${zOffset1}px) rotateY(24deg) scale(0.86)`;
+                card.style.opacity = '0.85';
+                card.style.zIndex = '10';
+                card.style.pointerEvents = 'auto';
+                card.style.filter = 'brightness(0.92)';
+            } else if (diff === 2) {
+                card.style.transform = `translateX(${xOffset2}px) translateZ(${zOffset2}px) rotateY(-36deg) scale(0.72)`;
+                card.style.opacity = '0.45';
+                card.style.zIndex = '6';
+                card.style.pointerEvents = 'auto';
+                card.style.filter = 'brightness(0.8)';
+            } else if (diff === -2) {
+                card.style.transform = `translateX(-${xOffset2}px) translateZ(${zOffset2}px) rotateY(36deg) scale(0.72)`;
+                card.style.opacity = '0.45';
+                card.style.zIndex = '6';
+                card.style.pointerEvents = 'auto';
+                card.style.filter = 'brightness(0.8)';
+            } else {
+                const side = diff > 0 ? 1 : -1;
+                card.style.transform = `translateX(${side * 600}px) translateZ(-500px) rotateY(${side * -45}deg) scale(0.5)`;
+                card.style.opacity = '0';
+                card.style.zIndex = '1';
+                card.style.pointerEvents = 'none';
+            }
+        });
+    }
+
+    // Karta Tıklayınca Merkeze Getir
+    cards.forEach((card, i) => {
+        card.addEventListener('click', () => {
+            if (activeIdx !== i) {
+                activeIdx = i;
+                updateCoverflow();
+                resetAutoPlay();
+            }
+        });
+    });
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            activeIdx = (activeIdx - 1 + total) % total;
+            updateCoverflow();
+            resetAutoPlay();
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            activeIdx = (activeIdx + 1) % total;
+            updateCoverflow();
+            resetAutoPlay();
+        });
+    }
+
+    // Dokunma (Touch/Swipe) Desteği
+    let startX = 0;
+    let endX = 0;
+    if (scene) {
+        scene.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+        }, { passive: true });
+
+        scene.addEventListener('touchend', (e) => {
+            endX = e.changedTouches[0].clientX;
+            const diffX = startX - endX;
+            if (Math.abs(diffX) > 40) {
+                if (diffX > 0) {
+                    activeIdx = (activeIdx + 1) % total;
+                } else {
+                    activeIdx = (activeIdx - 1 + total) % total;
+                }
+                updateCoverflow();
+                resetAutoPlay();
+            }
+        }, { passive: true });
+    }
+
+    // Otomatik Döndürme
+    function startAutoPlay() {
+        if (autoInterval) clearInterval(autoInterval);
+        autoInterval = setInterval(() => {
+            activeIdx = (activeIdx + 1) % total;
+            updateCoverflow();
+        }, 5000);
+    }
+
+    function resetAutoPlay() {
+        clearInterval(autoInterval);
+        startAutoPlay();
+    }
+
+    if (scene) {
+        scene.addEventListener('mouseenter', () => clearInterval(autoInterval));
+        scene.addEventListener('mouseleave', () => startAutoPlay());
+    }
+
+    updateCoverflow();
+    startAutoPlay();
+    window.addEventListener('resize', updateCoverflow, { passive: true });
+}
+
+/* ==========================================================================
+   12. SSS (Sıkça Sorulan Sorular / Accordion)
+   ========================================================================== */
+function initFaqAccordion() {
+    const items = document.querySelectorAll('.faq-item');
+
+    items.forEach(item => {
+        const btn = item.querySelector('.faq-question-btn');
+        const panel = item.querySelector('.faq-answer-panel');
+
+        if (!btn || !panel) return;
+
+        btn.addEventListener('click', () => {
+            const isActive = item.classList.contains('active');
+
+            // Diğer tüm açık panelleri kapat
+            items.forEach(other => {
+                if (other !== item) {
+                    other.classList.remove('active');
+                    const otherPanel = other.querySelector('.faq-answer-panel');
+                    if (otherPanel) otherPanel.style.maxHeight = '0px';
+                }
+            });
+
+            if (isActive) {
+                item.classList.remove('active');
+                panel.style.maxHeight = '0px';
+            } else {
+                item.classList.add('active');
+                panel.style.maxHeight = panel.scrollHeight + 'px';
+            }
         });
     });
 }
