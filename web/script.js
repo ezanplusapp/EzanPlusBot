@@ -9,6 +9,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     initHeaderScroll();
+    initSmartDeviceDownload();
     initThreeJsBackground();
     init3dMockupTilt();
     init3dCardTilt();
@@ -17,9 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initFaqAccordion();
     initInteractiveDhikr();
     initLivePrayerTimes();
-    initAudioPlayer();
+    initQuranShowcase();
     initWisdomRotator();
     initQrModal();
+    initBetaModal();
 });
 
 /* ==========================================================================
@@ -203,16 +205,58 @@ function vakitleriGuncelle() {
         }
     });
 
-    // Geri sayım formatla (02:45:12)
+    // Dairesel İlerleme Barı (Circular Progress) Hesapla
+    const oncekiDk = timeToMinutes(vakitler[oncekiVakit.key]);
+    let hedefDk = timeToMinutes(vakitler[siradakiVakit.key]);
+    let simdikiDk = nowMinutes + curSecs / 60;
+    
+    // Gece geçişi normalizasyonu (Yatsı -> İmsak)
+    if (hedefDk <= oncekiDk) {
+        hedefDk += 24 * 60;
+        if (simdikiDk < oncekiDk) {
+            simdikiDk += 24 * 60;
+        }
+    }
+    const toplamSure = hedefDk - oncekiDk;
+    const gecenSure = simdikiDk - oncekiDk;
+    const progress = Math.min(100, Math.max(0, toplamSure > 0 ? (gecenSure / toplamSure) * 100 : 0));
+    
+    // SVG çevresi = 2 * PI * r = 2 * 3.14159265 * 102 = 640.88
+    const circumference = 640.88;
+    const offset = circumference - (progress / 100) * circumference;
+    const circleBar = document.getElementById('timerCircleBar');
+    if (circleBar) {
+        circleBar.style.strokeDashoffset = offset.toFixed(2);
+    }
+
+    // Geri sayım formatla (02:45 ve :12)
     const kSaat = Math.floor(kalanSaniye / 3600);
     const kDakika = Math.floor((kalanSaniye % 3600) / 60);
     const kSaniye = kalanSaniye % 60;
-    const formatliSure = `${String(kSaat).padStart(2, '0')}:${String(kDakika).padStart(2, '0')}:${String(kSaniye).padStart(2, '0')}`;
+    const hmStr = `${String(kSaat).padStart(2, '0')}:${String(kDakika).padStart(2, '0')}`;
+    const secStr = `:${String(kSaniye).padStart(2, '0')}`;
 
-    const countdownEl = document.getElementById('liveCountdownTimer');
+    const digitsHM = document.getElementById('digitsHM');
+    const digitsSec = document.getElementById('digitsSec');
+    if (digitsHM && digitsSec) {
+        digitsHM.textContent = hmStr;
+        digitsSec.textContent = secStr;
+    } else {
+        const countdownEl = document.getElementById('liveCountdownTimer');
+        if (countdownEl) countdownEl.textContent = `${hmStr}${secStr}`;
+    }
+
     const countdownLabelEl = document.getElementById('liveCountdownLabel');
-    if (countdownEl) countdownEl.textContent = formatliSure;
     if (countdownLabelEl) countdownLabelEl.textContent = `${siradakiVakit.tr} Vaktine Kalan Süre`;
+    const appNextVakitTag = document.getElementById('appNextVakitTag');
+    if (appNextVakitTag) appNextVakitTag.textContent = siradakiVakit.tr.toUpperCase();
+
+    // Şehir ismini kadran hapında güncelle
+    const timerCityName = document.getElementById('appTimerCityName');
+    const sehirSelectEl = document.getElementById('sehirSelect');
+    if (timerCityName && sehirSelectEl) {
+        timerCityName.textContent = sehirSelectEl.options[sehirSelectEl.selectedIndex]?.text || "İstanbul";
+    }
 
     // Mockup içindeki küçük ekranı da güncelle
     const miniNextTime = document.getElementById('miniNextTime');
@@ -238,22 +282,265 @@ function vakitleriGuncelle() {
 }
 
 /* ==========================================================================
-   5. İnteraktif Tilavet & Audio Player
+   5. İnteraktif Kur'an-ı Kerim, Tilavet, Hatim ve Canlı Radyo Motoru
    ========================================================================== */
-function initAudioPlayer() {
-    const playBtn = document.getElementById('btnPlayRecitation');
-    const audioEl = document.getElementById('recitationAudio');
-    const progressBar = document.getElementById('audioProgressBar');
-    const progressFill = document.getElementById('audioProgressFill');
-    const curTimeEl = document.getElementById('audioCurTime');
-    const durTimeEl = document.getElementById('audioDurTime');
-    const eqBars = document.getElementById('equalizerBars');
+const QURAN_SURAHS_DATA = {
+    "ayetel-kursi": {
+        id: "ayetel-kursi",
+        badge: "BAKARA SÛRESİ • 255. ÂYET (ÂYETE'L-KÜRSÎ)",
+        juzBadge: "3. CÜZ • MEDENÎ",
+        verseKey: "2:255",
+        words: [
+            "اللَّهُ", "لَا", "إِلٰهَ", "إِلَّا", "هُوَ", "الْحَيُّ", "الْقَيُّومُ", "ۚ",
+            "لَا", "تَأْخُذُهُ", "سِنَةٌ", "وَلَا", "نَوْمٌ", "ۚ",
+            "لَهُ", "مَا", "فِي", "السَّمَاوَاتِ", "وَمَا", "فِي", "الْأَرْضِ", "ۗ",
+            "مَنْ", "ذَا", "الَّذِي", "يَشْفَعُ", "عِنْدَهُ", "إِلَّا", "بِإِذْنِهِ", "ۚ",
+            "يَعْلَمُ", "مَا", "بَيْنَ", "أَيْدِيهِمْ", "وَمَا", "خَلْفَهُمْ", "ۖ",
+            "وَلَا", "يُحِيطُونَ", "بِشَيْءٍ", "مِنْ", "عِلْمِهِ", "إِلَّا", "بِمَا", "شَاءَ", "ۚ",
+            "وَسِعَ", "كُرْسِيُّهُ", "السَّمَاوَاتِ", "وَالْأَرْضَ", "ۖ",
+            "وَلَا", "يَئُودُهُ", "حِفْظُهُمَا", "ۚ",
+            "وَهُوَ", "الْعَلِيُّ", "الْعَظِيمُ"
+        ],
+        latin: "Allâhu lâ ilâhe illâ huve'l-hayyu'l-kayyûm, lâ te'huzuhû sinetun velâ nevm, lehû mâ fî's-semâvâti vemâ fî'l-ard, men zellezî yeşfeu indehû illâ bi-iznih, ya'lemu mâ beyne eydîhim vemâ halfehum, velâ yuhîtûne bi-şey'in min ilmihî illâ bimâ şâe, vesia kursiyyuhu's-semâvâti ve'l-ard, velâ yeûduhû hifzuhumâ, ve huve'l-aliyyu'l-azîm.",
+        translations: {
+            diyanet: "“ Allah, O'ndan başka hiçbir ilah olmayandır; daima yaşayan (Hayy), bütün varlığın idaresini yürüten (Kayyûm) dir. O'nu ne bir uyuklama tutabilir, ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O, çok yücedir, çok büyüktür. ”",
+            yazir: "“ Allah ki, O'ndan başka ilah yoktur; daima diridir, yaratıklarını koruyup yöneticidir. O'nu ne bir uyuklama tutar ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O çok yüce, çok büyüktür. ”",
+            ozturk: "“ Allah, O'ndan başka ilah yoktur; diridir, her an yaratış ve idare halindedir. O'nu ne bir uyuklama tutar ne de bir uyku... O, çok yücedir, çok büyüktür. ”",
+            yuksel: "“ ALLAH: O'ndan başka tanrı yoktur; Diridir, Ebedidir. O'nu ne bir uyuklama ne de bir uyku yakalayamaz... O Yücedir, Büyüktür. ”"
+        },
+        tefekkur: "Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.",
+        localAudio: "assets/audio/002255.mp3",
+        surahNum: "002",
+        ayahNum: "255"
+    },
+    "fatiha": {
+        id: "fatiha",
+        badge: "FÂTİHA SÛRESİ • 1. ÂYET",
+        juzBadge: "1. CÜZ • MEKKÎ",
+        verseKey: "1:1",
+        words: ["بِسْمِ", "اللَّهِ", "الرَّحْمَٰنِ", "الرَّحِيمِ"],
+        latin: "Bismillâhirrahmânirrahîm.",
+        translations: {
+            diyanet: "“ Rahman ve Rahîm olan Allah'ın adıyla. ”",
+            yazir: "“ Merhametli ve çok lütufkâr olan Allah'ın adıyla. ”",
+            ozturk: "“ Rahman ve Rahîm Allah'ın adıyla. ”",
+            yuksel: "“ Bağışlayan ve Esirgeyen ALLAH'ın adıyla. ”"
+        },
+        tefekkur: "Her hayırlı amelin başı, kalbi ilahi rahmet kapısına açan Nebevî anahtardır.",
+        localAudio: "assets/audio/001001.mp3",
+        surahNum: "001",
+        ayahNum: "001"
+    },
+    "insirah": {
+        id: "insirah",
+        badge: "İNŞİRÂH SÛRESİ • 5-6. ÂYET",
+        juzBadge: "30. CÜZ • MEKKÎ",
+        verseKey: "94:5",
+        words: ["فَإِنَّ", "مَعَ", "الْعُسْرِ", "يُسْرًا", "•", "إِنَّ", "مَعَ", "الْعُسْرِ", "يُسْرًا"],
+        latin: "Fe inne meal usri yusrâ, inne meal usri yusrâ.",
+        translations: {
+            diyanet: "“ Şüphesiz her güçlükle beraber bir kolaylık vardır. Gerçekten güçlükle beraber bir kolaylık vardır. ”",
+            yazir: "“ Demek ki zorlukla beraber bir kolaylık var. Evet, zorlukla beraber bir kolaylık var! ”",
+            ozturk: "“ Demek ki, zorluğun yanında bir kolaylık mutlaka var! Evet, zorluğun yanında bir kolaylık mutlaka var! ”",
+            yuksel: "“ Kuşkusuz, zorlukla beraber bir kolaylık vardır. Evet, zorlukla beraber bir kolaylık vardır. ”"
+        },
+        tefekkur: "Sabır ve tevekkülün sonunda kalbe inen ilahi ferahlığın ebedi müjdesidir.",
+        localAudio: "assets/audio/insirah.mp3",
+        surahNum: "094",
+        ayahNum: "005"
+    },
+    "yasin": {
+        id: "yasin",
+        badge: "YÂSÎN SÛRESİ • 58. ÂYET",
+        juzBadge: "23. CÜZ • MEKKÎ",
+        verseKey: "36:58",
+        words: ["سَلَامٌ", "قَوْلًا", "مِنْ", "رَبٍّ", "رَحِيمٍ"],
+        latin: "Selâmun kavlen min rabbin rahîm.",
+        translations: {
+            diyanet: "“ Çok merhametli olan Rab'den bir söz olarak kendilerine 'Selâm' vardır. ”",
+            yazir: "“ Merhametli bir Rabbin sözü olarak onlara 'Selâm' vardır. ”",
+            ozturk: "“ Çok merhametli bir Rab'den bir de sözlü 'Selâm' vardır. ”",
+            yuksel: "“ Çok Rahîm olan Rab'den bir söz olarak: 'Selam!' ”"
+        },
+        tefekkur: "Cennet ehline Yüce Mevlâ katından bizzat ikram edilecek en şerefli hitaptır.",
+        localAudio: "assets/audio/036058.mp3",
+        surahNum: "036",
+        ayahNum: "058"
+    },
+    "mulk": {
+        id: "mulk",
+        badge: "MÜLK SÛRESİ • 1. ÂYET",
+        juzBadge: "29. CÜZ • MEKKÎ",
+        verseKey: "67:1",
+        words: ["تَبَارَكَ", "الَّذِي", "بِيَدِهِ", "الْمُلْكُ", "وَهُوَ", "عَلَىٰ", "كُلِّ", "شَيْءٍ", "قَدِيرٌ"],
+        latin: "Tebârekellezî biyedihil mulku ve huve alâ kulli şey'in kadîr.",
+        translations: {
+            diyanet: "“ Hükümranlık elinde olan Allah, yüceler yücesidir ve O her şeye hakkıyla güç yetirendir. ”",
+            yazir: "“ Mutlak hükümranlık elinde bulunan Allah ne yücedir! O'nun her şeye gücü yeter. ”",
+            ozturk: "“ Ne yücedir O ki, mülk ve saltanat O'nun elindedir. Ve O, her şeye güç yetirendir. ”",
+            yuksel: "“ Egemenlik elinde bulunan çok yücedir ve O her şeye Kadirdir. ”"
+        },
+        tefekkur: "Kabir azabından koruyan ve geceleri tefekkürle tilavet edilmesi tavsiye edilen sûredir.",
+        localAudio: "assets/audio/067001.mp3",
+        surahNum: "067",
+        ayahNum: "001"
+    },
+    "ihlas": {
+        id: "ihlas",
+        badge: "İHLÂS SÛRESİ • 1. ÂYET",
+        juzBadge: "30. CÜZ • MEKKÎ",
+        verseKey: "112:1",
+        words: ["قُلْ", "هُوَ", "اللَّهُ", "أَحَدٌ"],
+        latin: "Kul huvallâhu ehad.",
+        translations: {
+            diyanet: "“ De ki: O, Allah'tır, bir tektir. ”",
+            yazir: "“ De ki: O Allah, birdir. ”",
+            ozturk: "“ De ki: O, Allah'tır; Ehad'dir, tektir. ”",
+            yuksel: "“ De ki: O ALLAH birdir. ”"
+        },
+        tefekkur: "Tevhid akidesinin özü ve Kur'an'ın üçte birine denk olan saf ihlas beyanıdır.",
+        localAudio: "assets/audio/112001.mp3",
+        surahNum: "112",
+        ayahNum: "001"
+    }
+};
 
-    if (!playBtn || !audioEl) return;
+const QURAN_RECITERS_CONFIG = {
+    alafasy: { label: "Şeyh Mişari Râşid el-Afâsî", url: "https://everyayah.com/data/Alafasy_128kbps/" },
+    ghamadi: { label: "Saad el-Gâmidî", url: "https://everyayah.com/data/Ghamadi_40kbps/" },
+    basit:   { label: "Abdülbâsit Abdüssamed", url: "https://everyayah.com/data/Abdul_Basit_Murattal_192kbps/" },
+    husary:  { label: "Mahmud Halil el-Huserî", url: "https://everyayah.com/data/Husary_128kbps/" },
+    sudais:  { label: "Abdurrahman es-Sudeys", url: "https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/" },
+    shuraym: { label: "Suud eş-Şureym", url: "https://everyayah.com/data/Shuraym_128kbps/" },
+    minshawi:{ label: "Muhammed Sıddık el-Minşâvî", url: "https://everyayah.com/data/Minshawy_Murattal_128kbps/" }
+};
+
+let currentSurahKey = "ayetel-kursi";
+let currentReciterKey = "alafasy";
+let currentMealKey = "diyanet";
+let currentPlaybackSpeed = 1.0;
+let isRepeatEnabled = true;
+
+// 30 Cüz Durum Haritası (Varsayılan 18 cüz tamamlanmış = %60)
+let completedJuzMap = {
+    1: true, 2: true, 3: true, 4: true, 5: true, 6: true,
+    7: true, 8: true, 9: true, 10: true, 11: true, 12: true,
+    13: true, 14: true, 15: true, 16: true, 17: true, 18: true
+};
+
+function initQuranShowcase() {
+    initQuranNavTabs();
+    initQuranTilavetPlayer();
+    initHatimTracker();
+    initQuranRadio();
+}
+
+/* --- A. Kur'an Ana Sekmeler (Player / Hatim / Radio) --- */
+function initQuranNavTabs() {
+    const tabBtns = document.querySelectorAll('.quran-nav-tab');
+    const panels = document.querySelectorAll('.quran-tab-panel');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabKey = btn.getAttribute('data-tab');
+            tabBtns.forEach(b => b.classList.remove('active'));
+            panels.forEach(p => p.classList.remove('active'));
+
+            btn.classList.add('active');
+            const targetPanel = document.getElementById(`quranPanel-${tabKey}`);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
+        });
+    });
+}
+
+/* --- B. Canlı Tilavet Çaları & Senkron Karaoke --- */
+function initQuranTilavetPlayer() {
+    const audioEl = document.getElementById('quranRecitationAudio');
+    const playBtn = document.getElementById('mushafPlayBtn');
+    const progressTrack = document.getElementById('mushafProgressTrack');
+    const progressFill = document.getElementById('mushafProgressFill');
+    const curTimeEl = document.getElementById('mushafCurTime');
+    const durTimeEl = document.getElementById('mushafDurTime');
+    const equalizer = document.getElementById('mushafEqualizer');
+    const speedBtn = document.getElementById('mushafSpeedBtn');
+    const repeatBtn = document.getElementById('mushafRepeatBtn');
+    const surahChips = document.querySelectorAll('.surah-chip');
+    const reciterSelect = document.getElementById('reciterSelect');
+    const mealSelect = document.getElementById('mealSelect');
+
+    if (!audioEl || !playBtn) return;
+
+    function renderActiveSurah(surahKey) {
+        currentSurahKey = surahKey;
+        const data = QURAN_SURAHS_DATA[surahKey];
+        if (!data) return;
+
+        // Rozetler
+        const badgeEl = document.getElementById('mushafAyahBadge');
+        const juzBadgeEl = document.getElementById('mushafJuzBadge');
+        const titleEl = document.getElementById('mushafPlayingTitle');
+        if (badgeEl) badgeEl.textContent = data.badge;
+        if (juzBadgeEl) juzBadgeEl.textContent = data.juzBadge;
+        if (titleEl) titleEl.textContent = data.badge;
+
+        // Arapça Hat (Kelime spans)
+        const arabicEl = document.getElementById('mushafArabicText');
+        if (arabicEl) {
+            arabicEl.innerHTML = data.words.map((w, idx) => 
+                `<span class="quran-word waiting" id="qWord-${idx}">${w}</span>`
+            ).join(' ');
+        }
+
+        // Latin Okunuş
+        const latinEl = document.getElementById('mushafLatinText');
+        if (latinEl) latinEl.textContent = data.latin;
+
+        // Türkçe Meal
+        const transEl = document.getElementById('mushafTranslationText');
+        if (transEl) transEl.textContent = data.translations[currentMealKey] || data.translations['diyanet'];
+
+        // Tefekkür
+        const tefekkurEl = document.getElementById('mushafTefekkurText');
+        if (tefekkurEl) tefekkurEl.textContent = data.tefekkur;
+
+        // Audio Source
+        updateAudioSource();
+    }
+
+    function updateAudioSource() {
+        const data = QURAN_SURAHS_DATA[currentSurahKey];
+        if (!data) return;
+
+        let src = data.localAudio;
+        if (currentReciterKey !== 'alafasy') {
+            const rConfig = QURAN_RECITERS_CONFIG[currentReciterKey];
+            if (rConfig) {
+                src = `${rConfig.url}${data.surahNum}${data.ayahNum}.mp3`;
+            }
+        }
+
+        const wasPlaying = !audioEl.paused;
+        audioEl.src = src;
+        audioEl.playbackRate = currentPlaybackSpeed;
+        if (wasPlaying) {
+            audioEl.play().catch(e => console.log('Autoplay error:', e));
+        }
+    }
 
     function togglePlay() {
         if (audioEl.paused) {
-            audioEl.play().catch(e => console.log('Audio autoplay blocked:', e));
+            // Canlı radyo çalıyorsa sustur
+            const radioAudio = document.getElementById('quranLiveRadioAudio');
+            if (radioAudio && !radioAudio.paused) {
+                radioAudio.pause();
+                const rPlayBtn = document.getElementById('radioMainPlayBtn');
+                const rWave = document.getElementById('radioWaveform');
+                if (rPlayBtn) rPlayBtn.innerHTML = `<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
+                if (rWave) rWave.classList.remove('playing');
+            }
+            audioEl.play().catch(e => console.log('Audio blocked:', e));
         } else {
             audioEl.pause();
         }
@@ -261,7 +548,7 @@ function initAudioPlayer() {
 
     playBtn.addEventListener('click', togglePlay);
 
-    // Mockup içindeki küçük oynat butonu da aynı sesi çalsın
+    // Mockup mini play butonu ile senkronize
     const miniPlayBtn = document.getElementById('miniPlayBtn');
     if (miniPlayBtn) {
         miniPlayBtn.addEventListener('click', togglePlay);
@@ -269,12 +556,12 @@ function initAudioPlayer() {
 
     audioEl.addEventListener('play', () => {
         playBtn.innerHTML = `
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="4" width="4" height="16" rx="2"></rect>
                 <rect x="14" y="4" width="4" height="16" rx="2"></rect>
             </svg>
         `;
-        if (eqBars) eqBars.classList.add('playing');
+        if (equalizer) equalizer.classList.add('playing');
         if (miniPlayBtn) {
             miniPlayBtn.innerHTML = `
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -287,11 +574,11 @@ function initAudioPlayer() {
 
     audioEl.addEventListener('pause', () => {
         playBtn.innerHTML = `
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4"></polygon>
             </svg>
         `;
-        if (eqBars) eqBars.classList.remove('playing');
+        if (equalizer) equalizer.classList.remove('playing');
         if (miniPlayBtn) {
             miniPlayBtn.innerHTML = `
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -303,28 +590,225 @@ function initAudioPlayer() {
 
     audioEl.addEventListener('timeupdate', () => {
         if (!isNaN(audioEl.duration) && audioEl.duration > 0) {
-            const percent = (audioEl.currentTime / audioEl.duration) * 100;
-            if (progressFill) progressFill.style.width = `${percent}%`;
-
+            const progress = (audioEl.currentTime / audioEl.duration);
+            if (progressFill) progressFill.style.width = `${progress * 100}%`;
             if (curTimeEl) curTimeEl.textContent = formatAudioTime(audioEl.currentTime);
             if (durTimeEl) durTimeEl.textContent = formatAudioTime(audioEl.duration);
+
+            // Kelime Karaoke Vurgulama
+            const data = QURAN_SURAHS_DATA[currentSurahKey];
+            if (data && data.words) {
+                const totalWords = data.words.length;
+                const activeIndex = Math.min(totalWords - 1, Math.floor(progress * totalWords));
+
+                for (let i = 0; i < totalWords; i++) {
+                    const wEl = document.getElementById(`qWord-${i}`);
+                    if (!wEl) continue;
+                    if (i === activeIndex) {
+                        wEl.className = 'quran-word active';
+                    } else if (i < activeIndex) {
+                        wEl.className = 'quran-word done';
+                    } else {
+                        wEl.className = 'quran-word waiting';
+                    }
+                }
+            }
         }
     });
 
     audioEl.addEventListener('ended', () => {
-        if (progressFill) progressFill.style.width = '0%';
-        if (curTimeEl) curTimeEl.textContent = "0:00";
+        if (isRepeatEnabled) {
+            audioEl.currentTime = 0;
+            audioEl.play().catch(e => console.log('Repeat blocked:', e));
+        } else {
+            if (progressFill) progressFill.style.width = '0%';
+            if (curTimeEl) curTimeEl.textContent = "0:00";
+        }
     });
 
-    if (progressBar) {
-        progressBar.addEventListener('click', (e) => {
-            const rect = progressBar.getBoundingClientRect();
+    if (progressTrack) {
+        progressTrack.addEventListener('click', (e) => {
+            const rect = progressTrack.getBoundingClientRect();
             const clickPos = (e.clientX - rect.left) / rect.width;
             if (!isNaN(audioEl.duration)) {
                 audioEl.currentTime = clickPos * audioEl.duration;
             }
         });
     }
+
+    // Sûre Değişimi
+    surahChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            surahChips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            renderActiveSurah(chip.getAttribute('data-surah'));
+        });
+    });
+
+    // Hafız Değişimi
+    if (reciterSelect) {
+        reciterSelect.addEventListener('change', (e) => {
+            currentReciterKey = e.target.value;
+            updateAudioSource();
+        });
+    }
+
+    // Meal Değişimi
+    if (mealSelect) {
+        mealSelect.addEventListener('change', (e) => {
+            currentMealKey = e.target.value;
+            const data = QURAN_SURAHS_DATA[currentSurahKey];
+            const transEl = document.getElementById('mushafTranslationText');
+            if (data && transEl) {
+                transEl.textContent = data.translations[currentMealKey] || data.translations['diyanet'];
+            }
+        });
+    }
+
+    // Hız Butonu
+    if (speedBtn) {
+        speedBtn.addEventListener('click', () => {
+            if (currentPlaybackSpeed === 1.0) {
+                currentPlaybackSpeed = 1.25;
+            } else if (currentPlaybackSpeed === 1.25) {
+                currentPlaybackSpeed = 1.5;
+            } else {
+                currentPlaybackSpeed = 1.0;
+            }
+            speedBtn.textContent = `${currentPlaybackSpeed.toFixed(currentPlaybackSpeed % 1 === 0 ? 0 : 2)}x`;
+            audioEl.playbackRate = currentPlaybackSpeed;
+        });
+    }
+
+    // Tekrar Butonu
+    if (repeatBtn) {
+        repeatBtn.addEventListener('click', () => {
+            isRepeatEnabled = !isRepeatEnabled;
+            repeatBtn.classList.toggle('active', isRepeatEnabled);
+        });
+    }
+
+    // İlk Sûreyi Render Et (Âyete'l-Kürsî)
+    renderActiveSurah("ayetel-kursi");
+}
+
+/* --- C. 30 Cüz Çoklu Hatim Takibi --- */
+function initHatimTracker() {
+    const gridEl = document.getElementById('hatimJuzGrid');
+    const percentEl = document.getElementById('hatimPercentText');
+    const countEl = document.getElementById('hatimCountText');
+    const barFill = document.getElementById('hatimProgressBarFill');
+
+    if (!gridEl) return;
+
+    function updateHatimStats() {
+        const completedCount = Object.values(completedJuzMap).filter(Boolean).length;
+        const percent = Math.round((completedCount / 30) * 100);
+
+        if (percentEl) percentEl.textContent = `%${percent}`;
+        if (countEl) countEl.textContent = `${completedCount} / 30 Cüz Okundu`;
+        if (barFill) barFill.style.width = `${percent}%`;
+    }
+
+    gridEl.innerHTML = '';
+    for (let i = 1; i <= 30; i++) {
+        const isDone = !!completedJuzMap[i];
+        const box = document.createElement('div');
+        box.className = `juz-box ${isDone ? 'completed' : ''}`;
+        box.id = `juzBox-${i}`;
+        box.setAttribute('title', `${i}. Cüz (Tıkla ve durumunu değiştir)`);
+        box.innerHTML = `
+            <span class="juz-number">${i}</span>
+            <span class="juz-status-dot"></span>
+        `;
+
+        box.addEventListener('click', () => {
+            completedJuzMap[i] = !completedJuzMap[i];
+            box.classList.toggle('completed', completedJuzMap[i]);
+            updateHatimStats();
+
+            if (navigator.vibrate) {
+                navigator.vibrate(20);
+            }
+        });
+
+        gridEl.appendChild(box);
+    }
+
+    updateHatimStats();
+}
+
+/* --- D. 7/24 Kesintisiz Kur'an Radyosu --- */
+function initQuranRadio() {
+    const radioAudio = document.getElementById('quranLiveRadioAudio');
+    const rPlayBtn = document.getElementById('radioMainPlayBtn');
+    const rWave = document.getElementById('radioWaveform');
+    const statusTitle = document.getElementById('radioStatusTitle');
+    const sleepBtns = document.querySelectorAll('.sleep-btn');
+    let sleepTimeoutId = null;
+
+    if (!radioAudio || !rPlayBtn) return;
+
+    function toggleRadio() {
+        if (radioAudio.paused) {
+            // Tilavet çaları çalıyorsa durdur
+            const qAudio = document.getElementById('quranRecitationAudio');
+            if (qAudio && !qAudio.paused) {
+                qAudio.pause();
+            }
+
+            if (statusTitle) statusTitle.textContent = "Bağlanıyor...";
+            radioAudio.play().then(() => {
+                if (statusTitle) statusTitle.textContent = "Canlı Yayın Çalıyor";
+                rPlayBtn.innerHTML = `
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16" rx="2"></rect>
+                        <rect x="14" y="4" width="4" height="16" rx="2"></rect>
+                    </svg>
+                `;
+                if (rWave) rWave.classList.add('playing');
+            }).catch(e => {
+                console.log('Radio error:', e);
+                if (statusTitle) statusTitle.textContent = "Bağlantı Hatası";
+            });
+        } else {
+            radioAudio.pause();
+            if (statusTitle) statusTitle.textContent = "Yayın Duraklatıldı";
+            rPlayBtn.innerHTML = `
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                </svg>
+            `;
+            if (rWave) rWave.classList.remove('playing');
+        }
+    }
+
+    rPlayBtn.addEventListener('click', toggleRadio);
+
+    // Uyku Zamanlayıcısı
+    sleepBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            sleepBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (sleepTimeoutId) clearTimeout(sleepTimeoutId);
+            const mins = parseInt(btn.getAttribute('data-mins'), 10);
+            if (mins > 0) {
+                sleepTimeoutId = setTimeout(() => {
+                    if (!radioAudio.paused) {
+                        radioAudio.pause();
+                        if (statusTitle) statusTitle.textContent = "Uyku Zamanlayıcı Durdurdu";
+                        rPlayBtn.innerHTML = `
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                            </svg>
+                        `;
+                        if (rWave) rWave.classList.remove('playing');
+                    }
+                }, mins * 60 * 1000);
+            }
+        });
+    });
 }
 
 function formatAudioTime(sec) {
@@ -466,6 +950,78 @@ function initQrModal() {
 }
 
 /* ==========================================================================
+   7.5. Google Play Kapalı Beta Modalı
+   ========================================================================== */
+function initBetaModal() {
+    const triggers = document.querySelectorAll('.beta-modal-trigger');
+    const modal = document.getElementById('betaModalBackdrop');
+    const closeBtn = document.getElementById('betaModalClose');
+    const dismissBtn = document.getElementById('betaModalDismissBtn');
+
+    if (!modal) return;
+
+    triggers.forEach(trig => {
+        trig.addEventListener('click', (e) => {
+            e.preventDefault();
+            modal.classList.add('active');
+        });
+    });
+
+    const closeModal = () => modal.classList.remove('active');
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (dismissBtn) dismissBtn.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeModal();
+        }
+    });
+}
+
+/* ==========================================================================
+   7.8. Akıllı Cihaz Tespiti & İndirme Butonu Uyarlayıcı
+   ========================================================================== */
+function initSmartDeviceDownload() {
+    const btn = document.getElementById('headerDownloadBtn');
+    const textEl = document.getElementById('headerBtnText');
+    if (!btn || !textEl) return;
+
+    const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isMac = /macintosh|macintel/.test(ua) && !isIOS;
+    const isAndroid = /android/.test(ua);
+
+    const appStoreUrl = "https://apps.apple.com/us/app/ezan-plus-namaz-kuran/id6769426030";
+
+    if (isIOS || isMac) {
+        btn.classList.add('device-apple');
+        textEl.textContent = "App Store'dan İndir";
+        btn.href = appStoreUrl;
+        btn.target = "_blank";
+        btn.rel = "noopener";
+    } else if (isAndroid) {
+        btn.classList.add('device-android');
+        textEl.textContent = "Google Play (Beta)";
+        btn.href = "#";
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const betaModal = document.getElementById('betaModalBackdrop');
+            if (betaModal) betaModal.classList.add('active');
+        });
+    } else {
+        // Desktop Windows, Linux vb.
+        btn.classList.add('device-desktop');
+        textEl.textContent = "Uygulamayı İndir";
+        btn.href = "#indir";
+    }
+}
+
+/* ==========================================================================
    8. Three.js Manevi 3D Işık & Altın Parçacık Sahnesi
    ========================================================================== */
 function initThreeJsBackground() {
@@ -574,45 +1130,9 @@ function initThreeJsBackground() {
    ========================================================================== */
 function init3dMockupTilt() {
     const mockupWrap = document.getElementById('iphone3dWrapper');
-    const container = document.querySelector('.hero-section');
-    const glare = document.querySelector('.mockup-glare');
-    if (!mockupWrap || !container) return;
-
-    let currentX = 0;
-    let currentY = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let isHovered = false;
-
-    container.addEventListener('mousemove', (e) => {
-        isHovered = true;
-        const rect = container.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width;
-        const y = (e.clientY - rect.top) / rect.height;
-
-        targetX = (y - 0.5) * -22; // rotateX
-        targetY = (x - 0.5) * 26;  // rotateY
-
-        if (glare) {
-            const angle = Math.atan2(y - 0.5, x - 0.5) * (180 / Math.PI) + 90;
-            glare.style.background = `linear-gradient(${angle}deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 70%)`;
-        }
-    }, { passive: true });
-
-    container.addEventListener('mouseleave', () => {
-        isHovered = false;
-        targetX = 0;
-        targetY = 0;
-    });
-
-    function updateTilt() {
-        requestAnimationFrame(updateTilt);
-        currentX += (targetX - currentX) * 0.08;
-        currentY += (targetY - currentY) * 0.08;
-
-        mockupWrap.style.transform = `rotateX(${currentX.toFixed(2)}deg) rotateY(${currentY.toFixed(2)}deg)`;
+    if (mockupWrap) {
+        mockupWrap.style.transform = 'none';
     }
-    updateTilt();
 }
 
 /* ==========================================================================

@@ -54,18 +54,22 @@
                 <a href="#vakitler" class="nav-link">Vakitler</a>
                 <a href="#galeri" class="nav-link">Ekranlar</a>
                 <a href="#tilavet" class="nav-link">Tilavet</a>
-                <a href="#widget" class="nav-link">Widget</a>
                 <a href="#ozellikler" class="nav-link">Neden Biz?</a>
                 <a href="#sss" class="nav-link">SSS</a>
                 <a href="privacy-policy.html" class="nav-link">Gizlilik</a>
             </nav>
             
             <div class="nav-actions">
-                <a href="#indir" class="btn-indir-header">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.56.65-1.06 1.72-.92 2.74 1 .08 2.02-.49 2.62-1.24z"/>
-                    </svg>
-                    <span>Uygulamayı İndir</span>
+                <a href="#indir" class="btn-indir-header" id="headerDownloadBtn" aria-label="Uygulamayı İndir">
+                    <span class="btn-indir-icons">
+                        <svg class="icon-apple" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.56.65-1.06 1.72-.92 2.74 1 .08 2.02-.49 2.62-1.24z"/>
+                        </svg>
+                        <svg class="icon-android" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/>
+                        </svg>
+                    </span>
+                    <span id="headerBtnText">Uygulamayı İndir</span>
                 </a>
             </div>
         </div>
@@ -97,25 +101,31 @@
                 
                 <!-- Mağaza Butonları -->
                 <div class="store-buttons" id="indir">
-                    <a href="https://apps.apple.com" target="_blank" rel="noopener" class="store-btn">
+                    <a href="https://apps.apple.com/us/app/ezan-plus-namaz-kuran/id6769426030" target="_blank" rel="noopener" class="store-btn store-btn-apple">
                         <svg class="store-icon" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.56.65-1.06 1.72-.92 2.74 1 .08 2.02-.49 2.62-1.24z"/>
                         </svg>
                         <div class="store-text">
-                            <span class="store-sub">App Store'dan</span>
+                            <div class="store-top-row">
+                                <span class="store-sub">App Store'dan</span>
+                                <span class="store-badge-live">YAYINDA</span>
+                            </div>
                             <span class="store-main">İndirin</span>
                         </div>
                     </a>
                     
-                    <a href="https://play.google.com" target="_blank" rel="noopener" class="store-btn">
+                    <button type="button" class="store-btn store-btn-google beta-modal-trigger">
                         <svg class="store-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M3.609 1.814L13.792 12 3.61 22.186a2.38 2.38 0 0 1-.61-.954V2.768c.15-.36.368-.694.61-.954zm11.238 11.24l2.584-2.585L4.857 3.398l10 9.656zm0 1.892L4.857 20.602l12.574-7.07-2.584-2.586zm3.32-1.428l2.946-1.657a1.697 1.697 0 0 0 0-2.922L18.167 6.94l-2.072 2.072 2.072 2.507z"/>
+                            <path d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/>
                         </svg>
                         <div class="store-text">
-                            <span class="store-sub">Google Play'den</span>
-                            <span class="store-main">Edinin</span>
+                            <div class="store-top-row">
+                                <span class="store-sub">Google Play</span>
+                                <span class="store-badge-beta">KAPALI BETA</span>
+                            </div>
+                            <span class="store-main">Çok Yakında</span>
                         </div>
-                    </a>
+                    </button>
                     
                     <div class="qr-trigger-wrap qr-modal-trigger">
                         <svg class="qr-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -180,12 +190,12 @@
                     </div>
                 </div>
                 </div>
-                
-                <!-- Canlı Uygulama Durum Rozeti & Hızlı Yönlendirici -->
-                <div class="mockup-live-controls">
+
+                <!-- Canlı Uygulama Durum Rozeti & Hızlı Yönlendirici (Dikey Sağ Panel) -->
+                <div class="mockup-live-controls vertical-controls">
                     <div class="live-status-chip">
                         <span class="pulse-green-dot"></span>
-                        <span>CANLI UYGULAMA</span>
+                        <span class="live-chip-text">CANLI UYGULAMA</span>
                     </div>
                     <a href="/app/index.html" target="_blank" rel="noopener" class="btn-open-fullscreen-app" title="Tarayıcıda Tam Ekran Aç">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -193,7 +203,7 @@
                             <polyline points="15 3 21 3 21 9"></polyline>
                             <line x1="10" y1="14" x2="21" y2="3"></line>
                         </svg>
-                        <span>Tam Ekran</span>
+                        <span class="btn-fs-text">Tam Ekran</span>
                     </a>
                 </div>
             </div>
@@ -210,13 +220,18 @@
                 
                 <div class="prayer-section-header">
                     <div class="prayer-header-title">
-                        <span class="section-tag">CANLI İBADET VAKİTLERİ</span>
+                        <div class="app-date-row">
+                            <span class="app-hijri-badge">4 REBÎÜLÂHİR 1448</span>
+                            <span class="app-date-dot">•</span>
+                            <span class="app-date-miladi">15 EYLÜL</span>
+                        </div>
                         <h2>Hassas Namaz Vakitleri</h2>
-                        <p>Diyanet İşleri Başkanlığı takvimine %100 uyumlu, saniyesi saniyesine doğru hesaplama.</p>
+                        <p>Diyanet İşleri Başkanlığı takvimine %100 uyumlu, saniyesi saniyesine canlı takip.</p>
                     </div>
                     
                     <div class="city-select-pill">
-                        <span>📍 Şehir:</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kirmizi); flex-shrink: 0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <span>Şehir:</span>
                         <select id="sehirSelect">
                             <option value="istanbul" selected>İstanbul</option>
                             <option value="ankara">Ankara</option>
@@ -227,49 +242,111 @@
                         </select>
                     </div>
                 </div>
+
+                <!-- Uygulama Tarzı Merkez Geri Sayım Kadranı (Circular Progress PrayerTimerArea) -->
+                <div class="app-timer-hero-box">
+                    <div class="circular-progress-wrap">
+                        <svg class="circular-progress-svg" viewBox="0 0 220 220" width="220" height="220">
+                            <!-- Arka Plan Halka Kanalı -->
+                            <circle 
+                                class="circle-track" 
+                                cx="110" 
+                                cy="110" 
+                                r="102" 
+                                stroke="rgba(194, 155, 56, 0.2)" 
+                                stroke-width="7" 
+                                fill="transparent" 
+                            />
+                            <!-- Canlı Dinamik İlerleme Yayı -->
+                            <circle 
+                                class="circle-bar" 
+                                id="timerCircleBar"
+                                cx="110" 
+                                cy="110" 
+                                r="102" 
+                                stroke="var(--kirmizi)" 
+                                stroke-width="7" 
+                                stroke-linecap="round" 
+                                fill="transparent" 
+                                stroke-dasharray="640.88" 
+                                stroke-dashoffset="480" 
+                            />
+                        </svg>
+
+                        <!-- Dairesel Kadran İçeriği -->
+                        <div class="app-timer-dial-inner">
+                            <span class="app-next-vakit-tag" id="appNextVakitTag">İMSAK</span>
+                            <div class="app-timer-digits" id="liveCountdownTimer">
+                                <span class="digits-hm" id="digitsHM">04:12</span><span class="digits-sec" id="digitsSec">:35</span>
+                            </div>
+                            <div class="app-timer-city-pill" id="appTimerCityPill">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <span id="appTimerCityName">İstanbul</span>
+                            </div>
+                            <div class="app-timer-desc" id="liveCountdownLabel">İmsak Vaktine Kalan Süre</div>
+                        </div>
+                    </div>
+                </div>
                 
-                <!-- 6 Vakit Kutusu -->
+                <!-- 6 Vakit Kutusu (Uygulama PrayerTimeCards Tasarımı) -->
                 <div class="prayer-times-row">
                     <div class="prayer-time-box" id="prayerBox-imsak">
+                        <span class="prayer-card-volume">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        </span>
                         <div class="prayer-box-name">İmsak</div>
                         <div class="prayer-box-time" id="vakitTime-imsak">05:18</div>
                         <div class="prayer-box-status"></div>
                     </div>
                     <div class="prayer-time-box" id="prayerBox-gunes">
+                        <span class="prayer-card-volume">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        </span>
                         <div class="prayer-box-name">Güneş</div>
                         <div class="prayer-box-time" id="vakitTime-gunes">06:44</div>
                         <div class="prayer-box-status"></div>
                     </div>
                     <div class="prayer-time-box" id="prayerBox-ogle">
+                        <span class="prayer-card-volume">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        </span>
                         <div class="prayer-box-name">Öğle</div>
                         <div class="prayer-box-time" id="vakitTime-ogle">13:06</div>
                         <div class="prayer-box-status"></div>
                     </div>
                     <div class="prayer-time-box active" id="prayerBox-ikindi">
+                        <span class="prayer-card-volume">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        </span>
                         <div class="prayer-box-name">İkindi</div>
                         <div class="prayer-box-time" id="vakitTime-ikindi">16:38</div>
                         <div class="prayer-box-status">Şu Anki Vakit</div>
                     </div>
                     <div class="prayer-time-box" id="prayerBox-aksam">
+                        <span class="prayer-card-volume">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        </span>
                         <div class="prayer-box-name">Akşam</div>
                         <div class="prayer-box-time" id="vakitTime-aksam">19:18</div>
                         <div class="prayer-box-status">Sıradaki Vakit</div>
                     </div>
                     <div class="prayer-time-box" id="prayerBox-yatsi">
+                        <span class="prayer-card-volume">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        </span>
                         <div class="prayer-box-name">Yatsı</div>
                         <div class="prayer-box-time" id="vakitTime-yatsi">20:38</div>
                         <div class="prayer-box-status"></div>
                     </div>
                 </div>
                 
-                <!-- Canlı Geri Sayım Şeridi -->
+                <!-- Alt Bilgi Şeridi -->
                 <div class="next-prayer-banner-bottom">
-                    <div class="countdown-live-pill">
-                        <span class="badge-dot" style="background: var(--kirmizi);"></span>
-                        <span id="liveCountdownLabel">Akşam Vaktine Kalan Süre:</span>
-                        <span class="countdown-timer-value" id="liveCountdownTimer">02:44:12</span>
+                    <div class="diyanet-verified-pill">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--yesil); flex-shrink: 0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span>Diyanet Takvimi ile %100 Senkronize</span>
                     </div>
-                    <span style="font-size: 13px; color: var(--metin-soluk);">
+                    <span class="prayer-reminder-note">
                         Ezan Plus, vaktin girmesine 15, 30 ve 45 dakika kala özel manevi ezan bildirimleri gönderir.
                     </span>
                 </div>
@@ -408,72 +485,257 @@
     </section>
 
     <!-- ====================================================================
-         4. İnteraktif Tilavet & Stüdyo Audio Player Vitrini
+         4. Kur'an-ı Kerim & Tilavet Modülü (Mushaf Parşömeni Vitrini)
          ==================================================================== -->
-    <section class="audio-showcase-section" id="tilavet">
+    <section class="quran-showcase-section" id="tilavet">
         <div class="container">
-            <div class="audio-player-card">
+            <div class="section-header-center">
+                <span class="section-tag">KUR'AN-I KERİM & TİLAVET</span>
+                <h2 class="section-title">Medine Hattı, 7 Hafız & Kelime Senkron Tilavet</h2>
+                <p class="section-subtitle">
+                    114 Sûre, 6.236 Âyet ve 30 Cüz. Medine Kral Fehd Uthmani resmi hattı, kelime bazlı senkron karaoke, 4 muteber Türkçe meal, 30 cüz çoklu hatim takibi ve 7/24 canlı Kur'an radyosu.
+                </p>
                 
-                <!-- Sol: Tilavet ve Hafız Bilgisi -->
-                <div class="audio-info-side">
-                    <div class="audio-reciter-tag">
-                        <span>🎙️ Şeyh Mişari Râşid el-Afâsî</span>
+                <!-- Kur'an Alt Sekmeleri -->
+                <div class="quran-nav-tabs" id="quranNavTabs">
+                    <button class="quran-nav-tab active" data-tab="player">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <span>Canlı Tilavet & Kelime Takibi</span>
+                    </button>
+                    <button class="quran-nav-tab" data-tab="hatim">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        <span>30 Cüz Çoklu Hatim Takibi</span>
+                    </button>
+                    <button class="quran-nav-tab" data-tab="radio">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
+                        <span>7/24 Kesintisiz Kur'an Radyosu</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 1: CANLI TİLAVET VE KELİME TAKİBİ -->
+            <div class="quran-tab-panel active" id="quranPanel-player">
+                <div class="mushaf-master-card">
+                    
+                    <!-- Üst Seçici Çubuğu: Sûreler, Hafızlar, Mealler -->
+                    <div class="mushaf-controls-header">
+                        <!-- Sûre Seçimi -->
+                        <div class="mushaf-selector-group">
+                            <span class="selector-label">SÛRE / ÂYET SEÇİMİ:</span>
+                            <div class="surah-chips-scroll" id="surahChips">
+                                <button class="surah-chip active" data-surah="ayetel-kursi">Âyete'l-Kürsî (Bakara 255)</button>
+                                <button class="surah-chip" data-surah="fatiha">Fâtiha (1)</button>
+                                <button class="surah-chip" data-surah="insirah">İnşirâh (5-6)</button>
+                                <button class="surah-chip" data-surah="yasin">Yâsîn (58)</button>
+                                <button class="surah-chip" data-surah="mulk">Mülk (1)</button>
+                                <button class="surah-chip" data-surah="ihlas">İhlâs (1)</button>
+                            </div>
+                        </div>
+
+                        <!-- Hafız ve Meal Seçimi (İkili Dropdown) -->
+                        <div class="mushaf-reciter-meal-row">
+                            <div class="reciter-dropdown-wrap">
+                                <span class="sub-label">KÂRÎ / HAFIZ:</span>
+                                <select class="mushaf-select" id="reciterSelect" aria-label="Hafız Seçin">
+                                    <option value="alafasy" selected>Şeyh Mişari Râşid el-Afâsî</option>
+                                    <option value="ghamadi">Saad el-Gâmidî</option>
+                                    <option value="basit">Abdülbâsit Abdüssamed (Murattal)</option>
+                                    <option value="husary">Mahmud Halil el-Huserî</option>
+                                    <option value="sudais">Abdurrahman es-Sudeys</option>
+                                    <option value="shuraym">Suud eş-Şureym</option>
+                                    <option value="minshawi">Muhammed Sıddık el-Minşâvî</option>
+                                </select>
+                            </div>
+
+                            <div class="meal-dropdown-wrap">
+                                <span class="sub-label">TÜRKÇE MEAL:</span>
+                                <select class="mushaf-select" id="mealSelect" aria-label="Meal Seçin">
+                                    <option value="diyanet" selected>Diyanet İşleri Başkanlığı</option>
+                                    <option value="yazir">Elmalılı Hamdi Yazır</option>
+                                    <option value="ozturk">Yaşar Nuri Öztürk</option>
+                                    <option value="yuksel">Edip Yüksel</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <h2 class="audio-title">
-                        Stüdyo Kalitesinde Kur'an-ı Kerim Tilavetleri
-                    </h2>
-                    
-                    <p class="audio-desc">
-                        114 Sûre ve 6.236 âyetin tamamında kelime bazlı senkron karaoke takibi. Şeyh Mişari'nin asil sedası ve Elmalılı Hamdi Yazır mealiyle kalbinizi dinlendirin.
-                    </p>
-                    
-                    <!-- Audio Kontrolleri -->
-                    <div class="audio-controls-row">
-                        <button class="btn-play-recitation" id="btnPlayRecitation" title="Tilaveti Dinle">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+
+                    <!-- Âyet Sahnesi: Parşömen Kadranı -->
+                    <div class="mushaf-parchment-stage">
+                        <div class="mushaf-stage-ornament-top">
+                            <span class="mushaf-badge" id="mushafAyahBadge">BAKARA SÛRESİ • 255. ÂYET</span>
+                            <span class="mushaf-juz-badge" id="mushafJuzBadge">3. CÜZ • MEDENÎ</span>
+                        </div>
+
+                        <!-- Medine Uthmani Hat (Kelime Senkron Karaoke) -->
+                        <div class="mushaf-arabic-text" id="mushafArabicText" dir="rtl">
+                            <!-- JS ile kelimeler doldurulacak -->
+                        </div>
+
+                        <!-- Ayraç -->
+                        <div class="mushaf-divider">
+                            <span class="mushaf-divider-line"></span>
+                            <span class="mushaf-divider-diamond">◆</span>
+                            <span class="mushaf-divider-line"></span>
+                        </div>
+
+                        <!-- Latin Transkripsiyon -->
+                        <div class="mushaf-latin-text" id="mushafLatinText">
+                            <!-- JS ile okunuş doldurulacak -->
+                        </div>
+
+                        <!-- Türkçe Meal -->
+                        <div class="mushaf-translation-text" id="mushafTranslationText">
+                            <!-- JS ile meal doldurulacak -->
+                        </div>
+
+                        <!-- Nebevî Tefekkür Notu -->
+                        <div class="mushaf-tefekkur-box" id="mushafTefekkurBox">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            <span id="mushafTefekkurText">Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.</span>
+                        </div>
+                    </div>
+
+                    <!-- Alt Oynatıcı Çubuğu -->
+                    <div class="mushaf-player-bar">
+                        <button class="mushaf-play-btn" id="mushafPlayBtn" title="Tilaveti Oynat / Durdur" aria-label="Oynat">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
                             </svg>
                         </button>
-                        
-                        <div class="equalizer-bars" id="equalizerBars">
-                            <span class="eq-bar"></span>
-                            <span class="eq-bar"></span>
-                            <span class="eq-bar"></span>
-                            <span class="eq-bar"></span>
-                            <span class="eq-bar"></span>
+
+                        <div class="mushaf-equalizer" id="mushafEqualizer">
+                            <span class="m-eq-bar"></span>
+                            <span class="m-eq-bar"></span>
+                            <span class="m-eq-bar"></span>
+                            <span class="m-eq-bar"></span>
+                            <span class="m-eq-bar"></span>
                         </div>
-                        
-                        <div class="audio-progress-wrap">
-                            <div class="audio-progress-bar" id="audioProgressBar">
-                                <div class="audio-progress-fill" id="audioProgressFill"></div>
+
+                        <div class="mushaf-progress-container">
+                            <div class="mushaf-progress-track" id="mushafProgressTrack">
+                                <div class="mushaf-progress-fill" id="mushafProgressFill"></div>
                             </div>
-                            <div class="audio-time-label">
-                                <span id="audioCurTime">0:00</span>
-                                <span>İnşirâh Sûresi (5-6)</span>
-                                <span id="audioDurTime">0:14</span>
+                            <div class="mushaf-time-row">
+                                <span id="mushafCurTime">0:00</span>
+                                <span class="mushaf-playing-surah-title" id="mushafPlayingTitle">Bakara Sûresi, 255. Âyet</span>
+                                <span id="mushafDurTime">0:52</span>
                             </div>
                         </div>
+
+                        <div class="mushaf-player-options">
+                            <button class="mushaf-speed-btn" id="mushafSpeedBtn" title="Oynatma Hızı">1.0x</button>
+                            <button class="mushaf-repeat-btn active" id="mushafRepeatBtn" title="Âyet Tekrarı">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                            </button>
+                        </div>
                     </div>
-                    
-                    <!-- Gizli Audio Elemanı -->
-                    <audio id="recitationAudio" preload="auto" src="assets/audio/insirah.mp3"></audio>
+
                 </div>
-                
-                <!-- Sağ: Âyet Kartı Önizleme -->
-                <div class="audio-verse-box">
-                    <div class="audio-arabic-display">
-                        فَإِنَّ مَعَ الْعُسْرِ يُسْرًا • إِنَّ مَعَ الْعُسْرِ يُسْرًا
-                    </div>
-                    <div class="audio-translation-display">
-                        “ Elbette her zorlukla beraber bir kolaylık vardır. Gerçekten güçlükle beraber bir ferahlık vardır. ”
-                    </div>
-                    <span style="font-size: 12px; color: #A7F3D0; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;">
-                        İNŞİRÂH SÛRESİ • 5-6. ÂYET
-                    </span>
-                </div>
-                
             </div>
+
+            <!-- TAB 2: 30 CÜZ ÇOKLU HATİM TAKİBİ -->
+            <div class="quran-tab-panel" id="quranPanel-hatim">
+                <div class="mushaf-master-card hatim-card-theme">
+                    
+                    <div class="hatim-header-row">
+                        <div class="hatim-title-side">
+                            <span class="hatim-session-badge">AKTİF HATİM OTURUMU</span>
+                            <h3 class="hatim-session-title">“ Ramazan-ı Şerif Hatmi ”</h3>
+                            <p class="hatim-session-desc">Ezan Plus 30 Cüz Hatim Takibi; dilediğiniz kadar hatim oturumu açabilir, okuduğunuz cüzleri tek dokunuşla işaretleyip kaldığınız sayfayı anında görebilirsiniz.</p>
+                        </div>
+                        <div class="hatim-progress-dial-side">
+                            <div class="hatim-percent-number" id="hatimPercentText">%60</div>
+                            <span class="hatim-progress-subtitle" id="hatimCountText">18 / 30 Cüz Okundu</span>
+                        </div>
+                    </div>
+
+                    <!-- İlerleme Çubuğu -->
+                    <div class="hatim-global-progress-bar">
+                        <div class="hatim-global-progress-fill" id="hatimProgressBarFill" style="width: 60%;"></div>
+                    </div>
+
+                    <!-- 30 Cüz İnteraktif Seçim Gridi -->
+                    <div class="hatim-juz-grid" id="hatimJuzGrid">
+                        <!-- JS ile 1-30 Cüz yerleştirilecek -->
+                    </div>
+
+                    <!-- Hatim Özellik Rozetleri -->
+                    <div class="hatim-features-row">
+                        <div class="hatim-feature-pill">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <span>Birden Fazla Hatim Oturumu</span>
+                        </div>
+                        <div class="hatim-feature-pill">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                            <span>Kaldığın Sayfayı Otomatik Hatırlama</span>
+                        </div>
+                        <div class="hatim-feature-pill">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                            <span>Aile & Dostlarla Cüz Paylaşımı</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- TAB 3: 7/24 KESİNTİSİZ KUR'AN RADYOSU -->
+            <div class="quran-tab-panel" id="quranPanel-radio">
+                <div class="mushaf-master-card radio-card-theme">
+                    
+                    <div class="radio-live-header">
+                        <div class="radio-live-tag">
+                            <span class="pulse-live-red-dot"></span>
+                            <span>CANLI YAYIN • 7/24</span>
+                        </div>
+                        <h3 class="radio-station-title">MP3Quran Live & Mekke Canlı Tilavet</h3>
+                        <p class="radio-station-desc">Ezan Plus Kur'an Radyosu ile dünyanın en seçkin kârîlerinin sesinden kesintisiz canlı tilavet. İster evinizde, ister seyahatte kalbinizi Kur'an ile ferahlatın.</p>
+                    </div>
+
+                    <!-- Canlı Radyo Konsolu -->
+                    <div class="radio-player-console">
+                        <button class="radio-main-play-btn" id="radioMainPlayBtn" aria-label="Radyoyu Başlat">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                            </svg>
+                        </button>
+
+                        <div class="radio-waveform" id="radioWaveform">
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                            <span class="r-wave-bar"></span>
+                        </div>
+
+                        <div class="radio-status-text">
+                            <strong id="radioStatusTitle">Canlı Yayın Hazır</strong>
+                            <span id="radioStatusSub">Kesintisiz 128 kbps Stüdyo Yayını</span>
+                        </div>
+                    </div>
+
+                    <!-- Uyku Zamanlayıcısı (Sleep Timer) -->
+                    <div class="radio-sleep-timer-wrap">
+                        <span class="sleep-label">UYKU ZAMANLAYICISI:</span>
+                        <div class="sleep-options" id="radioSleepOptions">
+                            <button class="sleep-btn active" data-mins="0">Kapalı</button>
+                            <button class="sleep-btn" data-mins="15">15 Dk</button>
+                            <button class="sleep-btn" data-mins="30">30 Dk</button>
+                            <button class="sleep-btn" data-mins="45">45 Dk</button>
+                            <button class="sleep-btn" data-mins="60">60 Dk</button>
+                            <button class="sleep-btn" data-mins="90">90 Dk</button>
+                        </div>
+                    </div>
+
+                    <!-- Gizli Audio Elemanları -->
+                    <audio id="quranRecitationAudio" preload="auto" src="assets/audio/002255.mp3"></audio>
+                    <audio id="quranLiveRadioAudio" preload="none" src="https://radio.mp3islam.com/listen/quran_radio/radio.mp3"></audio>
+
+                </div>
+            </div>
+
         </div>
     </section>
 
@@ -521,138 +783,164 @@
     </section>
 
     <!-- ====================================================================
-         5.5. iOS 17/18 Widget'ları & Canlı Etkinlikler (Live Activities)
-         ==================================================================== -->
-    <section class="widgets-section" id="widget">
-        <div class="container">
-            <div class="widgets-split-layout">
-                
-                <!-- Sol: Metin ve Özellikler -->
-                <div class="widgets-text-content">
-                    <span class="section-tag">AKILLI ENTEGRASYON</span>
-                    <h2 class="section-title">Ekranı Açmadan Vaktin Farkında Olun</h2>
-                    <p class="section-subtitle">
-                        iOS Kilit Ekranı, Ana Ekran Widget'ları ve Dinamik Ada (Live Activities) desteğiyle günün manevi ritmi daima gözünüzün önünde.
-                    </p>
-                    
-                    <div class="widget-feature-items">
-                        <div class="w-item">
-                            <div class="w-icon-box">📲</div>
-                            <div class="w-text-box">
-                                <h4>Kilit Ekranı & Dinamik Ada</h4>
-                                <p>Telefonunuz kilitliyken bile sıradaki ezana kaç dakika kaldığını görün; namaza sükûnetle hazırlanın.</p>
-                            </div>
-                        </div>
-
-                        <div class="w-item">
-                            <div class="w-icon-box">🌙</div>
-                            <div class="w-text-box">
-                                <h4>StandBy (Komodin & Masaüstü) Modu</h4>
-                                <p>Cihazınız şarjdayken yatay konumda heybetli bir ezan saatine ve manevi tefekkür tablosuna dönüşür.</p>
-                            </div>
-                        </div>
-
-                        <div class="w-item">
-                            <div class="w-icon-box">🔔</div>
-                            <div class="w-text-box">
-                                <h4>Vakfe & Erken Ezan Uyarıları</h4>
-                                <p>Vaktin girmesine 15, 30 ve 45 dakika kala nazik hatırlatıcılar; Mekke, Medine ve İstanbul makamlarında ezan sesleri.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sağ: 3D Katmanlı Widget Vitrini -->
-                <div class="widgets-visual-mockup perspective-container">
-                    <div class="widget-interactive-stack">
-                        
-                        <!-- 1. Lock Screen Widget -->
-                        <div class="live-widget-card widget-glass-card">
-                            <div class="w-card-header">
-                                <div class="w-brand-row">
-                                    <span class="w-dot-indicator"></span>
-                                    <span>EZAN PLUS • SIRADAKİ VAKİT</span>
-                                </div>
-                                <span class="w-badge-time">16:38</span>
-                            </div>
-                            <div class="w-card-main">
-                                <div class="w-countdown-val">02:44</div>
-                                <div class="w-countdown-desc">
-                                    <strong>İkindi Vakti</strong>
-                                    <span>Akşam ezanına kalan süre</span>
-                                </div>
-                            </div>
-                            <div class="w-progress-line">
-                                <div class="w-progress-active" style="width: 68%;"></div>
-                            </div>
-                        </div>
-
-                        <!-- 2. Dynamic Island Capsule -->
-                        <div class="dynamic-island-preview">
-                            <div class="island-left">
-                                <span class="island-mosque-icon">🕌</span>
-                                <span class="island-label">İkindi</span>
-                            </div>
-                            <div class="island-right">
-                                <span class="island-timer">02:44 kaldı</span>
-                                <span class="island-live-dot"></span>
-                            </div>
-                        </div>
-
-                        <!-- 3. Günün Ayeti Widget -->
-                        <div class="live-widget-card widget-ayah-compact">
-                            <div class="w-ayah-quote">
-                                “ Şüphesiz namaz, mü'minler üzerine vakitleri belirlenmiş bir farzdır. ”
-                            </div>
-                            <div class="w-ayah-ref">NİSÂ SÛRESİ, 103. ÂYET</div>
-                        </div>
-
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </section>
-
-    <!-- ====================================================================
-         6. Neden Ezan Plus? (Özellik Kartları)
+         6. Neden Ezan Plus? — 12 Temel İbadet Direği (Tüm Özellikler)
          ==================================================================== -->
     <section class="features-section" id="ozellikler">
         <div class="container">
             <div class="section-header-center">
-                <span class="section-tag">PREMİUM STANDARTLAR</span>
-                <h2 class="section-title">Huşu İçinde İbadet İçin Tasarlandı</h2>
+                <span class="section-tag">EKSİKSİZ İBADET EKOSİSTEMİ</span>
+                <h2 class="section-title">Ezan Plus'ın 12 Temel Manevi Direği</h2>
                 <p class="section-subtitle">
-                    Gereksiz karmaşadan arındırılmış, yalnızca ibadetinize odaklanan saygılı ve asil bir arayüz.
+                    Gereksiz karmaşadan arındırılmış; yalnızca ibadetinize, tilavetinize ve tefekkürünüze odaklanan saygılı ve asil bir arayüz.
                 </p>
             </div>
             
-            <div class="features-grid">
+            <div class="features-grid-12">
                 
-                <div class="feature-card">
-                    <div class="feature-icon-box">🕊️</div>
-                    <h3>Huzurlu & Asil Tasarım</h3>
-                    <p>Kur'an okurken veya dua ederken ibadet huşunuzu bölecek rahatsız edici tam ekran pencereler yer almaz. Sade ve saygılı bir manevi deneyim.</p>
+                <!-- 1. Namaz Vakitleri & Ezan Sayacı -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(155, 27, 27, 0.1); color: var(--kirmizi);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </div>
+                        <span class="pillar-badge">DİYANET SENKRON</span>
+                    </div>
+                    <h3>Hassas Namaz Vakitleri & Ezan Sayacı</h3>
+                    <p>Diyanet İşleri Başkanlığı takvimiyle %100 uyumlu, astronomik konum hesabı. Dairesel canlı ilerleme kadranı, ezan öncesi 15, 30, 45 dk kala manevi bildirimler, kilit ekranı ve Dynamic Island widget desteği.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon-box">📚</div>
-                    <h3>%100 Tescilli Külliyat</h3>
-                    <p>Sıfır halüsinasyon garantisi. 6.236 âyet, Medine Uthmani hat ve Riyâzü's-Sâlihîn 1.900 sahih hadis arşivi.</p>
+                <!-- 2. Medine Hattı Kur'an & 7 Hafız -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(27, 67, 50, 0.1); color: var(--yesil);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        </div>
+                        <span class="pillar-badge">114 SÛRE • 7 HAFIZ</span>
+                    </div>
+                    <h3>Medine Hattı Kur'an & Tilavet</h3>
+                    <p>Medine Kral Fehd Uthmani resmi hattı, kelime bazlı senkron karaoke, Şeyh Mişari Râşid ve 6 usta hafız (Gâmidî, Abdülbâsit, Huserî, Sudeys, Şureym, Minşâvî) ve 4 muteber Türkçe meal.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon-box">🎙️</div>
-                    <h3>Kelime Kelime Karaoke</h3>
-                    <p>Şeyh Mişari Râşid tilavetleriyle senkron kelime takibi ve usta tiyatrocu Mazlum Kiper spiker anlatımı.</p>
+                <!-- 3. 30 Cüz Çoklu Hatim Takibi -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(180, 83, 9, 0.1); color: var(--altin);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        </div>
+                        <span class="pillar-badge">30 CÜZ YÖNETİMİ</span>
+                    </div>
+                    <h3>30 Cüz Çoklu Hatim Takibi</h3>
+                    <p>30 cüzün her birini tamamlandı işaretleme, yüzde ilerleme çubuğu, birden fazla hatim oturumu açma (Ramazan, Aile, Şahsi) ve kaldığın sayfayı otomatik hatırlama.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon-box">🔒</div>
-                    <h3>Tam Gizlilik & Çevrimdışı</h3>
-                    <p>Konumunuz sunuculara gönderilmez, cihazınızda güvenle işlenir. İnternetsiz ortamda dahi kusursuz çalışır.</p>
+                <!-- 4. 7/24 Kesintisiz Kur'an Radyosu -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(30, 58, 138, 0.1); color: #1E3A8A;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
+                        </div>
+                        <span class="pillar-badge">CANLI YAYIN</span>
+                    </div>
+                    <h3>7/24 Kesintisiz Kur'an Radyosu</h3>
+                    <p>MP3Quran ve Kâbe-i Muazzama canlı tilavet yayınları, arka planda kesintisiz dinleme, uyku zamanlayıcısı (15, 30, 45, 60, 90 dk) ve favori istasyon listesi.</p>
                 </div>
                 
+                <!-- 5. Manyetik Hassas Kıble Pusulası -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(27, 67, 50, 0.1); color: var(--yesil);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>
+                        </div>
+                        <span class="pillar-badge">152° KÂBE DOĞRULTUSU</span>
+                    </div>
+                    <h3>Manyetik Hassas Kıble Pusulası</h3>
+                    <p>Cihazınızın manyetik pusula sensörü ve GPS kalibrasyonuyla milimetrik Kâbe doğrultusu (152°), hedefe tam kilitlenince dokunsal haptik titreşim bildirimi ve 2.405 km mesafe hesabı.</p>
+                </div>
+
+                <!-- 6. Riyâzü's-Sâlihîn 1.900 Hadis -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(155, 27, 27, 0.1); color: var(--kirmizi);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/><path d="M12 8v4l3 3"/></svg>
+                        </div>
+                        <span class="pillar-badge">1.900 SAHİH HADİS</span>
+                    </div>
+                    <h3>Riyâzü's-Sâlihîn Hadis Külliyatı</h3>
+                    <p>İmam Nevevî'nin 1.900 sahih hadisi, Buhârî ve Müslim kaynakları, râvi künyeleri ve her hadise özel Nebevî hikmet tefekkür notları. Sıfır halüsinasyon, %100 tescilli arşiv.</p>
+                </div>
+
+                <!-- 7. Kaza Namazı & Oruç Takip Sihirbazı -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(180, 83, 9, 0.1); color: var(--altin);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>
+                        </div>
+                        <span class="pillar-badge">BORÇ SİHİRBAZI</span>
+                    </div>
+                    <h3>Kaza Namazı & Oruç Takip Sihirbazı</h3>
+                    <p>Doğum ve büluğ yılına göre kaza namazı borçlarınızı hesaplayan akıllı sihirbaz. 5 vakit + Vitir tek tıkla düşme, kaza orucu sayacı ve günlük hedef tempo belirleme.</p>
+                </div>
+
+                <!-- 8. Adım Adım Tesbihat & Haptik Zikirmatik -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(27, 67, 50, 0.1); color: var(--yesil);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="8"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>
+                        </div>
+                        <span class="pillar-badge">33'LÜK TESBİHAT</span>
+                    </div>
+                    <h3>Adım Adım Tesbihat & Haptik Zikirmatik</h3>
+                    <p>Namaz sonrası 33'lük tesbihat rehberi (Sübhanallah, Elhamdülillah, Allahuekber), serbest hedefli zikirler, gerçek tesbih hissi veren dokunsal haptik titreşim ve döngü takibi.</p>
+                </div>
+
+                <!-- 9. Manevi Dualar & Münacat Rehberi -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(155, 27, 27, 0.1); color: var(--kirmizi);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                        </div>
+                        <span class="pillar-badge">KUR'AN & SÜNNET</span>
+                    </div>
+                    <h3>Manevi Dualar & Münacat Rehberi</h3>
+                    <p>Ruh haline özel kategoriler (Huzur, Şifa, Tövbe, Rızık, Sıkıntıdan Kurtuluş, Sabah-Akşam). Medine hattı, Latin okunuş, Türkçe anlam ve fazilet açıklamaları.</p>
+                </div>
+
+                <!-- 10. İslami Rüya Tabirleri Danışmanı -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(180, 83, 9, 0.1); color: var(--altin);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+                        </div>
+                        <span class="pillar-badge">İBN-İ SÎRÎN USULÜ</span>
+                    </div>
+                    <h3>İslami Rüya Tabirleri Danışmanı</h3>
+                    <p>Kur'an ve Sünnet ışığında, İbn-i Sîrîn ve Nablûsî usulüne uygun, manevi sınırları gözeten edebi rüya tefekkürü danışmanı (sesli rüya anlatımı desteğiyle).</p>
+                </div>
+
+                <!-- 11. Hicri Takvim, Kandiller & Dini Günler -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(27, 67, 50, 0.1); color: var(--yesil);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                        <span class="pillar-badge">HİCRİ-MİLADİ</span>
+                    </div>
+                    <h3>Hicri Takvim, Kandiller & Dini Günler</h3>
+                    <p>Hicri ve Miladi güncel takvim, kandil günleri, üç aylar, Ramazan ve bayramlara canlı geri sayım; her güne özel Nebevî öğütler ve fazilet notları.</p>
+                </div>
+
+                <!-- 12. Yakındaki Camiler & Canlı Harita -->
+                <div class="feature-pillar-card">
+                    <div class="pillar-card-top">
+                        <div class="pillar-icon-box" style="background: rgba(30, 58, 138, 0.1); color: #1E3A8A;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                        </div>
+                        <span class="pillar-badge">CANLI HARİTA</span>
+                    </div>
+                    <h3>Yakındaki Camiler & Canlı Harita</h3>
+                    <p>Bulunduğunuz konuma en yakın cami ve ibadethaneler, canlı yürüyüş ve sürüş mesafesi, harita üzerinden doğrudan navigasyon ve yol tarifi.</p>
+                </div>
+
             </div>
         </div>
     </section>
@@ -666,36 +954,68 @@
                 <span class="section-tag">KULLANICI DENEYİMLERİ</span>
                 <h2 class="section-title">Kardeşlerimizin Gönlünden Süzülenler</h2>
                 <p class="section-subtitle">
-                    App Store ve Google Play'de binlerce 5 yıldızlı değerlendirme; asil, sade ve huşu dolu bir ibadet yolculuğu.
+                    App Store ve Google Play'de samimi değerlendirmeler; asil, sade ve huşu dolu bir ibadet yolculuğu.
                 </p>
             </div>
 
             <div class="testimonials-grid">
 
                 <div class="testimonial-card featured-testimonial">
-                    <div class="testi-stars">★★★★★</div>
+                    <div class="testi-card-top">
+                        <div class="testi-stars">★★★★★</div>
+                        <span class="testi-verified-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                            <span>Doğrulanmış Kullanıcı</span>
+                        </span>
+                    </div>
                     <p class="testi-quote">
-                        “Şeyh Mişari'nin tilavet kalitesi ve kıble pusulasının manyetik hassasiyeti harika. Vaktin girmesine 15 dakika kala gelen nazik bildirimler namaza vaktinde yetişmemi sağlıyor. Allah razı olsun.”
+                        “Şeyh Mişari'nin tilavet kalitesi ve kelime kelime takip sistemi olağanüstü. 30 cüz hatim takibi sayesinde Ramazan boyunca cüzlerimi eksiksiz tamamladım. Vaktin girmesine 15 dakika kala gelen nazik ezan bildirimleri ise paha biçilemez.”
                     </p>
                     <div class="testi-author">
-                        <div class="author-avatar">MY</div>
+                        <div class="author-avatar" style="background: #9B1B1B;">MY</div>
                         <div class="author-details">
                             <strong>Merve Y.</strong>
-                            <span>Google Play Kullanıcısı • Ankara</span>
+                            <span>App Store Kullanıcısı • Ankara</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="testimonial-card">
-                    <div class="testi-stars">★★★★★</div>
+                    <div class="testi-card-top">
+                        <div class="testi-stars">★★★★★</div>
+                        <span class="testi-verified-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                            <span>Doğrulanmış Kullanıcı</span>
+                        </span>
+                    </div>
                     <p class="testi-quote">
-                        “Tasarımı piyasadaki tüm ezan programlarından fersah fersah önde. Göz yormayan Mushaf krem zemini, tescilli Riyâzü's-Sâlihîn hadisleri ve kilit ekranı widget'ı mükemmel çalışıyor.”
+                        “Tasarımı piyasadaki tüm ezan programlarından fersah fersah önde. Göz yormayan Mushaf krem zemini, tescilli Riyâzü's-Sâlihîn hadisleri ve kilit ekranı widget'ı kusursuz çalışıyor. Reklam gürültüsünden uzak, tam bir sükunet.”
                     </p>
                     <div class="testi-author">
-                        <div class="author-avatar">MD</div>
+                        <div class="author-avatar" style="background: #B45309;">MD</div>
                         <div class="author-details">
                             <strong>Mustafa D.</strong>
                             <span>App Store Kullanıcısı • Bursa</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testi-card-top">
+                        <div class="testi-stars">★★★★★</div>
+                        <span class="testi-verified-pill">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                            <span>Doğrulanmış Kullanıcı</span>
+                        </span>
+                    </div>
+                    <p class="testi-quote">
+                        “Kilit ekranı widget'ı ve Dynamic Island desteği gün boyu namaz vaktini göz önünde tutuyor. Manyetik kıble pusulasının titreşimle Kâbe yönüne kilitlenmesi seyahatlerde en büyük yardımcım oldu. Allah emeği geçenlerden razı olsun.”
+                    </p>
+                    <div class="testi-author">
+                        <div class="author-avatar" style="background: #1B4332;">EK</div>
+                        <div class="author-details">
+                            <strong>Emre K.</strong>
+                            <span>App Store Kullanıcısı • İstanbul</span>
                         </div>
                     </div>
                 </div>
@@ -725,17 +1045,27 @@
                         <span class="faq-chevron">▾</span>
                     </button>
                     <div class="faq-answer-panel" style="max-height: 200px;">
-                        <p>Evet, istisnasız %100 uyumludur. Ezan Plus, Diyanet İşleri Başkanlığı'nın resmi hesaplama yöntemlerini ve konumunuza özel milimetrik astronomik koordinatları temel alır.</p>
+                        <p>Evet, istisnasız %100 uyumludur. Ezan Plus, Diyanet İşleri Başkanlığı'nın resmi hesaplama yöntemlerini ve bulunduğunuz konuma özel milimetrik astronomik koordinatları temel alarak vakitleri saniyesi saniyesine canlı sunar.</p>
                     </div>
                 </div>
 
                 <div class="faq-item">
                     <button class="faq-question-btn">
-                        <span>Ezan Plus ücretsiz mi, reklam içeriyor mu?</span>
+                        <span>Kur'an-ı Kerim tilavetlerinde hangi hafızlar ve mealler bulunmaktadır?</span>
                         <span class="faq-chevron">▾</span>
                     </button>
                     <div class="faq-answer-panel">
-                        <p>Ezan Plus temel ibadet özellikleri, namaz vakitleri, zikirmatik ve Kur'an tilavetiyle tamamen ücretsizdir. İbadet anınızda dikkatinizi dağıtacak rahatsız edici tam ekran reklamlar yer almaz. Dileyen kullanıcılarımız Ezan Plus Premium ile uygulamayı tamamen reklamsız kullanabilir ve sınırsız yapay zekâ özelliklerinden faydalanabilir.</p>
+                        <p>Uygulamamızda Şeyh Mişari Râşid el-Afâsî, Saad el-Gâmidî, Abdülbâsit Abdüssamed, Mahmud Halil el-Huserî, Abdurrahman es-Sudeys, Suud eş-Şureym ve Muhammed Sıddık el-Minşâvî olmak üzere 7 usta kârî yer alır. Mealler ise Diyanet İşleri Başkanlığı, Elmalılı Hamdi Yazır, Yaşar Nuri Öztürk ve Edip Yüksel külliyatıdır.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question-btn">
+                        <span>30 Cüz Hatim Takibi nasıl çalışır? Birden fazla hatim açabilir miyim?</span>
+                        <span class="faq-chevron">▾</span>
+                    </button>
+                    <div class="faq-answer-panel">
+                        <p>Evet. Ezan Plus içinde Şahsi Hatim, Ramazan Hatmi veya Aile Hatmi gibi dilediğiniz isimde birden fazla hatim oturumu başlatabilirsiniz. Okuduğunuz cüzleri tek dokunuşla tamamlandı işaretleyebilir, ilerleme çubuğunuzu yüzde olarak anlık görebilirsiniz.</p>
                     </div>
                 </div>
 
@@ -745,7 +1075,7 @@
                         <span class="faq-chevron">▾</span>
                     </button>
                     <div class="faq-answer-panel">
-                        <p>Evet. Bulunduğunuz konuma ait aylık ezan vakitleri, kıble pusulası, 1.900 sahih hadis külliyatı ve zikirmatik tamamen internetsiz ortamda kusursuz çalışır.</p>
+                        <p>Evet. Bulunduğunuz konuma ait aylık ezan vakitleri, manyetik kıble pusulası, 1.900 sahih hadis külliyatı, dualar, kaza takibi ve zikirmatik tamamen internetsiz ortamda kusursuz çalışır. İndirdiğiniz Kur'an sûrelerini de internetsiz dinleyebilirsiniz.</p>
                     </div>
                 </div>
 
@@ -755,17 +1085,27 @@
                         <span class="faq-chevron">▾</span>
                     </button>
                     <div class="faq-answer-panel">
-                        <p>Kesinlikle hayır. Konum bilginiz yalnızca namaz vakitlerini ve kıble açısını hesaplamak üzere cihazınızın yerel işlemcisinde anlık işlenir; sunuculara gönderilmez veya üçüncü taraflarla paylaşılmaz.</p>
+                        <p>Kesinlikle hayır. Konum bilginiz yalnızca namaz vakitlerini ve kıble açısını hesaplamak üzere cihazınızın yerel işlemcisinde anlık işlenir; hiçbir harici sunucuya gönderilmez veya üçüncü taraflarla paylaşılmaz.</p>
                     </div>
                 </div>
 
                 <div class="faq-item">
                     <button class="faq-question-btn">
-                        <span>Kur'an mealleri ve hadis kaynakları kime aittir?</span>
+                        <span>Kaza namazı borçlarımı nasıl takip edebilirim?</span>
                         <span class="faq-chevron">▾</span>
                     </button>
                     <div class="faq-answer-panel">
-                        <p>Kur'an-ı Kerim Medine Kral Fehd Uthmani resmi hattıdır. Mealler tescilli Elmalılı Hamdi Yazır ve Diyanet külliyatıdır. Hadisler İmam Nevevî'nin muteber eseri Riyâzü's-Sâlihîn'den (1.900 sahih hadis) derlenmiştir.</p>
+                        <p>Kaza Namazı Takip Sihirbazı'na doğum yılınızı ve büluğ başlangıcınızı girerek geçmiş namaz borçlarınızı otomatik hesaplatabilirsiniz. 5 vakit ve Vitir namazlarınızı kıldıkça tek dokunuşla borcunuzdan düşebilir, günlük hedef temponuzu takip edebilirsiniz.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question-btn">
+                        <span>Ezan Plus ücretsiz mi, reklam içeriyor mu?</span>
+                        <span class="faq-chevron">▾</span>
+                    </button>
+                    <div class="faq-answer-panel">
+                        <p>Ezan Plus temel ibadet özellikleri, namaz vakitleri, zikirmatik ve Kur'an tilavetiyle tamamen ücretsiz olarak ölçülü reklam destekli sunulmaktadır. İbadet ve tilavet anında dikkatinizi dağıtacak rahatsız edici tam ekran pencereler yer almaz. Dileyen kullanıcılarımız Ezan Plus Premium ile uygulamayı tamamen reklamsız kullanabilir ve sınırsız yapay zekâ özelliklerinden faydalanabilir.</p>
                     </div>
                 </div>
 
@@ -779,32 +1119,73 @@
     <section class="bottom-cta-section">
         <div class="container">
             <div class="bottom-cta-box">
-                <span class="section-tag" style="color: var(--kirmizi);">HEMEN BAŞLAYIN</span>
+                <div class="bottom-cta-ornament">
+                    <span class="cta-ornament-line"></span>
+                    <span class="cta-ornament-diamond">◆</span>
+                    <span class="cta-ornament-line"></span>
+                </div>
+                
+                <span class="section-tag cta-tag">HEMEN BAŞLAYIN</span>
                 <h2>Manevi Yolculuğunuzda Sükûneti Keşfedin</h2>
                 <p>
-                    Ezan Plus ile vaktin bereketine ortak olun. iOS ve Android için ücretsiz indirin, hayatınıza huzur katın.
+                    Ezan Plus ile vaktin bereketine ortak olun. iOS için App Store'da yayında; reklamsız, sade ve tescilli külliyatla huzura adım atın.
                 </p>
                 
                 <div class="bottom-cta-actions">
-                    <a href="https://apps.apple.com" target="_blank" rel="noopener" class="store-btn">
+                    <a href="https://apps.apple.com/us/app/ezan-plus-namaz-kuran/id6769426030" target="_blank" rel="noopener" class="store-btn store-btn-apple">
                         <svg class="store-icon" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.56.65-1.06 1.72-.92 2.74 1 .08 2.02-.49 2.62-1.24z"/>
                         </svg>
                         <div class="store-text">
-                            <span class="store-sub">App Store'dan</span>
+                            <div class="store-top-row">
+                                <span class="store-sub">App Store'dan</span>
+                                <span class="store-badge-live">YAYINDA</span>
+                            </div>
                             <span class="store-main">İndirin</span>
                         </div>
                     </a>
                     
-                    <a href="https://play.google.com" target="_blank" rel="noopener" class="store-btn">
+                    <button type="button" class="store-btn store-btn-google beta-modal-trigger">
                         <svg class="store-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M3.609 1.814L13.792 12 3.61 22.186a2.38 2.38 0 0 1-.61-.954V2.768c.15-.36.368-.694.61-.954zm11.238 11.24l2.584-2.585L4.857 3.398l10 9.656zm0 1.892L4.857 20.602l12.574-7.07-2.584-2.586zm3.32-1.428l2.946-1.657a1.697 1.697 0 0 0 0-2.922L18.167 6.94l-2.072 2.072 2.072 2.507z"/>
+                            <path d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/>
                         </svg>
                         <div class="store-text">
-                            <span class="store-sub">Google Play'den</span>
-                            <span class="store-main">Edinin</span>
+                            <div class="store-top-row">
+                                <span class="store-sub">Google Play</span>
+                                <span class="store-badge-beta">KAPALI BETA</span>
+                            </div>
+                            <span class="store-main">Çok Yakında</span>
                         </div>
-                    </a>
+                    </button>
+                    
+                    <button type="button" class="btn-qr-pill qr-modal-trigger">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                            <path d="M7 7h.01M17 7h.01M7 17h.01M17 17h.01"></path>
+                        </svg>
+                        <span>QR Kod ile İndir</span>
+                    </button>
+                </div>
+
+                <!-- Güven & Tescil Şeridi -->
+                <div class="bottom-cta-trust-bar">
+                    <div class="trust-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                        <span>%100 Tescilli Medine Hattı</span>
+                    </div>
+                    <span class="trust-dot">•</span>
+                    <div class="trust-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14.5l-3.5-3.5 1.41-1.41L11 13.67l5.09-5.09L17.5 10l-6.5 6.5z"/></svg>
+                        <span>Diyanet İbadet Takvimi</span>
+                    </div>
+                    <span class="trust-dot">•</span>
+                    <div class="trust-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                        <span>Cihaz İçi Gizlilik Odaklı</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -815,10 +1196,11 @@
          ==================================================================== -->
     <div class="qr-modal-backdrop" id="qrModalBackdrop">
         <div class="qr-modal-content">
-            <button class="qr-modal-close" id="qrModalClose">&times;</button>
+            <button class="qr-modal-close" id="qrModalClose" aria-label="Kapat">&times;</button>
+            <span class="qr-modal-badge">HIZLI YÜKLEME</span>
             <h3 style="font-size: 22px; margin-bottom: 8px;">Kameranızla Okutun</h3>
-            <p style="font-size: 14px; color: var(--metin-ikincil);">
-                Telefonunuzun kamerasını aşağıdaki koda tutarak Ezan Plus mobil uygulamasını doğrudan cihazınıza yükleyin.
+            <p style="font-size: 14px; color: var(--metin-ikincil); line-height: 1.6;">
+                Telefonunuzun kamerasını aşağıdaki koda tutarak Ezan Plus mobil uygulamasını doğrudan App Store üzerinden yükleyin.
             </p>
             
             <div class="qr-modal-img-wrap">
@@ -854,22 +1236,68 @@
                 </svg>
             </div>
             
-            <span style="font-size: 12px; font-weight: 700; color: var(--kirmizi);">
-                ezanplus.ozbornstudio.com
-            </span>
+            <a href="https://apps.apple.com/us/app/ezan-plus-namaz-kuran/id6769426030" target="_blank" rel="noopener" class="qr-appstore-link">
+                App Store'da Aç ↗
+            </a>
         </div>
     </div>
 
     <!-- ====================================================================
-         9. Kurumsal Footer
+         8.5. Google Play Kapalı Beta Modalı (Pop-up)
+         ==================================================================== -->
+    <div class="beta-modal-backdrop" id="betaModalBackdrop">
+        <div class="beta-modal-content">
+            <button class="beta-modal-close" id="betaModalClose" aria-label="Kapat">&times;</button>
+            
+            <div class="beta-modal-icon-wrap">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                    <path d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/>
+                </svg>
+            </div>
+
+            <div class="beta-modal-badge">
+                <span class="beta-dot"></span>
+                <span>GOOGLE PLAY KAPALI BETA</span>
+            </div>
+            
+            <h3 class="beta-modal-title">Android Sürümü Çok Yakında!</h3>
+            <p class="beta-modal-desc">
+                Ezan Plus Android sürümümüz şu anda kapalı beta test sürecindedir. Çok yakında tüm mümin kardeşlerimize Google Play Store üzerinden ücretsiz sunulacaktır.
+            </p>
+
+            <div class="beta-ios-card">
+                <div class="beta-ios-info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.56.65-1.06 1.72-.92 2.74 1 .08 2.02-.49 2.62-1.24z"/></svg>
+                    <div>
+                        <strong>iPhone veya iPad'iniz var mı?</strong>
+                        <span>App Store sürümümüz yayında, hemen indirebilirsiniz.</span>
+                    </div>
+                </div>
+                <a href="https://apps.apple.com/us/app/ezan-plus-namaz-kuran/id6769426030" target="_blank" rel="noopener" class="btn-beta-appstore">
+                    App Store'dan İndir ↗
+                </a>
+            </div>
+
+            <button type="button" class="btn-beta-dismiss" id="betaModalDismissBtn">Anladım</button>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         9. Kurumsal Footer (Asil & Huzurlu Gece Dokusu)
          ==================================================================== -->
     <footer class="site-footer">
         <div class="container">
             <div class="footer-grid">
                 
                 <div class="footer-brand">
-                    <h4>Ezan Plus</h4>
-                    <p>
+                    <div class="footer-brand-title-wrap">
+                        <img src="logo.png" alt="Ezan Plus Logo" class="footer-logo-img">
+                        <div>
+                            <h4>Ezan Plus</h4>
+                            <span class="footer-tagline">Kur'an & Vakit Rehberi</span>
+                        </div>
+                    </div>
+                    <p class="footer-desc">
                         İslami ibadet, Kur'an tilaveti, doğru namaz vakitleri ve manevi tefekkür odaklı yeni nesil premium mobil uygulama ekosistemi.
                     </p>
                     <div class="footer-social-links">
@@ -902,7 +1330,6 @@
                         <li><a href="#vakitler">Namaz Vakitleri</a></li>
                         <li><a href="#galeri">Uygulama Ekranları</a></li>
                         <li><a href="#tilavet">Kur'an Tilaveti</a></li>
-                        <li><a href="#widget">Widget & Dynamic Island</a></li>
                         <li><a href="#ozellikler">Neden Ezan Plus?</a></li>
                         <li><a href="#sss">Sıkça Sorulan Sorular</a></li>
                     </ul>
@@ -922,9 +1349,19 @@
                 <div class="footer-col">
                     <h5>Uygulamayı İndir</h5>
                     <ul class="footer-links-list">
-                        <li><a href="https://apps.apple.com" target="_blank" rel="noopener">iOS için İndir (App Store)</a></li>
-                        <li><a href="https://play.google.com" target="_blank" rel="noopener">Android için İndir (Play Store)</a></li>
-                        <li><a href="#" class="qr-modal-trigger">QR Kod Görüntüle</a></li>
+                        <li>
+                            <a href="https://apps.apple.com/us/app/ezan-plus-namaz-kuran/id6769426030" target="_blank" rel="noopener" class="footer-store-item">
+                                <span>iOS için İndir (App Store)</span>
+                                <span class="footer-badge-live">Yayında</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="footer-store-item beta-modal-trigger">
+                                <span>Android için İndir</span>
+                                <span class="footer-badge-beta">Kapalı Beta</span>
+                            </a>
+                        </li>
+                        <li><a href="#" class="qr-modal-trigger">QR Kod Görüntüle ↗</a></li>
                     </ul>
                 </div>
                 
@@ -932,7 +1369,7 @@
             
             <div class="footer-bottom-bar">
                 <span>&copy; 2026 Ezan Plus. Tüm hakları saklıdır. Ozborn Studio çatısı altında sevgi ve hürmetle geliştirilmiştir.</span>
-                <span>Tescilli Medine Uthmani Hat • Diyanet İşleri Başkanlığı Külliyatı</span>
+                <span class="footer-diyanet-note">Tescilli Medine Uthmani Hat • Diyanet İşleri Başkanlığı Külliyatı</span>
             </div>
         </div>
     </footer>

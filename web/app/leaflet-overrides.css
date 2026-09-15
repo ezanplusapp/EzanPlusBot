@@ -1,0 +1,3 @@
+.leaflet-container { font-family: var(--app-font-family, 'Lora', serif); z-index: 0; }
+.leaflet-control-attribution { font-size: 8px; opacity: 0.9; }
+@media print { body { background-color: white; color: black; } .no-print { display: none !important; } }
