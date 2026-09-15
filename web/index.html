@@ -243,100 +243,115 @@
                     </div>
                 </div>
 
-                <!-- Uygulama Tarzı Merkez Geri Sayım Kadranı (Circular Progress PrayerTimerArea) -->
-                <div class="app-timer-hero-box">
-                    <div class="circular-progress-wrap">
-                        <svg class="circular-progress-svg" viewBox="0 0 220 220" width="220" height="220">
-                            <!-- Arka Plan Halka Kanalı -->
-                            <circle 
-                                class="circle-track" 
-                                cx="110" 
-                                cy="110" 
-                                r="102" 
-                                stroke="rgba(194, 155, 56, 0.2)" 
-                                stroke-width="7" 
-                                fill="transparent" 
-                            />
-                            <!-- Canlı Dinamik İlerleme Yayı -->
-                            <circle 
-                                class="circle-bar" 
-                                id="timerCircleBar"
-                                cx="110" 
-                                cy="110" 
-                                r="102" 
-                                stroke="var(--kirmizi)" 
-                                stroke-width="7" 
-                                stroke-linecap="round" 
-                                fill="transparent" 
-                                stroke-dasharray="640.88" 
-                                stroke-dashoffset="480" 
-                            />
-                        </svg>
+                <!-- Sayaç ve Vakitler Birlikte (Aynı Satır / Mobilde Dikey Liste) -->
+                <div class="prayer-content-split">
+                    <!-- Sol / Merkez: Uygulama Tarzı Geri Sayım Kadranı (Circular Progress PrayerTimerArea) -->
+                    <div class="app-timer-hero-box">
+                        <div class="circular-progress-wrap">
+                            <svg class="circular-progress-svg" viewBox="0 0 220 220" width="220" height="220">
+                                <!-- Arka Plan Halka Kanalı -->
+                                <circle 
+                                    class="circle-track" 
+                                    cx="110" 
+                                    cy="110" 
+                                    r="102" 
+                                    stroke="rgba(194, 155, 56, 0.2)" 
+                                    stroke-width="7" 
+                                    fill="transparent" 
+                                />
+                                <!-- Canlı Dinamik İlerleme Yayı -->
+                                <circle 
+                                    class="circle-bar" 
+                                    id="timerCircleBar"
+                                    cx="110" 
+                                    cy="110" 
+                                    r="102" 
+                                    stroke="var(--kirmizi)" 
+                                    stroke-width="7" 
+                                    stroke-linecap="round" 
+                                    fill="transparent" 
+                                    stroke-dasharray="640.88" 
+                                    stroke-dashoffset="480" 
+                                />
+                            </svg>
 
-                        <!-- Dairesel Kadran İçeriği -->
-                        <div class="app-timer-dial-inner">
-                            <span class="app-next-vakit-tag" id="appNextVakitTag">İMSAK</span>
-                            <div class="app-timer-digits" id="liveCountdownTimer">
-                                <span class="digits-hm" id="digitsHM">04:12</span><span class="digits-sec" id="digitsSec">:35</span>
+                            <!-- Dairesel Kadran İçeriği -->
+                            <div class="app-timer-dial-inner">
+                                <span class="app-next-vakit-tag" id="appNextVakitTag">İMSAK</span>
+                                <div class="app-timer-digits" id="liveCountdownTimer">
+                                    <span class="digits-hm" id="digitsHM">04:12</span><span class="digits-sec" id="digitsSec">:35</span>
+                                </div>
+                                <div class="app-timer-city-pill" id="appTimerCityPill">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    <span id="appTimerCityName">İstanbul</span>
+                                </div>
+                                <div class="app-timer-desc" id="liveCountdownLabel">İmsak Vaktine Kalan Süre</div>
                             </div>
-                            <div class="app-timer-city-pill" id="appTimerCityPill">
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span id="appTimerCityName">İstanbul</span>
-                            </div>
-                            <div class="app-timer-desc" id="liveCountdownLabel">İmsak Vaktine Kalan Süre</div>
                         </div>
                     </div>
-                </div>
-                
-                <!-- 6 Vakit Kutusu (Uygulama PrayerTimeCards Tasarımı) -->
-                <div class="prayer-times-row">
-                    <div class="prayer-time-box" id="prayerBox-imsak">
-                        <span class="prayer-card-volume">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        </span>
-                        <div class="prayer-box-name">İmsak</div>
-                        <div class="prayer-box-time" id="vakitTime-imsak">05:18</div>
-                        <div class="prayer-box-status"></div>
-                    </div>
-                    <div class="prayer-time-box" id="prayerBox-gunes">
-                        <span class="prayer-card-volume">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        </span>
-                        <div class="prayer-box-name">Güneş</div>
-                        <div class="prayer-box-time" id="vakitTime-gunes">06:44</div>
-                        <div class="prayer-box-status"></div>
-                    </div>
-                    <div class="prayer-time-box" id="prayerBox-ogle">
-                        <span class="prayer-card-volume">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        </span>
-                        <div class="prayer-box-name">Öğle</div>
-                        <div class="prayer-box-time" id="vakitTime-ogle">13:06</div>
-                        <div class="prayer-box-status"></div>
-                    </div>
-                    <div class="prayer-time-box active" id="prayerBox-ikindi">
-                        <span class="prayer-card-volume">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        </span>
-                        <div class="prayer-box-name">İkindi</div>
-                        <div class="prayer-box-time" id="vakitTime-ikindi">16:38</div>
-                        <div class="prayer-box-status">Şu Anki Vakit</div>
-                    </div>
-                    <div class="prayer-time-box" id="prayerBox-aksam">
-                        <span class="prayer-card-volume">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        </span>
-                        <div class="prayer-box-name">Akşam</div>
-                        <div class="prayer-box-time" id="vakitTime-aksam">19:18</div>
-                        <div class="prayer-box-status">Sıradaki Vakit</div>
-                    </div>
-                    <div class="prayer-time-box" id="prayerBox-yatsi">
-                        <span class="prayer-card-volume">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        </span>
-                        <div class="prayer-box-name">Yatsı</div>
-                        <div class="prayer-box-time" id="vakitTime-yatsi">20:38</div>
-                        <div class="prayer-box-status"></div>
+                    
+                    <!-- Sağ: 6 Vakit Kutusu (Masaüstünde Grid, Mobilde Yukarıdan Aşağıya Sıralı) -->
+                    <div class="prayer-times-row">
+                        <div class="prayer-time-box" id="prayerBox-imsak">
+                            <div class="prayer-box-meta">
+                                <span class="prayer-card-volume">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                </span>
+                                <span class="prayer-box-name">İmsak</span>
+                            </div>
+                            <div class="prayer-box-status"></div>
+                            <div class="prayer-box-time" id="vakitTime-imsak">05:18</div>
+                        </div>
+                        <div class="prayer-time-box" id="prayerBox-gunes">
+                            <div class="prayer-box-meta">
+                                <span class="prayer-card-volume">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                </span>
+                                <span class="prayer-box-name">Güneş</span>
+                            </div>
+                            <div class="prayer-box-status"></div>
+                            <div class="prayer-box-time" id="vakitTime-gunes">06:44</div>
+                        </div>
+                        <div class="prayer-time-box" id="prayerBox-ogle">
+                            <div class="prayer-box-meta">
+                                <span class="prayer-card-volume">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                </span>
+                                <span class="prayer-box-name">Öğle</span>
+                            </div>
+                            <div class="prayer-box-status"></div>
+                            <div class="prayer-box-time" id="vakitTime-ogle">13:06</div>
+                        </div>
+                        <div class="prayer-time-box active" id="prayerBox-ikindi">
+                            <div class="prayer-box-meta">
+                                <span class="prayer-card-volume">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                </span>
+                                <span class="prayer-box-name">İkindi</span>
+                            </div>
+                            <div class="prayer-box-status">Şu Anki Vakit</div>
+                            <div class="prayer-box-time" id="vakitTime-ikindi">16:38</div>
+                        </div>
+                        <div class="prayer-time-box" id="prayerBox-aksam">
+                            <div class="prayer-box-meta">
+                                <span class="prayer-card-volume">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                </span>
+                                <span class="prayer-box-name">Akşam</span>
+                            </div>
+                            <div class="prayer-box-status">Sıradaki Vakit</div>
+                            <div class="prayer-box-time" id="vakitTime-aksam">19:18</div>
+                        </div>
+                        <div class="prayer-time-box" id="prayerBox-yatsi">
+                            <div class="prayer-box-meta">
+                                <span class="prayer-card-volume">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                </span>
+                                <span class="prayer-box-name">Yatsı</span>
+                            </div>
+                            <div class="prayer-box-status"></div>
+                            <div class="prayer-box-time" id="vakitTime-yatsi">20:38</div>
+                        </div>
                     </div>
                 </div>
                 
@@ -491,7 +506,7 @@
         <div class="container">
             <div class="section-header-center">
                 <span class="section-tag">KUR'AN-I KERİM & TİLAVET</span>
-                <h2 class="section-title">Medine Hattı, 7 Hafız & Kelime Senkron Tilavet</h2>
+                <h2 class="section-title">Medine Hattı & Kelime Senkron Tilavet</h2>
                 <p class="section-subtitle">
                     114 Sûre, 6.236 Âyet ve 30 Cüz. Medine Kral Fehd Uthmani resmi hattı, kelime bazlı senkron karaoke, 4 muteber Türkçe meal, 30 cüz çoklu hatim takibi ve 7/24 canlı Kur'an radyosu.
                 </p>
@@ -537,13 +552,7 @@
                             <div class="reciter-dropdown-wrap">
                                 <span class="sub-label">KÂRÎ / HAFIZ:</span>
                                 <select class="mushaf-select" id="reciterSelect" aria-label="Hafız Seçin">
-                                    <option value="alafasy" selected>Şeyh Mişari Râşid el-Afâsî</option>
-                                    <option value="ghamadi">Saad el-Gâmidî</option>
-                                    <option value="basit">Abdülbâsit Abdüssamed (Murattal)</option>
-                                    <option value="husary">Mahmud Halil el-Huserî</option>
-                                    <option value="sudais">Abdurrahman es-Sudeys</option>
-                                    <option value="shuraym">Suud eş-Şureym</option>
-                                    <option value="minshawi">Muhammed Sıddık el-Minşâvî</option>
+                                    <option value="alafasy" selected>Şeyh Mişari Râşid el-Afâsî (Kelime Senkronlu Külliyat)</option>
                                 </select>
                             </div>
 

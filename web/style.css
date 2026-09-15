@@ -42,6 +42,10 @@ html {
     overflow-x: clip;
 }
 
+section {
+    scroll-margin-top: 96px;
+}
+
 body {
     font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--bg-mushaf);
@@ -1157,13 +1161,22 @@ h1, h2, h3, .serif-font {
 }
 
 /* Uygulama Tarzı Merkez Kadran (PrayerTimerArea) */
+/* Sayaç ve Vakitler Bölünmüş Düzen (Masaüstünde Yan Yana, Mobilde Dikey Liste) */
+.prayer-content-split {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    margin: 16px 0 28px;
+}
+
 /* Uygulama Tarzı Merkez Kadran & Dairesel İlerleme Barı (Circular Progress) */
 .app-timer-hero-box {
+    flex: 0 0 260px;
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: center;
-    margin: 8px 0 24px;
+    margin: 0;
     position: relative;
 }
 
@@ -1264,18 +1277,19 @@ h1, h2, h3, .serif-font {
     margin-top: 3px;
 }
 
-/* 6 Vakit Kutuları (PrayerTimeCards Mimarisi) */
+/* 6 Vakit Kutuları (PrayerTimeCards Mimarisi — 3 Sütun x 2 Satır) */
 .prayer-times-row {
+    flex: 1;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
 }
 
 .prayer-time-box {
     background: #FFFDF9;
     border: 1px solid var(--kenarlik);
-    border-radius: 22px;
-    padding: 16px 10px;
+    border-radius: 20px;
+    padding: 16px 14px;
     text-align: center;
     position: relative;
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1286,12 +1300,19 @@ h1, h2, h3, .serif-font {
     justify-content: center;
 }
 
+.prayer-box-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
 .prayer-card-volume {
-    position: absolute;
-    top: 9px;
-    right: 10px;
     color: #A8A29E;
     transition: color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
 }
 
 .prayer-time-box.active {
@@ -1299,32 +1320,32 @@ h1, h2, h3, .serif-font {
     border-color: var(--kirmizi);
     color: #FFFFFF;
     box-shadow: 0 10px 25px rgba(155, 27, 27, 0.32);
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-2px) scale(1.02);
 }
 
 .prayer-time-box.active .prayer-card-volume {
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .prayer-box-name {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     color: var(--metin-ikincil);
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    margin-bottom: 4px;
 }
 
 .prayer-time-box.active .prayer-box-name {
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .prayer-box-time {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Manrope", sans-serif;
-    font-size: 21px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Manrope", monospace, sans-serif;
+    font-size: 24px;
     font-weight: 800;
     color: var(--metin-ana);
     font-variant-numeric: tabular-nums;
+    margin: 2px 0;
 }
 
 .prayer-time-box.active .prayer-box-time {
@@ -1332,17 +1353,14 @@ h1, h2, h3, .serif-font {
 }
 
 .prayer-box-status {
-    font-size: 9px;
-    font-weight: 800;
-    color: var(--metin-soluk);
-    margin-top: 4px;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    min-height: 14px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--yesil);
+    min-height: 15px;
 }
 
 .prayer-time-box.active .prayer-box-status {
-    color: #FFFFFF;
+    color: #FFFDF9;
     background: rgba(255, 255, 255, 0.2);
     padding: 2px 8px;
     border-radius: 10px;
@@ -3608,7 +3626,7 @@ h1, h2, h3, .serif-font {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 860px) {
     .nav-links {
         display: none;
     }
@@ -3621,16 +3639,87 @@ h1, h2, h3, .serif-font {
         font-size: 38px;
     }
 
+    /* Namaz Vakitleri & Sayaç: Mobilde Sayaç Üstte, Vakitler Yukarıdan Aşağıya */
+    .prayer-content-split {
+        flex-direction: column;
+        gap: 24px;
+        align-items: stretch;
+        margin: 12px 0 20px;
+    }
+
+    .app-timer-hero-box {
+        flex: 0 0 auto;
+        margin: 0 auto;
+    }
+
     .prayer-times-row {
-        grid-template-columns: repeat(3, 1fr);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .prayer-time-box {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        border-radius: 18px;
+        text-align: left;
+    }
+
+    .prayer-box-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 0;
+    }
+
+    .prayer-card-volume {
+        position: static;
+        margin: 0;
+    }
+
+    .prayer-box-name {
+        font-size: 15px;
+        font-weight: 700;
+        text-transform: capitalize;
+        margin-bottom: 0;
+    }
+
+    .prayer-box-time {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 0 0 0 auto;
+        padding-left: 12px;
+    }
+
+    .prayer-box-status {
+        margin: 0 12px 0 auto;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 12px;
+        white-space: nowrap;
+    }
+
+    .prayer-time-box.active {
+        transform: none;
     }
 
     .features-grid-12 {
         grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .feature-pillar-card {
+        padding: 24px 20px;
+        border-radius: 22px;
     }
 
     .hatim-juz-grid {
         grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
     }
 
     .quran-nav-tabs {
@@ -3644,9 +3733,34 @@ h1, h2, h3, .serif-font {
         justify-content: center;
     }
 
+    .surah-chips-scroll {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .surah-chips-scroll::-webkit-scrollbar {
+        display: none;
+    }
+    .surah-chip {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
     .mushaf-arabic-text {
-        font-size: 28px;
-        line-height: 2;
+        font-size: 30px;
+        line-height: 2.2;
+        margin-bottom: 20px;
+    }
+
+    .quran-word {
+        display: inline-block;
+        padding: 2px 4px;
+        margin: 2px 2px;
+        border-radius: 6px;
+        transition: all 0.15s ease;
     }
 
     .mushaf-reciter-meal-row {
@@ -3739,6 +3853,18 @@ h1, h2, h3, .serif-font {
     .hero-title {
         font-size: 32px;
     }
+    .live-prayer-card {
+        padding: 24px 16px;
+        border-radius: 24px;
+    }
+    .mushaf-master-card {
+        padding: 22px 14px;
+        border-radius: 24px;
+    }
+    .mushaf-parchment-stage {
+        padding: 22px 14px;
+        border-radius: 20px;
+    }
     .bottom-cta-box {
         padding: 36px 18px;
         border-radius: 28px;
@@ -3794,19 +3920,6 @@ h1, h2, h3, .serif-font {
 }
 
 @media (max-width: 400px) {
-    .prayer-times-row {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-    }
-    .prayer-time-box {
-        padding: 12px 6px;
-    }
-    .prayer-box-name {
-        font-size: 11px;
-    }
-    .prayer-box-time {
-        font-size: 18px;
-    }
     .wisdom-tab-btn {
         padding: 6px 10px;
         font-size: 11px;

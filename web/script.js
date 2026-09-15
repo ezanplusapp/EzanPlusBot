@@ -286,122 +286,518 @@ function vakitleriGuncelle() {
    ========================================================================== */
 const QURAN_SURAHS_DATA = {
     "ayetel-kursi": {
-        id: "ayetel-kursi",
-        badge: "BAKARA SÛRESİ • 255. ÂYET (ÂYETE'L-KÜRSÎ)",
-        juzBadge: "3. CÜZ • MEDENÎ",
-        verseKey: "2:255",
-        words: [
-            "اللَّهُ", "لَا", "إِلٰهَ", "إِلَّا", "هُوَ", "الْحَيُّ", "الْقَيُّومُ", "ۚ",
-            "لَا", "تَأْخُذُهُ", "سِنَةٌ", "وَلَا", "نَوْمٌ", "ۚ",
-            "لَهُ", "مَا", "فِي", "السَّمَاوَاتِ", "وَمَا", "فِي", "الْأَرْضِ", "ۗ",
-            "مَنْ", "ذَا", "الَّذِي", "يَشْفَعُ", "عِنْدَهُ", "إِلَّا", "بِإِذْنِهِ", "ۚ",
-            "يَعْلَمُ", "مَا", "بَيْنَ", "أَيْدِيهِمْ", "وَمَا", "خَلْفَهُمْ", "ۖ",
-            "وَلَا", "يُحِيطُونَ", "بِشَيْءٍ", "مِنْ", "عِلْمِهِ", "إِلَّا", "بِمَا", "شَاءَ", "ۚ",
-            "وَسِعَ", "كُرْسِيُّهُ", "السَّمَاوَاتِ", "وَالْأَرْضَ", "ۖ",
-            "وَلَا", "يَئُودُهُ", "حِفْظُهُمَا", "ۚ",
-            "وَهُوَ", "الْعَلِيُّ", "الْعَظِيمُ"
-        ],
-        latin: "Allâhu lâ ilâhe illâ huve'l-hayyu'l-kayyûm, lâ te'huzuhû sinetun velâ nevm, lehû mâ fî's-semâvâti vemâ fî'l-ard, men zellezî yeşfeu indehû illâ bi-iznih, ya'lemu mâ beyne eydîhim vemâ halfehum, velâ yuhîtûne bi-şey'in min ilmihî illâ bimâ şâe, vesia kursiyyuhu's-semâvâti ve'l-ard, velâ yeûduhû hifzuhumâ, ve huve'l-aliyyu'l-azîm.",
-        translations: {
-            diyanet: "“ Allah, O'ndan başka hiçbir ilah olmayandır; daima yaşayan (Hayy), bütün varlığın idaresini yürüten (Kayyûm) dir. O'nu ne bir uyuklama tutabilir, ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O, çok yücedir, çok büyüktür. ”",
-            yazir: "“ Allah ki, O'ndan başka ilah yoktur; daima diridir, yaratıklarını koruyup yöneticidir. O'nu ne bir uyuklama tutar ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O çok yüce, çok büyüktür. ”",
-            ozturk: "“ Allah, O'ndan başka ilah yoktur; diridir, her an yaratış ve idare halindedir. O'nu ne bir uyuklama tutar ne de bir uyku... O, çok yücedir, çok büyüktür. ”",
-            yuksel: "“ ALLAH: O'ndan başka tanrı yoktur; Diridir, Ebedidir. O'nu ne bir uyuklama ne de bir uyku yakalayamaz... O Yücedir, Büyüktür. ”"
+        "id": "ayetel-kursi",
+        "badge": "BAKARA SÛRESİ • 255. ÂYET (ÂYETE'L-KÜRSÎ)",
+        "juzBadge": "3. CÜZ • MEDENÎ",
+        "verseKey": "2:255",
+        "latin": "Allâhu lâ ilâhe illâ huve'l-hayyu'l-kayyûm, lâ te'huzuhû sinetun velâ nevm, lehû mâ fî's-semâvâti vemâ fî'l-ard, men zellezî yeşfeu indehû illâ bi-iznih, ya'lemu mâ beyne eydîhim vemâ halfehum, velâ yuhîtûne bi-şey'in min ilmihî illâ bimâ şâe, vesia kursiyyuhu's-semâvâti ve'l-ard, velâ yeûduhû hifzuhumâ, ve huve'l-aliyyu'l-azîm.",
+        "translations": {
+            "diyanet": "“ Allah, O'ndan başka hiçbir ilah olmayandır; daima yaşayan (Hayy), bütün varlığın idaresini yürüten (Kayyûm) dir. O'nu ne bir uyuklama tutabilir, ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O, çok yücedir, çok büyüktür. ”",
+            "yazir": "“ Allah ki, O'ndan başka ilah yoktur; daima diridir, yaratıklarını koruyup yöneticidir. O'nu ne bir uyuklama tutar ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O çok yüce, çok büyüktür. ”",
+            "ozturk": "“ Allah, O'ndan başka ilah yoktur; diridir, her an yaratış ve idare halindedir. O'nu ne bir uyuklama tutar ne de bir uyku... O, çok yücedir, çok büyüktür. ”",
+            "yuksel": "“ ALLAH: O'ndan başka tanrı yoktur; Diridir, Ebedidir. O'nu ne bir uyuklama ne de bir uyku yakalayamaz... O Yücedir, Büyüktür. ”"
         },
-        tefekkur: "Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.",
-        localAudio: "assets/audio/002255.mp3",
-        surahNum: "002",
-        ayahNum: "255"
+        "tefekkur": "Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.",
+        "localAudio": "assets/audio/002255.mp3",
+        "surahNum": "002",
+        "ayahNum": "255",
+        "words": [
+            {
+                "word": "ٱللَّهُ",
+                "start": 0.0,
+                "end": 1.11
+            },
+            {
+                "word": "لَآ",
+                "start": 1.11,
+                "end": 2.885
+            },
+            {
+                "word": "إِلَـٰهَ",
+                "start": 2.885,
+                "end": 3.59
+            },
+            {
+                "word": "إِلَّا",
+                "start": 3.59,
+                "end": 4.303
+            },
+            {
+                "word": "هُوَ",
+                "start": 4.303,
+                "end": 4.659
+            },
+            {
+                "word": "ٱلْحَىُّ",
+                "start": 4.659,
+                "end": 5.422
+            },
+            {
+                "word": "ٱلْقَيُّومُ ۚ",
+                "start": 5.422,
+                "end": 8.15
+            },
+            {
+                "word": "لَا",
+                "start": 8.15,
+                "end": 8.824
+            },
+            {
+                "word": "تَأْخُذُهُۥ",
+                "start": 8.824,
+                "end": 9.731
+            },
+            {
+                "word": "سِنَةٌ",
+                "start": 9.731,
+                "end": 10.558
+            },
+            {
+                "word": "وَلَا",
+                "start": 10.558,
+                "end": 11.591
+            },
+            {
+                "word": "نَوْمٌ ۚ",
+                "start": 11.591,
+                "end": 13.756
+            },
+            {
+                "word": "لَّهُۥ",
+                "start": 13.756,
+                "end": 14.55
+            },
+            {
+                "word": "مَا",
+                "start": 14.55,
+                "end": 15.01
+            },
+            {
+                "word": "فِى",
+                "start": 15.01,
+                "end": 15.603
+            },
+            {
+                "word": "ٱلسَّمَـٰوَٰتِ",
+                "start": 15.603,
+                "end": 16.968
+            },
+            {
+                "word": "وَمَا",
+                "start": 16.968,
+                "end": 17.212
+            },
+            {
+                "word": "فِى",
+                "start": 17.212,
+                "end": 17.913
+            },
+            {
+                "word": "ٱلْأَرْضِ ۗ",
+                "start": 17.913,
+                "end": 18.311
+            },
+            {
+                "word": "مَن",
+                "start": 18.311,
+                "end": 19.486
+            },
+            {
+                "word": "ذَا",
+                "start": 19.486,
+                "end": 19.879
+            },
+            {
+                "word": "ٱلَّذِى",
+                "start": 19.879,
+                "end": 20.364
+            },
+            {
+                "word": "يَشْفَعُ",
+                "start": 20.364,
+                "end": 21.386
+            },
+            {
+                "word": "عِندَهُۥٓ",
+                "start": 21.386,
+                "end": 23.512
+            },
+            {
+                "word": "إِلَّا",
+                "start": 23.512,
+                "end": 24.607
+            },
+            {
+                "word": "بِإِذْنِهِۦ ۚ",
+                "start": 24.607,
+                "end": 25.67
+            },
+            {
+                "word": "يَعْلَمُ",
+                "start": 25.67,
+                "end": 26.754
+            },
+            {
+                "word": "مَا",
+                "start": 26.754,
+                "end": 27.228
+            },
+            {
+                "word": "بَيْنَ",
+                "start": 27.228,
+                "end": 27.626
+            },
+            {
+                "word": "أَيْدِيهِمْ",
+                "start": 27.626,
+                "end": 28.764
+            },
+            {
+                "word": "وَمَا",
+                "start": 28.764,
+                "end": 29.233
+            },
+            {
+                "word": "خَلْفَهُمْ ۖ",
+                "start": 29.233,
+                "end": 30.233
+            },
+            {
+                "word": "وَلَا",
+                "start": 30.233,
+                "end": 30.789
+            },
+            {
+                "word": "يُحِيطُونَ",
+                "start": 30.789,
+                "end": 32.014
+            },
+            {
+                "word": "بِشَىْءٍ",
+                "start": 32.014,
+                "end": 33.35
+            },
+            {
+                "word": "مِّنْ",
+                "start": 33.35,
+                "end": 33.795
+            },
+            {
+                "word": "عِلْمِهِۦٓ",
+                "start": 33.795,
+                "end": 36.604
+            },
+            {
+                "word": "إِلَّا",
+                "start": 36.604,
+                "end": 37.316
+            },
+            {
+                "word": "بِمَا",
+                "start": 37.316,
+                "end": 38.176
+            },
+            {
+                "word": "شَآءَ ۚ",
+                "start": 38.176,
+                "end": 39.893
+            },
+            {
+                "word": "وَسِعَ",
+                "start": 39.893,
+                "end": 40.828
+            },
+            {
+                "word": "كُرْسِيُّهُ",
+                "start": 40.828,
+                "end": 41.814
+            },
+            {
+                "word": "ٱلسَّمَـٰوَٰتِ",
+                "start": 41.814,
+                "end": 43.189
+            },
+            {
+                "word": "وَٱلْأَرْضَ ۖ",
+                "start": 43.189,
+                "end": 44.302
+            },
+            {
+                "word": "وَلَا",
+                "start": 44.302,
+                "end": 45.117
+            },
+            {
+                "word": "يَـُٔودُهُۥ",
+                "start": 45.117,
+                "end": 46.398
+            },
+            {
+                "word": "حِفْظُهُمَا ۚ",
+                "start": 46.398,
+                "end": 48.12
+            },
+            {
+                "word": "وَهُوَ",
+                "start": 48.12,
+                "end": 48.793
+            },
+            {
+                "word": "ٱلْعَلِىُّ",
+                "start": 48.793,
+                "end": 49.653
+            },
+            {
+                "word": "ٱلْعَظِيمُ",
+                "start": 49.653,
+                "end": 52.035
+            }
+        ]
     },
     "fatiha": {
-        id: "fatiha",
-        badge: "FÂTİHA SÛRESİ • 1. ÂYET",
-        juzBadge: "1. CÜZ • MEKKÎ",
-        verseKey: "1:1",
-        words: ["بِسْمِ", "اللَّهِ", "الرَّحْمَٰنِ", "الرَّحِيمِ"],
-        latin: "Bismillâhirrahmânirrahîm.",
-        translations: {
-            diyanet: "“ Rahman ve Rahîm olan Allah'ın adıyla. ”",
-            yazir: "“ Merhametli ve çok lütufkâr olan Allah'ın adıyla. ”",
-            ozturk: "“ Rahman ve Rahîm Allah'ın adıyla. ”",
-            yuksel: "“ Bağışlayan ve Esirgeyen ALLAH'ın adıyla. ”"
+        "id": "fatiha",
+        "badge": "FÂTİHA SÛRESİ • 1. ÂYET",
+        "juzBadge": "1. CÜZ • MEKKÎ",
+        "verseKey": "1:1",
+        "latin": "Bismillâhirrahmânirrahîm.",
+        "translations": {
+            "diyanet": "“ Rahman ve Rahîm olan Allah'ın adıyla. ”",
+            "yazir": "“ Merhametli ve çok lütufkâr olan Allah'ın adıyla. ”",
+            "ozturk": "“ Rahman ve Rahîm Allah'ın adıyla. ”",
+            "yuksel": "“ Bağışlayan ve Esirgeyen ALLAH'ın adıyla. ”"
         },
-        tefekkur: "Her hayırlı amelin başı, kalbi ilahi rahmet kapısına açan Nebevî anahtardır.",
-        localAudio: "assets/audio/001001.mp3",
-        surahNum: "001",
-        ayahNum: "001"
+        "tefekkur": "Her hayırlı amelin başı, kalbi ilahi rahmet kapısına açan Nebevî anahtardır.",
+        "localAudio": "assets/audio/001001.mp3",
+        "surahNum": "001",
+        "ayahNum": "001",
+        "words": [
+            {
+                "word": "بِسْمِ",
+                "start": 0.0,
+                "end": 0.58
+            },
+            {
+                "word": "ٱللَّهِ",
+                "start": 0.58,
+                "end": 1.409
+            },
+            {
+                "word": "ٱلرَّحْمَـٰنِ",
+                "start": 1.409,
+                "end": 2.502
+            },
+            {
+                "word": "ٱلرَّحِيمِ",
+                "start": 2.502,
+                "end": 5.84
+            }
+        ]
     },
     "insirah": {
-        id: "insirah",
-        badge: "İNŞİRÂH SÛRESİ • 5-6. ÂYET",
-        juzBadge: "30. CÜZ • MEKKÎ",
-        verseKey: "94:5",
-        words: ["فَإِنَّ", "مَعَ", "الْعُسْرِ", "يُسْرًا", "•", "إِنَّ", "مَعَ", "الْعُسْرِ", "يُسْرًا"],
-        latin: "Fe inne meal usri yusrâ, inne meal usri yusrâ.",
-        translations: {
-            diyanet: "“ Şüphesiz her güçlükle beraber bir kolaylık vardır. Gerçekten güçlükle beraber bir kolaylık vardır. ”",
-            yazir: "“ Demek ki zorlukla beraber bir kolaylık var. Evet, zorlukla beraber bir kolaylık var! ”",
-            ozturk: "“ Demek ki, zorluğun yanında bir kolaylık mutlaka var! Evet, zorluğun yanında bir kolaylık mutlaka var! ”",
-            yuksel: "“ Kuşkusuz, zorlukla beraber bir kolaylık vardır. Evet, zorlukla beraber bir kolaylık vardır. ”"
+        "id": "insirah",
+        "badge": "İNŞİRÂH SÛRESİ • 5-6. ÂYET",
+        "juzBadge": "30. CÜZ • MEKKÎ",
+        "verseKey": "94:5-6",
+        "latin": "Fe inne meal usri yusrâ, inne meal usri yusrâ.",
+        "translations": {
+            "diyanet": "“ Şüphesiz her güçlükle beraber bir kolaylık vardır. Gerçekten güçlükle beraber bir kolaylık vardır. ”",
+            "yazir": "“ Demek ki zorlukla beraber bir kolaylık var. Evet, zorlukla beraber bir kolaylık var! ”",
+            "ozturk": "“ Demek ki, zorluğun yanında bir kolaylık mutlaka var! Evet, zorluğun yanında bir kolaylık mutlaka var! ”",
+            "yuksel": "“ Kuşkusuz, zorlukla beraber bir kolaylık vardır. Evet, zorlukla beraber bir kolaylık vardır. ”"
         },
-        tefekkur: "Sabır ve tevekkülün sonunda kalbe inen ilahi ferahlığın ebedi müjdesidir.",
-        localAudio: "assets/audio/insirah.mp3",
-        surahNum: "094",
-        ayahNum: "005"
+        "tefekkur": "Sabır ve tevekkülün sonunda kalbe inen ilahi ferahlığın ebedi müjdesidir.",
+        "localAudio": "assets/audio/insirah.mp3",
+        "surahNum": "094",
+        "ayahNum": "005",
+        "words": [
+            {
+                "word": "فَإِنَّ",
+                "start": 0.0,
+                "end": 1.64
+            },
+            {
+                "word": "مَعَ",
+                "start": 1.64,
+                "end": 2.01
+            },
+            {
+                "word": "ٱلْعُسْرِ",
+                "start": 2.01,
+                "end": 2.85
+            },
+            {
+                "word": "يُسْرًا ۙ",
+                "start": 2.85,
+                "end": 4.445
+            },
+            {
+                "word": "إِنَّ",
+                "start": 4.53,
+                "end": 5.93
+            },
+            {
+                "word": "مَعَ",
+                "start": 5.93,
+                "end": 6.31
+            },
+            {
+                "word": "ٱلْعُسْرِ",
+                "start": 6.31,
+                "end": 7.18
+            },
+            {
+                "word": "يُسْرًا",
+                "start": 7.18,
+                "end": 8.62
+            }
+        ]
     },
     "yasin": {
-        id: "yasin",
-        badge: "YÂSÎN SÛRESİ • 58. ÂYET",
-        juzBadge: "23. CÜZ • MEKKÎ",
-        verseKey: "36:58",
-        words: ["سَلَامٌ", "قَوْلًا", "مِنْ", "رَبٍّ", "رَحِيمٍ"],
-        latin: "Selâmun kavlen min rabbin rahîm.",
-        translations: {
-            diyanet: "“ Çok merhametli olan Rab'den bir söz olarak kendilerine 'Selâm' vardır. ”",
-            yazir: "“ Merhametli bir Rabbin sözü olarak onlara 'Selâm' vardır. ”",
-            ozturk: "“ Çok merhametli bir Rab'den bir de sözlü 'Selâm' vardır. ”",
-            yuksel: "“ Çok Rahîm olan Rab'den bir söz olarak: 'Selam!' ”"
+        "id": "yasin",
+        "badge": "YÂSÎN SÛRESİ • 58. ÂYET",
+        "juzBadge": "23. CÜZ • MEKKÎ",
+        "verseKey": "36:58",
+        "latin": "Selâmun kavlen min rabbin rahîm.",
+        "translations": {
+            "diyanet": "“ Çok merhametli olan Rab'den bir söz olarak kendilerine 'Selâm' vardır. ”",
+            "yazir": "“ Merhametli bir Rabbin sözü olarak onlara 'Selâm' vardır. ”",
+            "ozturk": "“ Çok merhametli bir Rab'den bir de sözlü 'Selâm' vardır. ”",
+            "yuksel": "“ Çok Rahîm olan Rab'den bir söz olarak: 'Selam!' ”"
         },
-        tefekkur: "Cennet ehline Yüce Mevlâ katından bizzat ikram edilecek en şerefli hitaptır.",
-        localAudio: "assets/audio/036058.mp3",
-        surahNum: "036",
-        ayahNum: "058"
+        "tefekkur": "Cennet ehline Yüce Mevlâ katından bizzat ikram edilecek en şerefli hitaptır.",
+        "localAudio": "assets/audio/036058.mp3",
+        "surahNum": "036",
+        "ayahNum": "058",
+        "words": [
+            {
+                "word": "سَلَـٰمٌ",
+                "start": 0.0,
+                "end": 1.46
+            },
+            {
+                "word": "قَوْلًا",
+                "start": 1.46,
+                "end": 3.25
+            },
+            {
+                "word": "مِّن",
+                "start": 3.25,
+                "end": 3.58
+            },
+            {
+                "word": "رَّبٍّ",
+                "start": 3.58,
+                "end": 4.51
+            },
+            {
+                "word": "رَّحِيمٍ",
+                "start": 4.51,
+                "end": 7.935
+            }
+        ]
     },
     "mulk": {
-        id: "mulk",
-        badge: "MÜLK SÛRESİ • 1. ÂYET",
-        juzBadge: "29. CÜZ • MEKKÎ",
-        verseKey: "67:1",
-        words: ["تَبَارَكَ", "الَّذِي", "بِيَدِهِ", "الْمُلْكُ", "وَهُوَ", "عَلَىٰ", "كُلِّ", "شَيْءٍ", "قَدِيرٌ"],
-        latin: "Tebârekellezî biyedihil mulku ve huve alâ kulli şey'in kadîr.",
-        translations: {
-            diyanet: "“ Hükümranlık elinde olan Allah, yüceler yücesidir ve O her şeye hakkıyla güç yetirendir. ”",
-            yazir: "“ Mutlak hükümranlık elinde bulunan Allah ne yücedir! O'nun her şeye gücü yeter. ”",
-            ozturk: "“ Ne yücedir O ki, mülk ve saltanat O'nun elindedir. Ve O, her şeye güç yetirendir. ”",
-            yuksel: "“ Egemenlik elinde bulunan çok yücedir ve O her şeye Kadirdir. ”"
+        "id": "mulk",
+        "badge": "MÜLK SÛRESİ • 1. ÂYET",
+        "juzBadge": "29. CÜZ • MEKKÎ",
+        "verseKey": "67:1",
+        "latin": "Tebârakellezî biyedihil mulku ve huve alâ kulli şey'in kadîr.",
+        "translations": {
+            "diyanet": "“ Hükümranlık elinde olan Allah, yüceler yücesidir ve O'nun her şeye gücü yeter. ”",
+            "yazir": "“ Mutlak hükümranlık elinde bulunan Allah yüceler yücesidir ve O her şeye kadirdir. ”",
+            "ozturk": "“ Mutlak egemenlik elinde bulunan o Allah çok yücedir. O, her şeye kadirdir. ”",
+            "yuksel": "“ Mutlak egemenlik elinde olan çok yücedir. Ve O her şeye Güç yetirendir. ”"
         },
-        tefekkur: "Kabir azabından koruyan ve geceleri tefekkürle tilavet edilmesi tavsiye edilen sûredir.",
-        localAudio: "assets/audio/067001.mp3",
-        surahNum: "067",
-        ayahNum: "001"
+        "tefekkur": "Kabir azabından koruyan ve mülkün yegane sahibini zikreden şifalı bir sûredir.",
+        "localAudio": "assets/audio/067001.mp3",
+        "surahNum": "067",
+        "ayahNum": "001",
+        "words": [
+            {
+                "word": "تَبَـٰرَكَ",
+                "start": 0.0,
+                "end": 1.04
+            },
+            {
+                "word": "ٱلَّذِى",
+                "start": 1.04,
+                "end": 1.99
+            },
+            {
+                "word": "بِيَدِهِ",
+                "start": 1.99,
+                "end": 2.82
+            },
+            {
+                "word": "ٱلْمُلْكُ",
+                "start": 2.82,
+                "end": 3.76
+            },
+            {
+                "word": "وَهُوَ",
+                "start": 3.76,
+                "end": 4.25
+            },
+            {
+                "word": "عَلَىٰ",
+                "start": 4.25,
+                "end": 4.95
+            },
+            {
+                "word": "كُلِّ",
+                "start": 4.95,
+                "end": 5.55
+            },
+            {
+                "word": "شَىْءٍ",
+                "start": 5.55,
+                "end": 7.28
+            },
+            {
+                "word": "قَدِيرٌ",
+                "start": 7.28,
+                "end": 10.725
+            }
+        ]
     },
     "ihlas": {
-        id: "ihlas",
-        badge: "İHLÂS SÛRESİ • 1. ÂYET",
-        juzBadge: "30. CÜZ • MEKKÎ",
-        verseKey: "112:1",
-        words: ["قُلْ", "هُوَ", "اللَّهُ", "أَحَدٌ"],
-        latin: "Kul huvallâhu ehad.",
-        translations: {
-            diyanet: "“ De ki: O, Allah'tır, bir tektir. ”",
-            yazir: "“ De ki: O Allah, birdir. ”",
-            ozturk: "“ De ki: O, Allah'tır; Ehad'dir, tektir. ”",
-            yuksel: "“ De ki: O ALLAH birdir. ”"
+        "id": "ihlas",
+        "badge": "İHLÂS SÛRESİ • 1. ÂYET",
+        "juzBadge": "30. CÜZ • MEKKÎ",
+        "verseKey": "112:1",
+        "latin": "Kul huvallâhu ehad.",
+        "translations": {
+            "diyanet": "“ De ki: O, Allah'tır, bir tektir. ”",
+            "yazir": "“ De ki: O Allah tektir. ”",
+            "ozturk": "“ De ki: O Allah tektir. ”",
+            "yuksel": "“ De ki: 'O, ALLAH'tır; Birdir.' ”"
         },
-        tefekkur: "Tevhid akidesinin özü ve Kur'an'ın üçte birine denk olan saf ihlas beyanıdır.",
-        localAudio: "assets/audio/112001.mp3",
-        surahNum: "112",
-        ayahNum: "001"
+        "tefekkur": "Kur'an'ın üçte birine denk olan saf tevhid ve ihlâs beyanıdır.",
+        "localAudio": "assets/audio/112001.mp3",
+        "surahNum": "112",
+        "ayahNum": "001",
+        "words": [
+            {
+                "word": "قُلْ",
+                "start": 0.0,
+                "end": 0.43
+            },
+            {
+                "word": "هُوَ",
+                "start": 0.43,
+                "end": 0.7
+            },
+            {
+                "word": "ٱللَّهُ",
+                "start": 0.7,
+                "end": 1.68
+            },
+            {
+                "word": "أَحَدٌ",
+                "start": 1.68,
+                "end": 2.915
+            }
+        ]
     }
 };
 
@@ -485,12 +881,25 @@ function initQuranTilavetPlayer() {
         if (juzBadgeEl) juzBadgeEl.textContent = data.juzBadge;
         if (titleEl) titleEl.textContent = data.badge;
 
-        // Arapça Hat (Kelime spans)
+        // Arapça Hat (Kelime spans & Tıklanabilir Dinleme)
         const arabicEl = document.getElementById('mushafArabicText');
         if (arabicEl) {
-            arabicEl.innerHTML = data.words.map((w, idx) => 
-                `<span class="quran-word waiting" id="qWord-${idx}">${w}</span>`
+            arabicEl.innerHTML = data.words.map((item, idx) => 
+                `<span class="quran-word waiting" id="qWord-${idx}" data-start="${item.start}" data-end="${item.end}" title="${item.start.toFixed(1)}s">${item.word}</span>`
             ).join(' ');
+
+            // Kelimeye tıklayınca tam o saniyeye atla
+            const wordSpans = arabicEl.querySelectorAll('.quran-word');
+            wordSpans.forEach(span => {
+                span.addEventListener('click', () => {
+                    const s = parseFloat(span.getAttribute('data-start'));
+                    if (!isNaN(s) && audioEl) {
+                        audioEl.currentTime = s;
+                        if (audioEl.paused) togglePlay();
+                        updateKaraoke();
+                    }
+                });
+            });
         }
 
         // Latin Okunuş
@@ -507,6 +916,7 @@ function initQuranTilavetPlayer() {
 
         // Audio Source
         updateAudioSource();
+        updateKaraoke();
     }
 
     function updateAudioSource() {
@@ -526,6 +936,44 @@ function initQuranTilavetPlayer() {
         audioEl.playbackRate = currentPlaybackSpeed;
         if (wasPlaying) {
             audioEl.play().catch(e => console.log('Autoplay error:', e));
+        }
+    }
+
+    function updateKaraoke() {
+        if (!audioEl) return;
+        const curTime = audioEl.currentTime || 0;
+        const durTime = audioEl.duration || 0;
+
+        if (durTime > 0) {
+            const progress = (curTime / durTime);
+            if (progressFill) progressFill.style.width = `${progress * 100}%`;
+            if (curTimeEl) curTimeEl.textContent = formatAudioTime(curTime);
+            if (durTimeEl) durTimeEl.textContent = formatAudioTime(durTime);
+        }
+
+        // Kelime Kelime Tescilli Senkron Karaoke (EzanPlusBot t_eval = curTime + 0.05s)
+        const data = QURAN_SURAHS_DATA[currentSurahKey];
+        if (data && data.words && data.words.length > 0) {
+            const tEval = curTime + 0.05;
+            const words = data.words;
+
+            for (let i = 0; i < words.length; i++) {
+                const wEl = document.getElementById(`qWord-${i}`);
+                if (!wEl) continue;
+                const w = words[i];
+
+                if (tEval >= w.start && tEval < w.end) {
+                    if (wEl.className !== 'quran-word active') wEl.className = 'quran-word active';
+                } else if (tEval >= w.end) {
+                    if (wEl.className !== 'quran-word done') wEl.className = 'quran-word done';
+                } else {
+                    if (wEl.className !== 'quran-word waiting') wEl.className = 'quran-word waiting';
+                }
+            }
+        }
+
+        if (!audioEl.paused && !audioEl.ended) {
+            karaokeRafId = requestAnimationFrame(updateKaraoke);
         }
     }
 
@@ -570,6 +1018,8 @@ function initQuranTilavetPlayer() {
                 </svg>
             `;
         }
+        cancelAnimationFrame(karaokeRafId);
+        karaokeRafId = requestAnimationFrame(updateKaraoke);
     });
 
     audioEl.addEventListener('pause', () => {
@@ -586,43 +1036,22 @@ function initQuranTilavetPlayer() {
                 </svg>
             `;
         }
+        cancelAnimationFrame(karaokeRafId);
+        updateKaraoke();
     });
 
-    audioEl.addEventListener('timeupdate', () => {
-        if (!isNaN(audioEl.duration) && audioEl.duration > 0) {
-            const progress = (audioEl.currentTime / audioEl.duration);
-            if (progressFill) progressFill.style.width = `${progress * 100}%`;
-            if (curTimeEl) curTimeEl.textContent = formatAudioTime(audioEl.currentTime);
-            if (durTimeEl) durTimeEl.textContent = formatAudioTime(audioEl.duration);
-
-            // Kelime Karaoke Vurgulama
-            const data = QURAN_SURAHS_DATA[currentSurahKey];
-            if (data && data.words) {
-                const totalWords = data.words.length;
-                const activeIndex = Math.min(totalWords - 1, Math.floor(progress * totalWords));
-
-                for (let i = 0; i < totalWords; i++) {
-                    const wEl = document.getElementById(`qWord-${i}`);
-                    if (!wEl) continue;
-                    if (i === activeIndex) {
-                        wEl.className = 'quran-word active';
-                    } else if (i < activeIndex) {
-                        wEl.className = 'quran-word done';
-                    } else {
-                        wEl.className = 'quran-word waiting';
-                    }
-                }
-            }
-        }
-    });
+    audioEl.addEventListener('timeupdate', updateKaraoke);
+    audioEl.addEventListener('seeked', updateKaraoke);
 
     audioEl.addEventListener('ended', () => {
+        cancelAnimationFrame(karaokeRafId);
         if (isRepeatEnabled) {
             audioEl.currentTime = 0;
             audioEl.play().catch(e => console.log('Repeat blocked:', e));
         } else {
             if (progressFill) progressFill.style.width = '0%';
             if (curTimeEl) curTimeEl.textContent = "0:00";
+            updateKaraoke();
         }
     });
 
