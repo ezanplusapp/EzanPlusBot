@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from src import kota_uretici
+import src.telegram.bot
 
 
 class TestKotaUretici(unittest.TestCase):
