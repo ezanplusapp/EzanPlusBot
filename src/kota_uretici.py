@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -104,6 +105,19 @@ def format_kompakt_kutu(
     return "\n".join(satirlar)
 
 
+def _github_token_al(token: Optional[str] = None) -> Optional[str]:
+    """Sistem ortamından veya gh CLI üzerinden geçerli GitHub PAT tokenını alır."""
+    sec_token = token or os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+    if not sec_token:
+        try:
+            p = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=3)
+            if p.returncode == 0 and p.stdout.strip():
+                sec_token = p.stdout.strip()
+        except Exception:
+            pass
+    return sec_token
+
+
 def github_actions_kullanimi(
     token: Optional[str] = None,
     repo: str = "ezanplusapp/EzanPlusBot"
@@ -111,18 +125,18 @@ def github_actions_kullanimi(
     """GitHub API üzerinden bu ayki Actions koşularını ve faturalanan dakikayı hesaplar."""
     now = datetime.now(timezone.utc)
     bu_ay_basi = datetime(now.year, now.month, 1, tzinfo=timezone.utc).isoformat()
-    sec_token = token or os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+    sec_token = _github_token_al(token)
 
     kota_toplam = 2000  # Standart hesap kotası: 2.000 dk/ay
 
     if not sec_token:
         return {
             "toplam_kosu": 0,
-            "harcanan_dk": 115,
-            "kalan_dk": 1885,
-            "yuzde": 5.75,
-            "is_akislari": {"Günlük Reels": 75, "Hadis & Dua": 40},
-            "kaynak": "tahmin",
+            "harcanan_dk": 2000,
+            "kalan_dk": 0,
+            "yuzde": 100.0,
+            "is_akislari": {},
+            "kaynak": "token_yok",
         }
 
     url = f"https://api.github.com/repos/{repo}/actions/runs?created=>={bu_ay_basi}&per_page=100"
@@ -138,9 +152,9 @@ def github_actions_kullanimi(
             log.warning("GitHub API yanıtı [%d]: %s", r.status_code, r.text[:120])
             return {
                 "toplam_kosu": 0,
-                "harcanan_dk": 115,
-                "kalan_dk": max(0, kota_toplam - 115),
-                "yuzde": (115 / float(kota_toplam)) * 100.0,
+                "harcanan_dk": 2000,
+                "kalan_dk": 0,
+                "yuzde": 100.0,
                 "is_akislari": {},
                 "kaynak": "hata_fallback",
             }
@@ -238,7 +252,7 @@ def cloudflare_kullanimi() -> Dict[str, str]:
 
 def github_rest_api_kullanimi() -> Dict[str, str]:
     """GitHub REST API 5.000 limit ve saatlik sıfırlanma durumunu döner."""
-    sec_token = os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+    sec_token = _github_token_al()
     if sec_token:
         try:
             r = requests.get(

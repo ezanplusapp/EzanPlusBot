@@ -629,7 +629,23 @@ def caption_ve_buton_guncelle(
         return False
     message_id = m_id
 
-    # 1. Medya mesajı başlığını güncellemeyi dene (editMessageCaption - 1024 karakter sınırı)
+    # 1. Metin mesajı veya uzun rapor kontrolü (editMessageText - 4096 karakter sınırı)
+    if len(yeni_caption) > 1000 or "<pre>" in yeni_caption:
+        try:
+            payload_txt: Dict[str, Any] = {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": yeni_caption[:4096],
+                "parse_mode": "HTML",
+            }
+            if butonlar is not None:
+                payload_txt["reply_markup"] = json.dumps({"inline_keyboard": butonlar})
+            _istek("editMessageText", data=payload_txt)
+            return True
+        except Exception as e_txt:
+            log.debug(f"editMessageText denenemedi ({e_txt}), editMessageCaption deneniyor...")
+
+    # 2. Medya mesajı başlığını güncellemeyi dene (editMessageCaption - 1024 karakter sınırı)
     caption_medya = yeni_caption
     if len(caption_medya) > 1020:
         caption_medya = caption_medya[:1015] + "..."
@@ -644,7 +660,7 @@ def caption_ve_buton_guncelle(
         if butonlar is not None:
             payload["reply_markup"] = json.dumps({"inline_keyboard": butonlar})
         _istek("editMessageCaption", data=payload)
-        return
+        return True
     except Exception as e:
         log.debug(f"editMessageCaption denenemedi ({e}), metin mesajı (editMessageText) deneniyor...")
 
