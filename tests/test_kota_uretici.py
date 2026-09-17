@@ -131,7 +131,7 @@ class TestKotaUretici(unittest.TestCase):
         self.assertIn("EZAN PLUS BULUT, AI & API KOTALARI", metin)
         self.assertIn("<pre>", metin)
         self.assertIn("</pre>", metin)
-        self.assertIn("GITHUB ACTIONS (2.000 dk)", metin)
+        self.assertIn("GITHUB ACTIONS", metin)
         self.assertIn("YAPAY ZEKA (Gemini AI)", metin)
         self.assertIn("CLOUDFLARE (Worker & KV)", metin)
         self.assertIn("GITHUB REST API", metin)

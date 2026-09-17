@@ -180,26 +180,36 @@ def github_actions_kullanimi(
                     continue
 
         harcanan_dk = sum(by_wf.values())
-        kalan_dk = max(0, kota_toplam - harcanan_dk)
+        is_public = False
+        try:
+            repo_res = requests.get(f"https://api.github.com/repos/{repo}", headers=headers, timeout=4)
+            if repo_res.status_code == 200:
+                is_public = not repo_res.json().get("private", True)
+        except Exception:
+            pass
+
+        kalan_dk = 99999 if is_public else max(0, kota_toplam - harcanan_dk)
         gh_yuzde = (harcanan_dk / float(kota_toplam)) * 100.0
 
         return {
             "toplam_kosu": total_runs,
             "harcanan_dk": harcanan_dk,
             "kalan_dk": kalan_dk,
-            "yuzde": gh_yuzde,
+            "yuzde": 0.0 if is_public else gh_yuzde,
             "is_akislari": by_wf,
             "kaynak": "canli_api",
+            "is_public": is_public,
         }
     except Exception as e:
         log.warning("GitHub Actions kullanım verisi alınamadı: %s", e)
         return {
             "toplam_kosu": 0,
-            "harcanan_dk": 115,
-            "kalan_dk": max(0, kota_toplam - 115),
-            "yuzde": (115 / float(kota_toplam)) * 100.0,
+            "harcanan_dk": 2000,
+            "kalan_dk": 0,
+            "yuzde": 100.0,
             "is_akislari": {},
-            "kaynak": "istisna_fallback",
+            "kaynak": "hata_fallback",
+            "is_public": False,
         }
 
 
@@ -451,13 +461,23 @@ def kota_metni_uret(kategori: int | str = 1) -> str:
     # =========================================================================
     if kat_int == 1:
         gh = github_actions_kullanimi()
+        gh_is_public = gh.get("is_public", False)
         gh_bar = cizgi_bar(gh["yuzde"])
-        gh_satirlar: List[Tuple[str, str]] = [
-            ("Harcanan Sure", f"{gh['harcanan_dk']:,} dk (%{gh['yuzde']:.1f})"),
-            ("Kalan Sure", f"{gh['kalan_dk']:,} dk"),
-            ("Sifirlanma", sifirlanma_ay_basi()),
-            ("Ilerleme", f"[{gh_bar}]"),
-        ]
+        baslik_actions = "GITHUB ACTIONS (Sinirsiz)" if gh_is_public else "GITHUB ACTIONS (2.000 dk)"
+        if gh_is_public:
+            gh_satirlar: List[Tuple[str, str]] = [
+                ("Harcanan Sure", f"{gh['harcanan_dk']:,} dk"),
+                ("Kalan Sure", "Sinirsiz [✓]"),
+                ("Kota Durumu", "Public [✓]"),
+                ("Ilerleme", f"[{cizgi_bar(0)}]"),
+            ]
+        else:
+            gh_satirlar: List[Tuple[str, str]] = [
+                ("Harcanan Sure", f"{gh['harcanan_dk']:,} dk (%{gh['yuzde']:.1f})"),
+                ("Kalan Sure", f"{gh['kalan_dk']:,} dk"),
+                ("Sifirlanma", sifirlanma_ay_basi()),
+                ("Ilerleme", f"[{gh_bar}]"),
+            ]
         if gh.get("is_akislari"):
             sirali_wf = sorted(gh["is_akislari"].items(), key=lambda x: x[1], reverse=True)[:3]
             for adi, dk in sirali_wf:
@@ -490,7 +510,7 @@ def kota_metni_uret(kategori: int | str = 1) -> str:
         ]
 
         bolumler = [
-            ("GITHUB ACTIONS (2.000 dk)", gh_satirlar),
+            (baslik_actions, gh_satirlar),
             ("YAPAY ZEKA (Gemini AI)", ai_satirlar),
             ("CLOUDFLARE (Worker & KV)", cf_satirlar),
             ("GITHUB REST API", api_satirlar),
