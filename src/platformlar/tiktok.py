@@ -23,7 +23,8 @@ log = logging.getLogger(__name__)
 
 AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/"
 TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
-INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
+DIRECT_POST_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
+INBOX_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
 STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
 
 SCOPES = "user.info.basic,video.upload,video.publish"
@@ -199,9 +200,15 @@ def tiktok_video_yukle(
     video_yolu: str | Path,
     baslik: str,
     aciklama: Optional[str] = None,
+    taslak_modu: bool = True,
 ) -> Dict[str, Any]:
     """
-    9:16 dikey videoyu TikTok'a doğrudan yükler ve yayınlar.
+    9:16 dikey videoyu TikTok'a yükler.
+    taslak_modu=True: TikTok Inbox (Draft) modunda yükler (/v2/post/publish/inbox/video/init/).
+                      Video kullanıcının TikTok mobil uygulamasındaki 'Gelen Kutusu / Taslaklar' klasörüne düşer,
+                      kullanıcı telefonundan kontrol edip yayınlar. App Review gerektirmez (video.upload yeterlidir).
+    taslak_modu=False: TikTok Direct Post modunda doğrudan yayınlar (/v2/post/publish/video/init/).
+                       TikTok App Review onayı (video.publish) gerektirir. Hata alırsa otomatik olarak taslak moduna düşer.
     """
     v_path = Path(video_yolu)
     if not v_path.exists():
@@ -214,39 +221,69 @@ def tiktok_video_yukle(
     # TikTok başlık ve etiketlerini manşeti koruyarak birleştir
     caption_fmt = baslik_ve_etiketleri_birlestir(baslik, aciklama, maks_karakter=2000)
 
-    # 1. Adım: Video Yükleme Başlat
-    log.info(f"TikTok video yükleme başlatılıyor ({dosya_boyutu / (1024*1024):.2f} MB)...")
     init_headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json; charset=UTF-8",
     }
-    init_body = {
-        "post_info": {
-            "title": caption_fmt,
-            "privacy_level": "PUBLIC_TO_EVERYONE",
-            "disable_duet": False,
-            "disable_stitch": False,
-            "disable_comment": False,
-            "video_cover_timestamp_ms": 1000,
-        },
-        "source_info": {
-            "source": "FILE_UPLOAD",
-            "video_size": dosya_boyutu,
-            "chunk_size": dosya_boyutu,
-            "total_chunk_count": 1,
-        },
-    }
 
-    init_res = requests.post(INIT_URL, headers=init_headers, json=init_body, timeout=30)
-    init_data = init_res.json()
-    if init_data.get("error", {}).get("code") != "ok":
-        raise RuntimeError(f"TikTok init hatası: {init_data}")
+    init_data = None
+    kullanilan_mod = "inbox" if taslak_modu else "direct"
+
+    if taslak_modu:
+        log.info(f"TikTok video yükleme başlatılıyor [TASLAK / INBOX MODU] ({dosya_boyutu / (1024*1024):.2f} MB)...")
+        inbox_body = {
+            "source_info": {
+                "source": "FILE_UPLOAD",
+                "video_size": dosya_boyutu,
+                "chunk_size": dosya_boyutu,
+                "total_chunk_count": 1,
+            }
+        }
+        init_res = requests.post(INBOX_INIT_URL, headers=init_headers, json=inbox_body, timeout=30)
+        init_data = init_res.json()
+        if init_data.get("error", {}).get("code") != "ok":
+            raise RuntimeError(f"TikTok inbox (taslak) init hatası: {init_data}")
+    else:
+        log.info(f"TikTok video yükleme başlatılıyor [DOĞRUDAN YAYIN] ({dosya_boyutu / (1024*1024):.2f} MB)...")
+        direct_body = {
+            "post_info": {
+                "title": caption_fmt,
+                "privacy_level": "PUBLIC_TO_EVERYONE",
+                "disable_duet": False,
+                "disable_stitch": False,
+                "disable_comment": False,
+                "video_cover_timestamp_ms": 1000,
+            },
+            "source_info": {
+                "source": "FILE_UPLOAD",
+                "video_size": dosya_boyutu,
+                "chunk_size": dosya_boyutu,
+                "total_chunk_count": 1,
+            },
+        }
+        init_res = requests.post(DIRECT_POST_INIT_URL, headers=init_headers, json=direct_body, timeout=30)
+        init_data = init_res.json()
+        if init_data.get("error", {}).get("code") != "ok":
+            log.warning(f"TikTok direct post başarısız ({init_data}), taslak (inbox) moduna geçiliyor...")
+            inbox_body = {
+                "source_info": {
+                    "source": "FILE_UPLOAD",
+                    "video_size": dosya_boyutu,
+                    "chunk_size": dosya_boyutu,
+                    "total_chunk_count": 1,
+                }
+            }
+            init_res = requests.post(INBOX_INIT_URL, headers=init_headers, json=inbox_body, timeout=30)
+            init_data = init_res.json()
+            if init_data.get("error", {}).get("code") != "ok":
+                raise RuntimeError(f"TikTok hem direct hem inbox init hatası: {init_data}")
+            kullanilan_mod = "inbox"
 
     publish_id = init_data["data"]["publish_id"]
     upload_url = init_data["data"]["upload_url"]
 
     # 2. Adım: Video Baytlarını Yükle
-    log.info("Video baytları TikTok sunucularına aktarılıyor...")
+    log.info(f"Video baytları TikTok sunucularına aktarılıyor (Mod: {kullanilan_mod})...")
     with open(v_path, "rb") as f:
         video_bytes = f.read()
 
@@ -273,9 +310,42 @@ def tiktok_video_yukle(
         log.info(f"TikTok işlenme durumu: {status}")
 
         if status == "PUBLISH_COMPLETE":
-            log.info(f"🎉 TikTok videosu başarıyla yayınlandı! Publish ID: {publish_id}")
-            return {"publish_id": publish_id, "status": status}
+            if kullanilan_mod == "inbox":
+                log.info(f"🎉 TikTok videosu başarıyla TASLAK / GELEN KUTUSUNA iletildi! Publish ID: {publish_id}")
+            else:
+                log.info(f"🎉 TikTok videosu başarıyla yayınlandı! Publish ID: {publish_id}")
+            return {"publish_id": publish_id, "status": status, "mod": kullanilan_mod}
         elif status == "FAILED":
-            raise RuntimeError(f"TikTok yayınlama başarısız oldu: {st_data}")
+            raise RuntimeError(f"TikTok yükleme başarısız oldu: {st_data}")
 
-    return {"publish_id": publish_id, "status": "PROCESSING"}
+    return {"publish_id": publish_id, "status": "PROCESSING", "mod": kullanilan_mod}
+
+
+def auth_url_uret() -> str:
+    """TikTok OAuth yetkilendirme bağlantısını üretir."""
+    key, _ = get_tiktok_api_anahtarlari()
+    params = {
+        "client_key": key,
+        "scope": SCOPES,
+        "response_type": "code",
+        "redirect_uri": REDIRECT_URI,
+        "state": "ezanplus_tiktok_auth",
+    }
+    return f"{AUTH_URL}?{urllib.parse.urlencode(params)}"
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    kod = sys.argv[1] if len(sys.argv) > 1 else None
+    if kod:
+        log.info(f"Girilen kod takas ediliyor: {kod}")
+        yetki_al(manuel_kod=kod)
+    else:
+        log.info("TikTok OAuth akışı başlatılıyor...")
+        url = auth_url_uret()
+        print("\n" + "=" * 60)
+        print("🔗 TIKTOK GİRİŞ BAĞLANTISI:")
+        print(url)
+        print("=" * 60 + "\n")
+        yetki_al()
+

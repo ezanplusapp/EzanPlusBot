@@ -79,10 +79,42 @@ def tabloları_hazirla():
             con.execute("ALTER TABLE paylasimlar ADD COLUMN instagram_story_post_id TEXT")
         except sqlite3.OperationalError:
             pass
+        # Ayarlar tablosu (R2, entegrasyonlar vb. için esnek yapılandırma)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS ayarlar (
+                anahtar TEXT PRIMARY KEY,
+                deger TEXT
+            )
+        """)
         # Hızlı mükerrer arama için index
         con.execute("CREATE INDEX IF NOT EXISTS idx_kaynak ON paylasimlar(kaynak)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_durum ON paylasimlar(durum)")
         con.commit()
+
+
+def ayar_getir(anahtar: str, varsayilan: str = "") -> str:
+    """Veritabanındaki ayarlar tablosundan bir değeri çeker."""
+    try:
+        with baglanti_al() as con:
+            row = con.execute("SELECT deger FROM ayarlar WHERE anahtar = ?", (anahtar,)).fetchone()
+            if row and row["deger"] is not None:
+                return str(row["deger"]).strip()
+    except Exception as e:
+        log.debug(f"Veritabanından ayar çekilemedi ({anahtar}): {e}")
+    return varsayilan
+
+
+def ayar_kaydet(anahtar: str, deger: str) -> None:
+    """Veritabanındaki ayarlar tablosuna bir değer kaydeder / günceller."""
+    try:
+        with baglanti_al() as con:
+            con.execute(
+                "INSERT INTO ayarlar (anahtar, deger) VALUES (?, ?) ON CONFLICT(anahtar) DO UPDATE SET deger=excluded.deger",
+                (anahtar, deger),
+            )
+    except Exception as e:
+        log.error(f"Veritabanına ayar kaydedilemedi ({anahtar}): {e}")
+
 
 
 YAYIN_GECMISI_DOSYASI = KOK_DIZIN / "data" / "yayin_gecmisi.json"
@@ -253,6 +285,7 @@ def durum_guncelle(
     tiktok_post_id: Optional[str] = None,
     threads_post_id: Optional[str] = None,
     facebook_post_id: Optional[str] = None,
+    yayin_zamani: Optional[str] = None,
 ):
     """Paylaşımın durumunu günceller."""
     with baglanti_al() as con:
@@ -283,7 +316,10 @@ def durum_guncelle(
         if facebook_post_id is not None:
             updates.append("facebook_post_id = ?")
             params.append(facebook_post_id)
-        if yeni_durum == "yayinlandi":
+        if yayin_zamani is not None:
+            updates.append("yayin_zamani = ?")
+            params.append(yayin_zamani)
+        elif yeni_durum == "yayinlandi":
             updates.append("yayin_zamani = CURRENT_TIMESTAMP")
 
         params.append(paylasim_id)
@@ -337,6 +373,26 @@ def paylasim_getir(paylasim_id: int) -> Optional[Dict[str, Any]]:
         if d.get("gorsel_yollari"):
             d["gorsel_yollari"] = json.loads(d["gorsel_yollari"])
         return d
+
+
+def zamanlanmis_paylasimlari_getir() -> List[Dict[str, Any]]:
+    """Yayın saati gelmiş (yayin_zamani <= simdi) ve durumu 'zamanlandi' olan kayıtları döner."""
+    simdi_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with baglanti_al() as con:
+        cur = con.execute(
+            "SELECT * FROM paylasimlar WHERE durum = 'zamanlandi' AND (yayin_zamani <= ? OR yayin_zamani <= CURRENT_TIMESTAMP) ORDER BY yayin_zamani ASC",
+            (simdi_str,),
+        )
+        sonuclar = []
+        for row in cur.fetchall():
+            d = dict(row)
+            if d.get("gorsel_yollari"):
+                try:
+                    d["gorsel_yollari"] = json.loads(d["gorsel_yollari"])
+                except Exception:
+                    pass
+            sonuclar.append(d)
+        return sonuclar
 
 
 def paylasim_guncelle(paylasim_id: int, **kwargs) -> bool:

@@ -1901,11 +1901,11 @@ KELIME_PALET_ALIASES: Dict[str, str] = {
 def kelime_karti_ciz(
     kelime_tr: str,
     kelime_ar: str,
-    okunus: str,
-    kok: str,
-    lugat_anlami: str,
-    kuran_boyutu: str,
-    hayat_dersi: str,
+    okunus: str = "",
+    kok: str = "",
+    lugat_anlami: str = "",
+    kuran_boyutu: str = "",
+    hayat_dersi: str = "",
     ayet_ref: Optional[str] = None,
     cikti_dosya_adi: Optional[str] = None,
     format_tipi: str = "4:5",
@@ -2003,7 +2003,14 @@ def kelime_karti_ciz(
     pt_origin = 29 if is_916 else 23
     f_origin = font_al(FONT_GOVDE, pt_origin, agirlik=400)
     temiz_kok = kok_latinize_et(kok)
-    origin_txt = f"Arapça: {okunus}   •   Kök: {temiz_kok}"
+    if okunus and temiz_kok:
+        origin_txt = f"Arapça: {okunus}   •   Kök: {temiz_kok}"
+    elif okunus:
+        origin_txt = f"Arapça: {okunus}"
+    elif temiz_kok:
+        origin_txt = f"Kök: {temiz_kok}"
+    else:
+        origin_txt = "Kur'an-ı Kerim Kavramı"
     o_bb = draw.textbbox((0, 0), origin_txt, font=f_origin)
     ow = o_bb[2] - o_bb[0]
     oh = o_bb[3] - o_bb[1]

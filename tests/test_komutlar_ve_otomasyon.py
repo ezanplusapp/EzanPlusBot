@@ -124,23 +124,27 @@ class TestOtomasyonVeKomutlar(unittest.TestCase):
         )
         self.assertIsNotNone(pid)
 
-        # Yayın geçmişine girdi mi kontrol et
-        kayit = db.paylasim_getir(pid)
-        db.yayin_gecmisi_kaydet(kayit)
-        gecmis_once = db.yayin_gecmisi_yukle()
-        self.assertTrue(any(item.get("kaynak") == "Test Sûresi, 1. Âyet" for item in gecmis_once))
+        try:
+            # Yayın geçmişine girdi mi kontrol et
+            kayit = db.paylasim_getir(pid)
+            db.yayin_gecmisi_kaydet(kayit)
+            gecmis_once = db.yayin_gecmisi_yukle()
+            self.assertTrue(any(item.get("kaynak") == "Test Sûresi, 1. Âyet" for item in gecmis_once))
 
-        # Yayından kaldır
-        sonuclar = yayindan_kaldir(pid)
-        self.assertIsInstance(sonuclar, dict)
+            # Yayından kaldır
+            sonuclar = yayindan_kaldir(pid)
+            self.assertIsInstance(sonuclar, dict)
 
-        # Durum kontrolü
-        kayit_sonra = db.paylasim_getir(pid)
-        self.assertEqual(kayit_sonra["durum"], "yayindan_kaldirildi")
+            # Durum kontrolü
+            kayit_sonra = db.paylasim_getir(pid)
+            self.assertEqual(kayit_sonra["durum"], "yayindan_kaldirildi")
 
-        # JSON geçmişinden silindi mi kontrol et
-        gecmis_sonra = db.yayin_gecmisi_yukle()
-        self.assertFalse(any(item.get("kaynak") == "Test Sûresi, 1. Âyet" for item in gecmis_sonra))
+            # JSON geçmişinden silindi mi kontrol et
+            gecmis_sonra = db.yayin_gecmisi_yukle()
+            self.assertFalse(any(item.get("kaynak") == "Test Sûresi, 1. Âyet" for item in gecmis_sonra))
+        finally:
+            with db.baglanti_al() as con:
+                con.execute("DELETE FROM paylasimlar WHERE id = ?", (pid,))
 
     def test_video_secavend_ve_satir_araligi(self):
         """Secavend durak işaretlerinin ayıklandığını ve satırlar arası >= 28px net pay olduğunu doğrular."""

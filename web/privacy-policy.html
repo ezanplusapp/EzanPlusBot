@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ezan Plus — Gizlilik Politikası / Privacy Policy</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; line-height: 1.65; max-width: 760px; margin: 32px auto; padding: 0 20px; color: #1f2937; }
+        h1, h2 { color: #111827; }
+        h1 { font-size: 26px; margin-bottom: 4px; }
+        h2 { font-size: 18px; margin-top: 28px; }
+        a { color: #b45309; }
+        ul { padding-left: 20px; }
+        .updated { color: #6b7280; font-size: 14px; margin-bottom: 16px; }
+        .tabs { display: flex; gap: 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 24px; }
+        .tab { padding: 10px 18px; background: none; border: none; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab.active { color: #b45309; border-bottom-color: #b45309; }
+        .lang { display: none; }
+        .lang.active { display: block; }
+        footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 13px; }
+        footer a { color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="tabs">
+        <button class="tab active" onclick="switchLang('tr')" id="tab-tr">Türkçe</button>
+        <button class="tab" onclick="switchLang('en')" id="tab-en">English</button>
+    </div>
+
+    <!-- TÜRKÇE -->
+    <section class="lang active" id="lang-tr">
+        <h1>Ezan Plus Gizlilik Politikası</h1>
+        <p class="updated">Son güncelleme: 1 Eylül 2026</p>
+
+        <h2>1. Kapsam</h2>
+        <p>Ezan Plus; namaz vakitleri, Kur'an, hadis, zikir, cami arama, AI destekli yardımcı özellikler, reklam ve isteğe bağlı bulut senkronizasyonu sunar. Uygulama verileri mümkün olduğunca cihazda tutulur; ancak belirli özellikler etkinleştirildiğinde ilgili üçüncü taraf servislerle veri aktarımı yapılır.</p>
+
+        <h2>2. Cihazda Saklanan Veriler</h2>
+        <ul>
+            <li>Ayarlar, bildirim tercihleri, tema, dil ve konum seçimleri.</li>
+            <li>Zikir sayaçları, takvim notları, rüya geçmişi, Kur'an yer imleri ve benzeri uygulama verileri.</li>
+            <li>Özel ses kütüphanesi metadatası ve indirilen/oluşturulan yerel içerikler.</li>
+            <li>Kullanıcının manuel olarak dışa aktardığı yedek dosyaları.</li>
+        </ul>
+
+        <h2>3. Hesap ve Bulut Senkronizasyonu</h2>
+        <p>Google veya Apple ile giriş yapmayı seçerseniz Firebase Authentication kullanılır. Bulut senkronizasyonu açık olduğunda belirli ayarlar ve seçili uygulama kayıtları Firebase Firestore üzerinde hesabınızla ilişkili olarak saklanır.</p>
+        <ul>
+            <li>Hesap bilgileri: ad, e-posta, sağlayıcı, avatar.</li>
+            <li>Buluta giden veriler: ayarların hassas olmayan bölümleri, konum, zikir, rüya, takvim ve yer imi kayıtları.</li>
+            <li>Premium/abonelik yetkileri ve AI kredi hakları bulut yedeklerine dahil edilmez.</li>
+        </ul>
+
+        <h2>4. Konum, Harita ve İçerik Servisleri</h2>
+        <p>Aşağıdaki servisler seçilen özelliğe göre veri alabilir:</p>
+        <ul>
+            <li>OpenStreetMap Nominatim ve Overpass: konum arama, ters geocode ve yakın cami bulma.</li>
+            <li>Esri harita servisleri: standart ve uydu harita görselleri. Harita istekleri Cloudflare üzerindeki uygulama proxy katmanından iletilebilir.</li>
+            <li>Namaz vakti ve dini içerik kaynakları: resmi vakit veya içerik sağlayıcıları (örn. Diyanet İşleri Başkanlığı).</li>
+            <li>Web sürümünde harita kütüphane dosyaları ve stil varlıkları uzaktan yüklenebilir.</li>
+        </ul>
+
+        <h2>5. AI Özellikleri</h2>
+        <p>AI özelliklerini kullandığınızda girdileriniz önce uygulamanın kimlik doğrulamalı proxy katmanına (Cloudflare Workers), oradan da Google Gemini servisine iletilir. AI cevapları otomatik olarak oluşturulur ve dini, tıbbi veya hukuki profesyonel danışmanlık yerine geçmez.</p>
+
+        <h2>6. Reklam ve Ölçümleme</h2>
+        <p>Ücretsiz sürümde Google AdMob kullanılabilir. Gerektiğinde Google User Messaging Platform (UMP) ve iOS App Tracking Transparency (ATT) izinleri istenir. Reklam gösterimi için cihaz bilgileri, reklam kimliği ve onay durumu Google ile paylaşılabilir.</p>
+
+    <h2>7. Satın Alma ve Abonelikler</h2>
+        <p>Ücretli paketler Google Play veya Apple App Store üzerinden satılır. Ödeme kartı bilgileri uygulama sunucularında tutulmaz; tahsilat ve abonelik yönetimi ilgili mağaza sağlayıcısı tarafından yapılır. Abonelik durumu ve hakların eşleştirilmesi için RevenueCat kullanılabilir.</p>
+
+        <h2>8. Yedekler ve Veri Aktarımı</h2>
+        <p>Manuel dışa aktardığınız yedek dosyaları JSON formatındadır ve şifrelenmiş olarak paketlenmez. Bu dosyaları paylaşma, e-posta ile gönderme veya üçüncü taraf depolama alanlarına yükleme sorumluluğu kullanıcıya aittir.</p>
+
+        <h2>9. Saklama ve Silme</h2>
+        <ul>
+            <li>Cihaz verileri uygulamayı kaldırdığınızda veya verileri sıfırladığınızda silinir.</li>
+            <li>Bulut verileri hesabınız bağlı olduğu sürece saklanır; çıkış yaptığınızda yerel kopyalar cihazınızda kalabilir.</li>
+            <li>Hesabınızı ve ilişkili bulut verilerini uygulamada Ayarlar &gt; Hesap &gt; Hesabı Sil yoluyla silebilirsiniz. Ayrıntılı adımlar <a href="/account-deletion">hesap silme sayfasında</a> yer alır.</li>
+            <li>Abonelik kayıtları ilgili mağaza sağlayıcısının kendi politikalarına tabidir.</li>
+        </ul>
+
+    <h2>10. Güvenlik</h2>
+        <p>Yetki kontrolleri, reklam izin akışları ve satın alma doğrulamaları uygulama sürümüne göre güçlendirilebilir. Buna rağmen internet üzerinden aktardığınız hiçbir verinin mutlak güvenlik garantisi yoktur; cihaz güvenliği, ekran kilidi ve hesap korumaları kullanıcı sorumluluğundadır.</p>
+        <p>Uygulama kararlılığını izlemek amacıyla sınırlı hata ve performans tanılama verileri Sentry üzerinden işlenebilir. Bu kayıtlara parola veya ödeme kartı bilgisi bilinçli olarak eklenmez.</p>
+
+        <h2>11. Avrupa Ekonomik Alanı, Birleşik Krallık ve İsviçre Kullanıcıları</h2>
+        <p>GDPR ve eşdeğeri düzenlemeler kapsamındaysanız verilerinizi şu hukuki dayanaklarla işleriz:</p>
+        <ul>
+            <li><strong>Açık rıza:</strong> Kişiselleştirilmiş reklam ve reklam ölçümlemesi. Rıza, uygulamanın ilk açılışında Google User Messaging Platform (UMP) ekranı üzerinden alınır.</li>
+            <li><strong>Sözleşmenin ifası:</strong> Hesap oluşturma, bulut senkronizasyonu ve abonelik haklarının eşleştirilmesi.</li>
+            <li><strong>Meşru menfaat:</strong> Uygulama kararlılığının izlenmesi, hata tanılama ve kötüye kullanımın önlenmesi.</li>
+            <li><strong>Hukuki yükümlülük:</strong> Saklanması mevzuatça zorunlu kayıtlar.</li>
+        </ul>
+        <p><strong>Haklarınız:</strong> erişim, düzeltme, silme, işlemenin kısıtlanması, veri taşınabilirliği ve işlemeye itiraz. Bu hakları <a href="mailto:support@ozbornstudio.com">support@ozbornstudio.com</a> adresine yazarak kullanabilirsiniz.</p>
+        <p><strong>Rızanızı geri çekme:</strong> Reklam rızanızı istediğiniz zaman uygulama içinde Ayarlar &gt; Veri Yönetimi &gt; Reklam Gizlilik Tercihleri yolundan değiştirebilirsiniz. Rızanın geri çekilmesi, geri çekilmeden önceki işlemenin hukuka uygunluğunu etkilemez. Hesabınızı ve bulut verilerinizi Ayarlar &gt; Hesap &gt; Hesabı Sil yolundan silebilirsiniz.</p>
+        <p><strong>Çerezler ve cihaz tanımlayıcıları:</strong> Uygulama web tarayıcısı çerezi kullanmaz. Bunun yerine cihaz üzerinde yerel depolama ve reklam kimliği gibi cihaz tanımlayıcıları kullanılır. Bunların reklam amacıyla kullanılması yukarıda açıklanan rızaya tabidir.</p>
+        <p><strong>Yurt dışına aktarım:</strong> Verileriniz, hizmet sağlayıcılarımızın bulunduğu ülkelerde (ör. Amerika Birleşik Devletleri) işlenebilir. Bu aktarımlar, sağlayıcıların standart sözleşme hükümleri gibi uygun güvenceleri kapsamında gerçekleşir.</p>
+        <p>Yerel veri koruma otoritenize şikâyette bulunma hakkınız saklıdır.</p>
+
+        <h2>12. Kaliforniya ve Diğer ABD Eyaletleri Kullanıcıları</h2>
+        <p>CCPA/CPRA ve benzeri eyalet yasaları kapsamındaysanız aşağıdakiler geçerlidir.</p>
+        <p><strong>Topladığımız kategoriler:</strong> tanımlayıcılar (reklam kimliği, hesap kimliği); internet veya benzeri ağ etkinliği (uygulama içi etkileşim, reklam gösterim ve tıklama verisi); coğrafi konum verisi (namaz vakti, kıble ve yakındaki cami araması için hassas konum); ve kendi girdiğiniz kullanıcı içeriği (zikir, kaza, dua ve rüya kayıtları gibi).</p>
+        <p><strong>Satış ve paylaşım:</strong> Kişisel bilgilerinizi para karşılığı <em>satmıyoruz</em>. Ancak reklam kimliğiniz ve reklam etkileşim verileriniz, CCPA'nın tanımladığı anlamda &ldquo;bağlamlar arası davranışsal reklamcılık için paylaşım&rdquo; kapsamına girebilir.</p>
+        <p><strong>Vazgeçme hakkı (Do Not Sell or Share My Personal Information):</strong> Bu paylaşımdan çıkmak için uygulama içinde Ayarlar &gt; Veri Yönetimi &gt; Reklam Gizlilik Tercihleri yolunu kullanın ya da <a href="mailto:support@ozbornstudio.com">support@ozbornstudio.com</a> adresine yazın.</p>
+        <p><strong>Diğer haklarınız:</strong> hangi verilerin toplandığını öğrenme, silinmesini isteme, düzeltilmesini isteme ve bu hakları kullandığınız için ayrımcılığa uğramama.</p>
+        <p><strong>Konum verisi hakkında:</strong> Konumunuz yalnızca namaz vakti hesaplaması, kıble yönü ve yakındaki cami araması için kullanılır. Konum bilginiz reklam tedarikçilerine gönderilmez.</p>
+
+        <h2>13. Çocukların Gizliliği</h2>
+        <p>Uygulama 13 yaş altındaki çocuklara yönelik tasarlanmamıştır. 13 yaş altındaki bir kullanıcının verisini bilerek toplamayız.</p>
+
+        <h2>14. İletişim</h2>
+        <p>Sorularınız, hesap silme talepleri veya gizlilik konuları için: <a href="mailto:support@ozbornstudio.com">support@ozbornstudio.com</a></p>
+    </section>
+
+    <!-- ENGLISH -->
+    <section class="lang" id="lang-en">
+        <h1>Ezan Plus Privacy Policy</h1>
+        <p class="updated">Last updated: September 1, 2026</p>
+
+        <h2>1. Scope</h2>
+        <p>Ezan Plus offers prayer times, Quran, hadith, dhikr, mosque finder, AI-assisted helper features, advertising, and optional cloud sync. App data is kept on the device whenever possible; however, when certain features are enabled, data is transmitted to relevant third-party services.</p>
+
+        <h2>2. Data Stored on Device</h2>
+        <ul>
+            <li>Settings, notification preferences, theme, language, and location selections.</li>
+            <li>Dhikr counters, calendar notes, dream history, Quran bookmarks, and similar app data.</li>
+            <li>Custom audio library metadata and downloaded/created local content.</li>
+            <li>Backup files manually exported by the user.</li>
+        </ul>
+
+        <h2>3. Account and Cloud Sync</h2>
+        <p>If you choose to sign in with Google or Apple, Firebase Authentication is used. When cloud sync is enabled, certain settings and selected app records are stored in Firebase Firestore associated with your account.</p>
+        <ul>
+            <li>Account info: name, email, provider, avatar.</li>
+            <li>Data sent to cloud: non-sensitive parts of settings, location, dhikr, dream, calendar, and bookmark records.</li>
+            <li>Premium/subscription entitlements and AI credit balances are NOT included in cloud backups (managed server-side).</li>
+        </ul>
+
+        <h2>4. Location, Maps, and Content Services</h2>
+        <p>The following services may receive data based on the feature you use:</p>
+        <ul>
+            <li>OpenStreetMap Nominatim and Overpass: location search, reverse geocoding, and finding nearby mosques.</li>
+            <li>Esri map services: standard and satellite map imagery. Map requests may be relayed through the app's Cloudflare proxy layer.</li>
+            <li>Prayer time and religious content sources: official time or content providers (e.g. Turkey's Diyanet).</li>
+            <li>On the web version, map library files and style assets may be loaded remotely.</li>
+        </ul>
+
+        <h2>5. AI Features</h2>
+        <p>When you use AI features, your inputs are first sent to the app's authenticated proxy layer (Cloudflare Workers), then forwarded to Google Gemini. AI responses are auto-generated and do not replace professional religious, medical, or legal advice.</p>
+
+        <h2>6. Advertising and Measurement</h2>
+        <p>The free tier may use Google AdMob. When required, Google User Messaging Platform (UMP) and iOS App Tracking Transparency (ATT) consents are requested. For ad delivery, device info, ad identifier, and consent state may be shared with Google.</p>
+
+        <h2>7. Purchases and Subscriptions</h2>
+        <p>Paid plans are sold via Google Play or Apple App Store. Payment card information is NOT stored on app servers; billing and subscription management is handled by the relevant store provider. RevenueCat may be used to match subscription status with app entitlements.</p>
+
+        <h2>8. Backups and Data Export</h2>
+        <p>Manually exported backup files are in JSON format and are not bundled with encryption. Sharing these files, sending them via email, or uploading them to third-party storage is the user's responsibility.</p>
+
+        <h2>9. Retention and Deletion</h2>
+        <ul>
+            <li>Device data is deleted when you uninstall the app or reset data.</li>
+            <li>Cloud data is retained while your account is connected; on sign-out, local copies may remain on your device.</li>
+            <li>You can delete your account and associated cloud data in Settings &gt; Account &gt; Delete Account. Detailed steps are available on the <a href="/account-deletion">account deletion page</a>.</li>
+            <li>Subscription records are subject to the relevant store provider's own policies.</li>
+        </ul>
+
+    <h2>10. Security</h2>
+        <p>Authorization controls, ad consent flows, and purchase validation are strengthened across versions. Nevertheless, no data transmitted over the internet has absolute security guarantees; device security, screen lock, and account protection are the user's responsibility.</p>
+        <p>Limited crash and performance diagnostics may be processed through Sentry to monitor app stability. Passwords and payment card information are not intentionally included in these diagnostics.</p>
+
+        <h2>11. Users in the European Economic Area, United Kingdom, and Switzerland</h2>
+        <p>If you are covered by the GDPR or an equivalent regulation, we process your data on the following legal bases:</p>
+        <ul>
+            <li><strong>Consent:</strong> Personalised advertising and ad measurement. Consent is collected on first launch through the Google User Messaging Platform (UMP) screen.</li>
+            <li><strong>Performance of a contract:</strong> Account creation, cloud sync, and matching subscription entitlements.</li>
+            <li><strong>Legitimate interests:</strong> Monitoring app stability, crash diagnostics, and preventing abuse.</li>
+            <li><strong>Legal obligation:</strong> Records we are required to retain by law.</li>
+        </ul>
+        <p><strong>Your rights:</strong> access, rectification, erasure, restriction of processing, data portability, and objection to processing. You can exercise these by writing to <a href="mailto:support@ozbornstudio.com">support@ozbornstudio.com</a>.</p>
+        <p><strong>Withdrawing consent:</strong> You can change your advertising consent at any time in the app under Settings &gt; Data Management &gt; Ad Privacy Choices. Withdrawing consent does not affect the lawfulness of processing carried out before the withdrawal. You can delete your account and cloud data under Settings &gt; Account &gt; Delete Account.</p>
+        <p><strong>Cookies and device identifiers:</strong> The app does not use web browser cookies. It uses on-device local storage and device identifiers such as the advertising ID instead. Their use for advertising is subject to the consent described above.</p>
+        <p><strong>International transfers:</strong> Your data may be processed in the countries where our service providers operate (for example, the United States). Such transfers take place under appropriate safeguards, such as those providers' standard contractual clauses.</p>
+        <p>You retain the right to lodge a complaint with your local data protection authority.</p>
+
+        <h2>12. Users in California and Other U.S. States</h2>
+        <p>If you are covered by the CCPA/CPRA or a similar state law, the following applies.</p>
+        <p><strong>Categories we collect:</strong> identifiers (advertising ID, account ID); internet or similar network activity (in-app interaction, ad impression and click data); geolocation data (precise location, for prayer time calculation, qibla direction, and nearby mosque search); and user content you enter yourself (such as dhikr, missed-prayer, supplication, and dream records).</p>
+        <p><strong>Sale and sharing:</strong> We do <em>not</em> sell your personal information for money. However, your advertising ID and ad interaction data may fall within what the CCPA defines as &ldquo;sharing for cross-context behavioural advertising&rdquo;.</p>
+        <p><strong>Your right to opt out (Do Not Sell or Share My Personal Information):</strong> To opt out of this sharing, use Settings &gt; Data Management &gt; Ad Privacy Choices in the app, or write to <a href="mailto:support@ozbornstudio.com">support@ozbornstudio.com</a>.</p>
+        <p><strong>Your other rights:</strong> to know what data is collected, to request deletion, to request correction, and not to be discriminated against for exercising these rights.</p>
+        <p><strong>About location data:</strong> Your location is used only for prayer time calculation, qibla direction, and nearby mosque search. Your location is not sent to advertising vendors.</p>
+
+        <h2>13. Children's Privacy</h2>
+        <p>The app is not designed for children under 13. We do not knowingly collect data from users under 13.</p>
+
+        <h2>14. Contact</h2>
+        <p>For questions, account deletion requests, or privacy matters: <a href="mailto:support@ozbornstudio.com">support@ozbornstudio.com</a></p>
+    </section>
+
+    <footer>
+        <a href="index.html">← Back to legal documents</a>
+    </footer>
+
+    <script>
+        function switchLang(lang) {
+            document.querySelectorAll('.lang').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('lang-' + lang).classList.add('active');
+            document.getElementById('tab-' + lang).classList.add('active');
+            document.documentElement.lang = lang;
+        }
+        // Auto-detect browser language on first load (only switches to EN if browser is English)
+        if (navigator.language && navigator.language.toLowerCase().startsWith('en')) {
+            switchLang('en');
+        }
+    </script>
+</body>
+</html>

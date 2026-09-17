@@ -313,7 +313,7 @@ def ayet_icerigi_uret(
 Sen Ezan Plus mobil uygulamasının İslami ilimler ve editoryal içerik uzmanısın.
 Sana verilen tescilli Kur'an-ı Kerim ayet metnini ve mealini ASLA değiştirmeyeceksin.
 Görevin:
-1) Verilen Arapça kelime listesindeki tam {toplam_ar_kelime} kelimeye birebir (1:1) karşılık gelen Latin okunuşlarını bir dizi ("latin_kelimeler") olarak üretmek. Her bir eleman tam olarak karşılık gelen Arapça kelimenin okunuşudur. Dizi tam {toplam_ar_kelime} elemanlı olmalıdır. Şapkalı harfleri (â, î, û) ve kesmeleri doğru kullan. Harf-i tarifleri (es-süfehâe, el-kitâb vb.) tek bir kelime olarak yaz, asla ayırma. Ayrıca tüm bu kelimelerin aralarında boşluk olan tam akıcı metnini "arapca_okunus" alanında ver.
+1) Verilen Arapça kelime listesindeki tam {toplam_ar_kelime} kelimeye birebir (1:1) karşılık gelen Latin okunuşlarını bir dizi ("latin_kelimeler") olarak üretmek. Her bir eleman tam olarak karşılık gelen Arapça kelimenin okunuşudur. Dizi tam {toplam_ar_kelime} elemanlı olmalıdır. Şapkalı harfleri (â, î, û) ve kesmeleri (') doğru kullan. Asla akademik alt/üst noktalı harfler (ḍ, ẓ, ṭ, ṣ vb.) kullanma; halkın rahat okuduğu standart Türkçe harfler (d, z, t, s, h vb.) kullan. Harf-i tarifleri (es-süfehâe, el-kitâb vb.) tek bir kelime olarak yaz, asla ayırma. Ayrıca tüm bu kelimelerin aralarında boşluk olan tam akıcı metnini "arapca_okunus" alanında ver.
 2) İnsanın kalbine veya manevi bir haline dokunan, sonunda iki nokta üst üste olan 2-4 kelimelik bir çağrı anonsu yazmak ("video_baslik_satir1"). Örn: 'Kalbin daraldığında hatırla:', 'Dünya seni aldattığında bil ki:', 'Ruhun yorulduğunda hatırla:', 'Yalnız hissettiğinde unutma:'. Asla ucuz yapay kancalar ('bu ayet senin için' vb.) yazma! Asla tırnak koyma! Maksimum 30 karakter.
 3) Ayetin mesajından süzülen 2-4 kelimelik derin, manşet gücünde vurucu hakikat cümlesi yazmak ("video_baslik_satir2"). Örn: 'Zorlukla beraber kolaylık var.', 'Gerçek hayat ahirettir.', 'Allah sabredenlerle beraberdir.'. Asla tırnak koyma! Maksimum 32 karakter.
 4) Bu ayetin günlük hayatımıza, iç huzurumuza ve pratik yaşamımıza bakan 2-3 cümlelik çok samimi, bilgece ve kalbe dokunan bir tefekkür dersi yazmak ("tefekkur_notu").
@@ -357,13 +357,13 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
     veri = _gemini_cagir_json(prompt, sistem_talimati)
 
     # Latin kelimeler kontrolü: Eğer tam dizi geldiyse kullan, eksikse/fazlaysa hizala
-    from .video import turkce_okunus_hizala
+    from .video import turkce_okunus_hizala, latin_okunus_temizle
     lk = veri.get("latin_kelimeler")
     if isinstance(lk, list) and len(lk) == toplam_ar_kelime:
-        veri["latin_kelimeler"] = [str(w).strip() for w in lk]
+        veri["latin_kelimeler"] = [latin_okunus_temizle(str(w).strip()) for w in lk]
         veri["arapca_okunus"] = " ".join(veri["latin_kelimeler"])
     else:
-        tr_ham = [str(w).strip() for w in lk] if isinstance(lk, list) and lk else str(veri.get("arapca_okunus") or "").split()
+        tr_ham = [latin_okunus_temizle(str(w).strip()) for w in lk] if isinstance(lk, list) and lk else [latin_okunus_temizle(w) for w in str(veri.get("arapca_okunus") or "").split()]
         if not tr_ham:
             tr_ham = [""] * toplam_ar_kelime
         veri["latin_kelimeler"] = turkce_okunus_hizala(tr_ham, ar_kelime_listesi)
@@ -799,3 +799,64 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
     veri["format"] = f"post_{format_tipi.replace(':', '_')}"
 
     return veri
+
+
+def metin_ve_tefekkur_revize_et(
+    turkce_metin: str,
+    kategori: str = "ayet",
+    hedef: str = "yenile",
+    mevcut_tefekkur: str = "",
+    mevcut_caption: str = "",
+) -> Dict[str, str]:
+    """
+    GEMINI.md Anayasasına tam uyumlu olarak:
+    - Orijinal Türkçe meal/hadis metnine KESİNLİKLE DOKUNMAZ.
+    - Yalnızca edebi tefekkür notunu ve sosyal medya açıklamasını (caption) revize eder.
+    - hedef:
+        'kisalt'  -> Tefekkürü tek cümlelik, öz ve vurucu bir hale getirir.
+        'genislet'-> Tefekkürü 2-3 cümlelik daha derin bir hikmet dersine dönüştürür.
+        'yenile'  -> Yeni ve taze bir edebi bakış açısıyla tefekkür ve caption üretir.
+    """
+    hedef_talimat = {
+        "kisalt": "Mevcut tefekkür notunu ve hayat dersini TEK CÜMLELİK, son derece vurucu, net ve öz bir hikmet cümlesine indirge.",
+        "genislet": "Mevcut tefekkür notunu 2-3 cümlelik daha derin, kalbe dokunan ve günlük hayata rehberlik eden doyurucu bir tefekküre dönüştür.",
+        "yenile": "Bu metin üzerine taze, samimi, bilgece ve kalbe dokunan yepyeni bir tefekkür notu ve sosyal medya metni kaleme al.",
+    }.get(hedef, "Taze bir tefekkür notu ve açıklama yaz.")
+
+    prompt = f"""
+Aşağıdaki kutsal / tescilli İslami metin için edebi tefekkür notunu ve sosyal medya açıklamasını revize et.
+
+METİN KATEGORİSİ: {kategori.upper()}
+TESCİLLİ TÜRKÇE MEAL / METİN (BU METNE ASLA DOKUNMA, AYNEN KORU):
+"{turkce_metin}"
+
+MEVCUT TEFEKKÜR NOTU:
+"{mevcut_tefekkur}"
+
+GÖREV:
+{hedef_talimat}
+
+KURALLAR:
+1. Türkçe meal metnini asla değiştirme veya yapay zekayla yeniden çevirme!
+2. Asla "bot", "otomasyon", "yapay zeka", "algoritma" gibi kelimeler KULLANMA.
+3. Çıktıyı kesinlikle geçerli bir JSON olarak ver:
+{{
+  "tefekkur_notu": "Revize edilmiş tefekkür notu",
+  "caption": "Instagram/TikTok için kopyalanabilir tam açıklama metni (#ezanplus etiketiyle)"
+}}
+"""
+    try:
+        veri = _gemini_cagir_json(prompt)
+        tef = str(veri.get("tefekkur_notu") or "").strip()
+        cap = str(veri.get("caption") or "").strip()
+        if not tef:
+            tef = mevcut_tefekkur
+        if not cap:
+            cap = mevcut_caption
+        if "#ezanplus" not in cap:
+            cap += "\n\n#ezanplus #tefekkur"
+        return tef, cap
+    except Exception as e:
+        log.warning(f"Metin revizyonu hatası ({e}), mevcut metin korundu.")
+        return mevcut_tefekkur, mevcut_caption
+

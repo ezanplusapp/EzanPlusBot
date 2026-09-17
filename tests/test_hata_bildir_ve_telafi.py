@@ -145,31 +145,35 @@ class TestHataBildirVeTelafi(unittest.TestCase):
             durum="onaylandi",
             gorsel_yollari=[gorsel_yolu, gorsel_yolu],
         )
-        # Facebook önceden başarılı olmuş gibi işaretle
-        db.paylasim_guncelle(pid, facebook_post_id="fb_already_exists_123")
+        try:
+            # Facebook önceden başarılı olmuş gibi işaretle
+            db.paylasim_guncelle(pid, facebook_post_id="fb_already_exists_123")
 
-        # mock yayinla alt fonksiyonları
-        with patch.object(meta, "instagram_gorsel_paylas", return_value={"id": "ig_new_999"}) as mock_ig, \
-             patch.object(meta, "instagram_story_paylas", return_value={"id": "story_new_999"}) as mock_story, \
-             patch.object(meta, "facebook_post_paylas") as mock_fb, \
-             patch.object(threads, "threads_zincir_paylas", return_value={"id": "th_new_999"}) as mock_th:
+            # mock yayinla alt fonksiyonları
+            with patch.object(meta, "instagram_gorsel_paylas", return_value={"id": "ig_new_999"}) as mock_ig, \
+                 patch.object(meta, "instagram_story_paylas", return_value={"id": "story_new_999"}) as mock_story, \
+                 patch.object(meta, "facebook_post_paylas") as mock_fb, \
+                 patch.object(threads, "threads_zincir_paylas", return_value={"id": "th_new_999"}) as mock_th:
 
-            sonuclar = yonetici.yayinla_telafi(pid, hedef_kanal="hepsi")
+                sonuclar = yonetici.yayinla_telafi(pid, hedef_kanal="hepsi")
 
-            # Facebook zaten var olduğu için çağrılmamalı
-            mock_fb.assert_not_called()
-            # Instagram eksik olduğu için çağrılmış olmalı
-            self.assertIn("instagram", sonuclar)
-            self.assertEqual(sonuclar["instagram"], "ig_new_999")
+                # Facebook zaten var olduğu için çağrılmamalı
+                mock_fb.assert_not_called()
+                # Instagram eksik olduğu için çağrılmış olmalı
+                self.assertIn("instagram", sonuclar)
+                self.assertEqual(sonuclar["instagram"], "ig_new_999")
 
-            # DB'de facebook id'si korunmuş olmalı
-            guncel_kayit = db.paylasim_getir(pid)
-            self.assertEqual(guncel_kayit["facebook_post_id"], "fb_already_exists_123")
-            self.assertEqual(guncel_kayit["instagram_post_id"], "ig_new_999")
+                # DB'de facebook id'si korunmuş olmalı
+                guncel_kayit = db.paylasim_getir(pid)
+                self.assertEqual(guncel_kayit["facebook_post_id"], "fb_already_exists_123")
+                self.assertEqual(guncel_kayit["instagram_post_id"], "ig_new_999")
+        finally:
+            with db.baglanti_al() as con:
+                con.execute("DELETE FROM paylasimlar WHERE id = ?", (pid,))
 
     @patch("src.platformlar.meta.requests.post")
     def test_gecici_medya_yukle_uguu_onceligi(self, mock_post):
-        """gecici_medya_yukle fonksiyonunun ilk olarak uguu.se'yi denediğini doğrular."""
+        """gecici_medya_yukle fonksiyonunun R2 harici veya fallback durumunda uguu.se'yi denediğini doğrular."""
         # Sahte bir PNG oluştur
         test_file = Path(__file__).resolve().parent / "test_gorsel_temp.png"
         test_file.write_bytes(b"\x89PNG\r\n\x1a\nfakecontent")
@@ -184,7 +188,8 @@ class TestHataBildirVeTelafi(unittest.TestCase):
             }
             mock_post.return_value = mock_response
 
-            url = meta.gecici_medya_yukle(test_file)
+            # r2 hariç tutulduğunda doğrudan Uguu'ya düşmeli
+            url = meta.gecici_medya_yukle(test_file, haric_cdnler={"r2"})
             self.assertEqual(url, "https://h.uguu.se/testfile.png")
             # requests.post ilk çağrıda uguu.se adresine istek göndermeli
             ilk_istek_url = mock_post.call_args[0][0]
@@ -192,6 +197,26 @@ class TestHataBildirVeTelafi(unittest.TestCase):
         finally:
             if test_file.exists():
                 test_file.unlink()
+
+    @patch("src.platformlar.r2.requests.put")
+    def test_gecici_medya_yukle_r2_onceligi(self, mock_put):
+        """gecici_medya_yukle fonksiyonunun 1. öncelik olarak Cloudflare R2'yi denediğini doğrular."""
+        test_file = Path(__file__).resolve().parent / "test_gorsel_temp_r2.png"
+        test_file.write_bytes(b"\x89PNG\r\n\x1a\nfakecontent")
+
+        try:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_put.return_value = mock_resp
+
+            url = meta.gecici_medya_yukle(test_file)
+            self.assertIn("media.ezanplus.ozbornstudio.com/sosyal/", url)
+            self.assertTrue(mock_put.called)
+
+        finally:
+            if test_file.exists():
+                test_file.unlink()
+
 
 
 if __name__ == "__main__":

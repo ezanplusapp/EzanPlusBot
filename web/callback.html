@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Yetkilendirme • Ezan Plus</title>
+  <style>
+    body {
+      background: #FBF9F4;
+      color: #1C1917;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .auth-card {
+      background: #FFFDF9;
+      border: 1px solid #EAE4D5;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 540px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    }
+    h1 {
+      font-size: 24px;
+      color: #9B1B1B;
+      margin-bottom: 12px;
+    }
+    p {
+      font-size: 15px;
+      color: #4B5563;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .code-box {
+      background: #F3EFE6;
+      border: 1px solid #D6CEBE;
+      border-radius: 12px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 16px;
+      word-break: break-all;
+      margin-bottom: 20px;
+      color: #1C1917;
+      user-select: all;
+    }
+    .btn {
+      background: #9B1B1B;
+      color: #fff;
+      border: none;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:hover {
+      background: #7F1515;
+      transform: translateY(-1px);
+    }
+    .success-badge {
+      display: inline-block;
+      background: #E6F4EA;
+      color: #137333;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .error-badge {
+      display: inline-block;
+      background: #FCE8E6;
+      color: #C5221F;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-card" id="card">
+    <div class="success-badge" id="badge">TikTok Yetkilendirme Başarılı</div>
+    <h1 id="title">Yetkilendirme Kodu Hazır</h1>
+    <p id="desc">Aşağıdaki yetkilendirme kodunu kopyalayıp terminale veya sohbete yapıştırabilirsiniz:</p>
+    
+    <div class="code-box" id="codeText">Yükleniyor...</div>
+    
+    <button class="btn" id="copyBtn" onclick="copyCode()">
+      📋 Kodu Kopyala
+    </button>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const error = urlParams.get('error') || urlParams.get('error_description');
+
+    const badge = document.getElementById('badge');
+    const title = document.getElementById('title');
+    const desc = document.getElementById('desc');
+    const codeText = document.getElementById('codeText');
+    const copyBtn = document.getElementById('copyBtn');
+
+    if (error) {
+      badge.className = 'error-badge';
+      badge.innerText = 'Yetkilendirme Hatası';
+      title.innerText = 'Bağlantı Başarısız Oldu';
+      desc.innerText = 'TikTok girişinde bir hata oluştu: ' + error;
+      codeText.innerText = error;
+      copyBtn.style.display = 'none';
+    } else if (code) {
+      codeText.innerText = code;
+    } else {
+      badge.className = 'error-badge';
+      badge.innerText = 'Kod Bulunamadı';
+      title.innerText = 'Parametre Eksik';
+      desc.innerText = 'Adres çubuğunda herhangi bir yetkilendirme kodu tespit edilemedi.';
+      codeText.innerText = window.location.href;
+      copyBtn.style.display = 'none';
+    }
+
+    function copyCode() {
+      if (code) {
+        navigator.clipboard.writeText(code).then(() => {
+          copyBtn.innerText = '✅ Kopyalandı!';
+          setTimeout(() => {
+            copyBtn.innerText = '📋 Kodu Kopyala';
+          }, 3000);
+        });
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+import{j as s}from"./vendor-react-DmlSUEVg.js";import{bk as t}from"./index-DQPxnpFR.js";const A=()=>!1,l=({isOpen:o,lang:i="tr",onAccept:n,onClose:r})=>o?s.jsx(t,{onClose:r}):null;export{l as A,A as i};

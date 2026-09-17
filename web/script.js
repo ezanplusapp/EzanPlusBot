@@ -19,10 +19,26 @@ document.addEventListener('DOMContentLoaded', () => {
     initInteractiveDhikr();
     initLivePrayerTimes();
     initQuranShowcase();
-    initWisdomRotator();
+    initHadithModule();
     initQrModal();
-    initBetaModal();
 });
+
+/* ==========================================================================
+   Global Metin Sadeleştirme (Arama & Eşleme)
+   ========================================================================== */
+function normalizeSearchText(str) {
+    if (!str) return '';
+    return str
+        .toLowerCase()
+        .replace(/[âäà]/g, 'a')
+        .replace(/[îïìı]/g, 'i')
+        .replace(/[ûüù]/g, 'u')
+        .replace(/[ôöò]/g, 'o')
+        .replace(/[ç]/g, 'c')
+        .replace(/[ğ]/g, 'g')
+        .replace(/[ş]/g, 's')
+        .replace(/['’‘\-_\s]/g, '');
+}
 
 /* ==========================================================================
    1. Header Scroll Efekti
@@ -284,538 +300,18 @@ function vakitleriGuncelle() {
 /* ==========================================================================
    5. İnteraktif Kur'an-ı Kerim, Tilavet, Hatim ve Canlı Radyo Motoru
    ========================================================================== */
-const QURAN_SURAHS_DATA = {
-    "ayetel-kursi": {
-        "id": "ayetel-kursi",
-        "badge": "BAKARA SÛRESİ • 255. ÂYET (ÂYETE'L-KÜRSÎ)",
-        "juzBadge": "3. CÜZ • MEDENÎ",
-        "verseKey": "2:255",
-        "latin": "Allâhu lâ ilâhe illâ huve'l-hayyu'l-kayyûm, lâ te'huzuhû sinetun velâ nevm, lehû mâ fî's-semâvâti vemâ fî'l-ard, men zellezî yeşfeu indehû illâ bi-iznih, ya'lemu mâ beyne eydîhim vemâ halfehum, velâ yuhîtûne bi-şey'in min ilmihî illâ bimâ şâe, vesia kursiyyuhu's-semâvâti ve'l-ard, velâ yeûduhû hifzuhumâ, ve huve'l-aliyyu'l-azîm.",
-        "translations": {
-            "diyanet": "“ Allah, O'ndan başka hiçbir ilah olmayandır; daima yaşayan (Hayy), bütün varlığın idaresini yürüten (Kayyûm) dir. O'nu ne bir uyuklama tutabilir, ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O, çok yücedir, çok büyüktür. ”",
-            "yazir": "“ Allah ki, O'ndan başka ilah yoktur; daima diridir, yaratıklarını koruyup yöneticidir. O'nu ne bir uyuklama tutar ne de bir uyku. Göklerde ve yerde ne varsa hepsi O'nundur... O çok yüce, çok büyüktür. ”",
-            "ozturk": "“ Allah, O'ndan başka ilah yoktur; diridir, her an yaratış ve idare halindedir. O'nu ne bir uyuklama tutar ne de bir uyku... O, çok yücedir, çok büyüktür. ”",
-            "yuksel": "“ ALLAH: O'ndan başka tanrı yoktur; Diridir, Ebedidir. O'nu ne bir uyuklama ne de bir uyku yakalayamaz... O Yücedir, Büyüktür. ”"
-        },
-        "tefekkur": "Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.",
-        "localAudio": "assets/audio/002255.mp3",
-        "surahNum": "002",
-        "ayahNum": "255",
-        "words": [
-            {
-                "word": "ٱللَّهُ",
-                "start": 0.0,
-                "end": 1.11
-            },
-            {
-                "word": "لَآ",
-                "start": 1.11,
-                "end": 2.885
-            },
-            {
-                "word": "إِلَـٰهَ",
-                "start": 2.885,
-                "end": 3.59
-            },
-            {
-                "word": "إِلَّا",
-                "start": 3.59,
-                "end": 4.303
-            },
-            {
-                "word": "هُوَ",
-                "start": 4.303,
-                "end": 4.659
-            },
-            {
-                "word": "ٱلْحَىُّ",
-                "start": 4.659,
-                "end": 5.422
-            },
-            {
-                "word": "ٱلْقَيُّومُ ۚ",
-                "start": 5.422,
-                "end": 8.15
-            },
-            {
-                "word": "لَا",
-                "start": 8.15,
-                "end": 8.824
-            },
-            {
-                "word": "تَأْخُذُهُۥ",
-                "start": 8.824,
-                "end": 9.731
-            },
-            {
-                "word": "سِنَةٌ",
-                "start": 9.731,
-                "end": 10.558
-            },
-            {
-                "word": "وَلَا",
-                "start": 10.558,
-                "end": 11.591
-            },
-            {
-                "word": "نَوْمٌ ۚ",
-                "start": 11.591,
-                "end": 13.756
-            },
-            {
-                "word": "لَّهُۥ",
-                "start": 13.756,
-                "end": 14.55
-            },
-            {
-                "word": "مَا",
-                "start": 14.55,
-                "end": 15.01
-            },
-            {
-                "word": "فِى",
-                "start": 15.01,
-                "end": 15.603
-            },
-            {
-                "word": "ٱلسَّمَـٰوَٰتِ",
-                "start": 15.603,
-                "end": 16.968
-            },
-            {
-                "word": "وَمَا",
-                "start": 16.968,
-                "end": 17.212
-            },
-            {
-                "word": "فِى",
-                "start": 17.212,
-                "end": 17.913
-            },
-            {
-                "word": "ٱلْأَرْضِ ۗ",
-                "start": 17.913,
-                "end": 18.311
-            },
-            {
-                "word": "مَن",
-                "start": 18.311,
-                "end": 19.486
-            },
-            {
-                "word": "ذَا",
-                "start": 19.486,
-                "end": 19.879
-            },
-            {
-                "word": "ٱلَّذِى",
-                "start": 19.879,
-                "end": 20.364
-            },
-            {
-                "word": "يَشْفَعُ",
-                "start": 20.364,
-                "end": 21.386
-            },
-            {
-                "word": "عِندَهُۥٓ",
-                "start": 21.386,
-                "end": 23.512
-            },
-            {
-                "word": "إِلَّا",
-                "start": 23.512,
-                "end": 24.607
-            },
-            {
-                "word": "بِإِذْنِهِۦ ۚ",
-                "start": 24.607,
-                "end": 25.67
-            },
-            {
-                "word": "يَعْلَمُ",
-                "start": 25.67,
-                "end": 26.754
-            },
-            {
-                "word": "مَا",
-                "start": 26.754,
-                "end": 27.228
-            },
-            {
-                "word": "بَيْنَ",
-                "start": 27.228,
-                "end": 27.626
-            },
-            {
-                "word": "أَيْدِيهِمْ",
-                "start": 27.626,
-                "end": 28.764
-            },
-            {
-                "word": "وَمَا",
-                "start": 28.764,
-                "end": 29.233
-            },
-            {
-                "word": "خَلْفَهُمْ ۖ",
-                "start": 29.233,
-                "end": 30.233
-            },
-            {
-                "word": "وَلَا",
-                "start": 30.233,
-                "end": 30.789
-            },
-            {
-                "word": "يُحِيطُونَ",
-                "start": 30.789,
-                "end": 32.014
-            },
-            {
-                "word": "بِشَىْءٍ",
-                "start": 32.014,
-                "end": 33.35
-            },
-            {
-                "word": "مِّنْ",
-                "start": 33.35,
-                "end": 33.795
-            },
-            {
-                "word": "عِلْمِهِۦٓ",
-                "start": 33.795,
-                "end": 36.604
-            },
-            {
-                "word": "إِلَّا",
-                "start": 36.604,
-                "end": 37.316
-            },
-            {
-                "word": "بِمَا",
-                "start": 37.316,
-                "end": 38.176
-            },
-            {
-                "word": "شَآءَ ۚ",
-                "start": 38.176,
-                "end": 39.893
-            },
-            {
-                "word": "وَسِعَ",
-                "start": 39.893,
-                "end": 40.828
-            },
-            {
-                "word": "كُرْسِيُّهُ",
-                "start": 40.828,
-                "end": 41.814
-            },
-            {
-                "word": "ٱلسَّمَـٰوَٰتِ",
-                "start": 41.814,
-                "end": 43.189
-            },
-            {
-                "word": "وَٱلْأَرْضَ ۖ",
-                "start": 43.189,
-                "end": 44.302
-            },
-            {
-                "word": "وَلَا",
-                "start": 44.302,
-                "end": 45.117
-            },
-            {
-                "word": "يَـُٔودُهُۥ",
-                "start": 45.117,
-                "end": 46.398
-            },
-            {
-                "word": "حِفْظُهُمَا ۚ",
-                "start": 46.398,
-                "end": 48.12
-            },
-            {
-                "word": "وَهُوَ",
-                "start": 48.12,
-                "end": 48.793
-            },
-            {
-                "word": "ٱلْعَلِىُّ",
-                "start": 48.793,
-                "end": 49.653
-            },
-            {
-                "word": "ٱلْعَظِيمُ",
-                "start": 49.653,
-                "end": 52.035
-            }
-        ]
-    },
-    "fatiha": {
-        "id": "fatiha",
-        "badge": "FÂTİHA SÛRESİ • 1. ÂYET",
-        "juzBadge": "1. CÜZ • MEKKÎ",
-        "verseKey": "1:1",
-        "latin": "Bismillâhirrahmânirrahîm.",
-        "translations": {
-            "diyanet": "“ Rahman ve Rahîm olan Allah'ın adıyla. ”",
-            "yazir": "“ Merhametli ve çok lütufkâr olan Allah'ın adıyla. ”",
-            "ozturk": "“ Rahman ve Rahîm Allah'ın adıyla. ”",
-            "yuksel": "“ Bağışlayan ve Esirgeyen ALLAH'ın adıyla. ”"
-        },
-        "tefekkur": "Her hayırlı amelin başı, kalbi ilahi rahmet kapısına açan Nebevî anahtardır.",
-        "localAudio": "assets/audio/001001.mp3",
-        "surahNum": "001",
-        "ayahNum": "001",
-        "words": [
-            {
-                "word": "بِسْمِ",
-                "start": 0.0,
-                "end": 0.58
-            },
-            {
-                "word": "ٱللَّهِ",
-                "start": 0.58,
-                "end": 1.409
-            },
-            {
-                "word": "ٱلرَّحْمَـٰنِ",
-                "start": 1.409,
-                "end": 2.502
-            },
-            {
-                "word": "ٱلرَّحِيمِ",
-                "start": 2.502,
-                "end": 5.84
-            }
-        ]
-    },
-    "insirah": {
-        "id": "insirah",
-        "badge": "İNŞİRÂH SÛRESİ • 5-6. ÂYET",
-        "juzBadge": "30. CÜZ • MEKKÎ",
-        "verseKey": "94:5-6",
-        "latin": "Fe inne meal usri yusrâ, inne meal usri yusrâ.",
-        "translations": {
-            "diyanet": "“ Şüphesiz her güçlükle beraber bir kolaylık vardır. Gerçekten güçlükle beraber bir kolaylık vardır. ”",
-            "yazir": "“ Demek ki zorlukla beraber bir kolaylık var. Evet, zorlukla beraber bir kolaylık var! ”",
-            "ozturk": "“ Demek ki, zorluğun yanında bir kolaylık mutlaka var! Evet, zorluğun yanında bir kolaylık mutlaka var! ”",
-            "yuksel": "“ Kuşkusuz, zorlukla beraber bir kolaylık vardır. Evet, zorlukla beraber bir kolaylık vardır. ”"
-        },
-        "tefekkur": "Sabır ve tevekkülün sonunda kalbe inen ilahi ferahlığın ebedi müjdesidir.",
-        "localAudio": "assets/audio/insirah.mp3",
-        "surahNum": "094",
-        "ayahNum": "005",
-        "words": [
-            {
-                "word": "فَإِنَّ",
-                "start": 0.0,
-                "end": 1.64
-            },
-            {
-                "word": "مَعَ",
-                "start": 1.64,
-                "end": 2.01
-            },
-            {
-                "word": "ٱلْعُسْرِ",
-                "start": 2.01,
-                "end": 2.85
-            },
-            {
-                "word": "يُسْرًا ۙ",
-                "start": 2.85,
-                "end": 4.445
-            },
-            {
-                "word": "إِنَّ",
-                "start": 4.53,
-                "end": 5.93
-            },
-            {
-                "word": "مَعَ",
-                "start": 5.93,
-                "end": 6.31
-            },
-            {
-                "word": "ٱلْعُسْرِ",
-                "start": 6.31,
-                "end": 7.18
-            },
-            {
-                "word": "يُسْرًا",
-                "start": 7.18,
-                "end": 8.62
-            }
-        ]
-    },
-    "yasin": {
-        "id": "yasin",
-        "badge": "YÂSÎN SÛRESİ • 58. ÂYET",
-        "juzBadge": "23. CÜZ • MEKKÎ",
-        "verseKey": "36:58",
-        "latin": "Selâmun kavlen min rabbin rahîm.",
-        "translations": {
-            "diyanet": "“ Çok merhametli olan Rab'den bir söz olarak kendilerine 'Selâm' vardır. ”",
-            "yazir": "“ Merhametli bir Rabbin sözü olarak onlara 'Selâm' vardır. ”",
-            "ozturk": "“ Çok merhametli bir Rab'den bir de sözlü 'Selâm' vardır. ”",
-            "yuksel": "“ Çok Rahîm olan Rab'den bir söz olarak: 'Selam!' ”"
-        },
-        "tefekkur": "Cennet ehline Yüce Mevlâ katından bizzat ikram edilecek en şerefli hitaptır.",
-        "localAudio": "assets/audio/036058.mp3",
-        "surahNum": "036",
-        "ayahNum": "058",
-        "words": [
-            {
-                "word": "سَلَـٰمٌ",
-                "start": 0.0,
-                "end": 1.46
-            },
-            {
-                "word": "قَوْلًا",
-                "start": 1.46,
-                "end": 3.25
-            },
-            {
-                "word": "مِّن",
-                "start": 3.25,
-                "end": 3.58
-            },
-            {
-                "word": "رَّبٍّ",
-                "start": 3.58,
-                "end": 4.51
-            },
-            {
-                "word": "رَّحِيمٍ",
-                "start": 4.51,
-                "end": 7.935
-            }
-        ]
-    },
-    "mulk": {
-        "id": "mulk",
-        "badge": "MÜLK SÛRESİ • 1. ÂYET",
-        "juzBadge": "29. CÜZ • MEKKÎ",
-        "verseKey": "67:1",
-        "latin": "Tebârakellezî biyedihil mulku ve huve alâ kulli şey'in kadîr.",
-        "translations": {
-            "diyanet": "“ Hükümranlık elinde olan Allah, yüceler yücesidir ve O'nun her şeye gücü yeter. ”",
-            "yazir": "“ Mutlak hükümranlık elinde bulunan Allah yüceler yücesidir ve O her şeye kadirdir. ”",
-            "ozturk": "“ Mutlak egemenlik elinde bulunan o Allah çok yücedir. O, her şeye kadirdir. ”",
-            "yuksel": "“ Mutlak egemenlik elinde olan çok yücedir. Ve O her şeye Güç yetirendir. ”"
-        },
-        "tefekkur": "Kabir azabından koruyan ve mülkün yegane sahibini zikreden şifalı bir sûredir.",
-        "localAudio": "assets/audio/067001.mp3",
-        "surahNum": "067",
-        "ayahNum": "001",
-        "words": [
-            {
-                "word": "تَبَـٰرَكَ",
-                "start": 0.0,
-                "end": 1.04
-            },
-            {
-                "word": "ٱلَّذِى",
-                "start": 1.04,
-                "end": 1.99
-            },
-            {
-                "word": "بِيَدِهِ",
-                "start": 1.99,
-                "end": 2.82
-            },
-            {
-                "word": "ٱلْمُلْكُ",
-                "start": 2.82,
-                "end": 3.76
-            },
-            {
-                "word": "وَهُوَ",
-                "start": 3.76,
-                "end": 4.25
-            },
-            {
-                "word": "عَلَىٰ",
-                "start": 4.25,
-                "end": 4.95
-            },
-            {
-                "word": "كُلِّ",
-                "start": 4.95,
-                "end": 5.55
-            },
-            {
-                "word": "شَىْءٍ",
-                "start": 5.55,
-                "end": 7.28
-            },
-            {
-                "word": "قَدِيرٌ",
-                "start": 7.28,
-                "end": 10.725
-            }
-        ]
-    },
-    "ihlas": {
-        "id": "ihlas",
-        "badge": "İHLÂS SÛRESİ • 1. ÂYET",
-        "juzBadge": "30. CÜZ • MEKKÎ",
-        "verseKey": "112:1",
-        "latin": "Kul huvallâhu ehad.",
-        "translations": {
-            "diyanet": "“ De ki: O, Allah'tır, bir tektir. ”",
-            "yazir": "“ De ki: O Allah tektir. ”",
-            "ozturk": "“ De ki: O Allah tektir. ”",
-            "yuksel": "“ De ki: 'O, ALLAH'tır; Birdir.' ”"
-        },
-        "tefekkur": "Kur'an'ın üçte birine denk olan saf tevhid ve ihlâs beyanıdır.",
-        "localAudio": "assets/audio/112001.mp3",
-        "surahNum": "112",
-        "ayahNum": "001",
-        "words": [
-            {
-                "word": "قُلْ",
-                "start": 0.0,
-                "end": 0.43
-            },
-            {
-                "word": "هُوَ",
-                "start": 0.43,
-                "end": 0.7
-            },
-            {
-                "word": "ٱللَّهُ",
-                "start": 0.7,
-                "end": 1.68
-            },
-            {
-                "word": "أَحَدٌ",
-                "start": 1.68,
-                "end": 2.915
-            }
-        ]
-    }
-};
-
-const QURAN_RECITERS_CONFIG = {
-    alafasy: { label: "Şeyh Mişari Râşid el-Afâsî", url: "https://everyayah.com/data/Alafasy_128kbps/" },
-    ghamadi: { label: "Saad el-Gâmidî", url: "https://everyayah.com/data/Ghamadi_40kbps/" },
-    basit:   { label: "Abdülbâsit Abdüssamed", url: "https://everyayah.com/data/Abdul_Basit_Murattal_192kbps/" },
-    husary:  { label: "Mahmud Halil el-Huserî", url: "https://everyayah.com/data/Husary_128kbps/" },
-    sudais:  { label: "Abdurrahman es-Sudeys", url: "https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/" },
-    shuraym: { label: "Suud eş-Şureym", url: "https://everyayah.com/data/Shuraym_128kbps/" },
-    minshawi:{ label: "Muhammed Sıddık el-Minşâvî", url: "https://everyayah.com/data/Minshawy_Murattal_128kbps/" }
-};
-
-let currentSurahKey = "ayetel-kursi";
-let currentReciterKey = "alafasy";
-let currentMealKey = "diyanet";
+let allSurahs = [];
+let currentSurahNo = 2; // Bakara Sûresi (Varsayılan)
+let currentAyahNo = 255; // Âyete'l-Kürsî (Varsayılan)
+let currentSurahAyahs = [];
+let surahCache = {};
+let currentMealKey = 'diy'; // 'diy' = Diyanet, 'elm' = Elmalılı
+let isAutoFlow = true;
+let isRepeatEnabled = false;
 let currentPlaybackSpeed = 1.0;
-let isRepeatEnabled = true;
+let karaokeRafId = null;
+let currentJuzFilter = 0;
+let surahSearchTerm = '';
 
 // 30 Cüz Durum Haritası (Varsayılan 18 cüz tamamlanmış = %60)
 let completedJuzMap = {
@@ -851,10 +347,11 @@ function initQuranNavTabs() {
     });
 }
 
-/* --- B. Canlı Tilavet Çaları & Senkron Karaoke --- */
+/* --- B. Canlı Tilavet Çaları & Senkron Karaoke (114 Sûre & 6.236 Âyet) --- */
 function initQuranTilavetPlayer() {
     const audioEl = document.getElementById('quranRecitationAudio');
     const playBtn = document.getElementById('mushafPlayBtn');
+    const miniPlayBtn = document.getElementById('miniPlayBtn');
     const progressTrack = document.getElementById('mushafProgressTrack');
     const progressFill = document.getElementById('mushafProgressFill');
     const curTimeEl = document.getElementById('mushafCurTime');
@@ -862,83 +359,330 @@ function initQuranTilavetPlayer() {
     const equalizer = document.getElementById('mushafEqualizer');
     const speedBtn = document.getElementById('mushafSpeedBtn');
     const repeatBtn = document.getElementById('mushafRepeatBtn');
-    const surahChips = document.querySelectorAll('.surah-chip');
-    const reciterSelect = document.getElementById('reciterSelect');
+    const autoFlowBtn = document.getElementById('autoNextAyahToggle');
     const mealSelect = document.getElementById('mealSelect');
+    const prevAyahBtn = document.getElementById('prevAyahBtn');
+    const nextAyahBtn = document.getElementById('nextAyahBtn');
+    const ayahSelectDropdown = document.getElementById('ayahSelectDropdown');
+    const surahPickerBtn = document.getElementById('mushafSurahPickerBtn');
+    const currentSurahBtnTitle = document.getElementById('currentSurahBtnTitle');
+
+    // Modal Öğeleri
+    const surahModal = document.getElementById('surahModalBackdrop');
+    const surahModalCloseBtn = document.getElementById('surahModalCloseBtn');
+    const surahSearchInput = document.getElementById('surahSearchInput');
+    const surahSearchClear = document.getElementById('surahSearchClear');
+    const surahCuzChips = document.getElementById('surahCuzChips');
+    const surahListGrid = document.getElementById('surahListGrid');
+
+    // Metin Alanları
+    const badgeEl = document.getElementById('mushafAyahBadge');
+    const juzBadgeEl = document.getElementById('mushafJuzBadge');
+    const arabicEl = document.getElementById('mushafArabicText');
+    const latinEl = document.getElementById('mushafLatinText');
+    const transEl = document.getElementById('mushafTranslationText');
+    const tefekkurEl = document.getElementById('mushafTefekkurText');
+    const titleEl = document.getElementById('mushafPlayingTitle');
 
     if (!audioEl || !playBtn) return;
 
-    function renderActiveSurah(surahKey) {
-        currentSurahKey = surahKey;
-        const data = QURAN_SURAHS_DATA[surahKey];
-        if (!data) return;
+    // 114 Sûre Fihristini Yükle
+    fetch('/data/quran/surahs.json')
+        .then(res => res.json())
+        .then(data => {
+            allSurahs = data;
+            initSurahModalControls();
+            loadSurah(currentSurahNo, currentAyahNo, false);
+        })
+        .catch(err => {
+            console.error('Sûre kataloğu yüklenemedi:', err);
+        });
 
-        // Rozetler
-        const badgeEl = document.getElementById('mushafAyahBadge');
-        const juzBadgeEl = document.getElementById('mushafJuzBadge');
-        const titleEl = document.getElementById('mushafPlayingTitle');
-        if (badgeEl) badgeEl.textContent = data.badge;
-        if (juzBadgeEl) juzBadgeEl.textContent = data.juzBadge;
-        if (titleEl) titleEl.textContent = data.badge;
+    // Sûre Fihristi Modal Denetimleri
+    function initSurahModalControls() {
+        if (!surahModal) return;
 
-        // Arapça Hat (Kelime spans & Tıklanabilir Dinleme)
-        const arabicEl = document.getElementById('mushafArabicText');
-        if (arabicEl) {
-            arabicEl.innerHTML = data.words.map((item, idx) => 
-                `<span class="quran-word waiting" id="qWord-${idx}" data-start="${item.start}" data-end="${item.end}" title="${item.start.toFixed(1)}s">${item.word}</span>`
-            ).join(' ');
+        // Cüz Filtre Çiplerini Doldur
+        if (surahCuzChips) {
+            surahCuzChips.innerHTML = `<button class="cuz-filter-chip active" data-cuz="0">Tüm Sûreler</button>`;
+            for (let c = 1; c <= 30; c++) {
+                const btn = document.createElement('button');
+                btn.className = 'cuz-filter-chip';
+                btn.setAttribute('data-cuz', c);
+                btn.textContent = `${c}. Cüz`;
+                surahCuzChips.appendChild(btn);
+            }
 
-            // Kelimeye tıklayınca tam o saniyeye atla
-            const wordSpans = arabicEl.querySelectorAll('.quran-word');
-            wordSpans.forEach(span => {
-                span.addEventListener('click', () => {
-                    const s = parseFloat(span.getAttribute('data-start'));
-                    if (!isNaN(s) && audioEl) {
-                        audioEl.currentTime = s;
-                        if (audioEl.paused) togglePlay();
-                        updateKaraoke();
-                    }
+            surahCuzChips.querySelectorAll('.cuz-filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    surahCuzChips.querySelectorAll('.cuz-filter-chip').forEach(b => b.classList.remove('active'));
+                    chip.classList.add('active');
+                    currentJuzFilter = parseInt(chip.getAttribute('data-cuz'), 10) || 0;
+                    renderSurahListGrid();
                 });
             });
         }
 
-        // Latin Okunuş
-        const latinEl = document.getElementById('mushafLatinText');
-        if (latinEl) latinEl.textContent = data.latin;
+        // Arama Çubuğu
+        if (surahSearchInput) {
+            surahSearchInput.addEventListener('input', (e) => {
+                surahSearchTerm = e.target.value.trim().toLowerCase();
+                if (surahSearchClear) {
+                    surahSearchClear.style.display = surahSearchTerm ? 'block' : 'none';
+                }
+                renderSurahListGrid();
+            });
+        }
 
-        // Türkçe Meal
-        const transEl = document.getElementById('mushafTranslationText');
-        if (transEl) transEl.textContent = data.translations[currentMealKey] || data.translations['diyanet'];
+        if (surahSearchClear) {
+            surahSearchClear.addEventListener('click', () => {
+                if (surahSearchInput) surahSearchInput.value = '';
+                surahSearchTerm = '';
+                surahSearchClear.style.display = 'none';
+                renderSurahListGrid();
+            });
+        }
 
-        // Tefekkür
-        const tefekkurEl = document.getElementById('mushafTefekkurText');
-        if (tefekkurEl) tefekkurEl.textContent = data.tefekkur;
+        // Modal Açma / Kapatma
+        if (surahPickerBtn) {
+            surahPickerBtn.addEventListener('click', () => {
+                openSurahModal();
+            });
+        }
 
-        // Audio Source
-        updateAudioSource();
-        updateKaraoke();
+        if (surahModalCloseBtn) {
+            surahModalCloseBtn.addEventListener('click', closeSurahModal);
+        }
+
+        surahModal.addEventListener('click', (e) => {
+            if (e.target === surahModal) closeSurahModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && surahModal.classList.contains('open')) {
+                closeSurahModal();
+            }
+        });
     }
 
-    function updateAudioSource() {
-        const data = QURAN_SURAHS_DATA[currentSurahKey];
-        if (!data) return;
+    function openSurahModal() {
+        if (!surahModal) return;
+        renderSurahListGrid();
+        surahModal.style.display = 'flex';
+        // Küçük gecikmeyle CSS animasyonunu tetikle
+        requestAnimationFrame(() => {
+            surahModal.classList.add('open');
+            if (surahSearchInput) surahSearchInput.focus();
+        });
+    }
 
-        let src = data.localAudio;
-        if (currentReciterKey !== 'alafasy') {
-            const rConfig = QURAN_RECITERS_CONFIG[currentReciterKey];
-            if (rConfig) {
-                src = `${rConfig.url}${data.surahNum}${data.ayahNum}.mp3`;
+    function closeSurahModal() {
+        if (!surahModal) return;
+        surahModal.classList.remove('open');
+        setTimeout(() => {
+            surahModal.style.display = 'none';
+        }, 250);
+    }
+
+    function renderSurahListGrid() {
+        if (!surahListGrid || !allSurahs.length) return;
+
+        let filtered = allSurahs;
+        if (currentJuzFilter > 0) {
+            filtered = filtered.filter(s => s.cuz === currentJuzFilter);
+        }
+        if (surahSearchTerm) {
+            const normTerm = normalizeSearchText(surahSearchTerm);
+            filtered = filtered.filter(s => 
+                normalizeSearchText(s.tr).includes(normTerm) ||
+                (s.en && normalizeSearchText(s.en).includes(normTerm)) ||
+                (s.ar && s.ar.includes(surahSearchTerm)) ||
+                String(s.no).includes(surahSearchTerm)
+            );
+        }
+
+        surahListGrid.innerHTML = filtered.map(s => `
+            <div class="surah-grid-item ${s.no === currentSurahNo ? 'active' : ''}" data-no="${s.no}">
+                <div class="surah-item-left">
+                    <span class="surah-item-no">${s.no}</span>
+                    <div class="surah-item-text">
+                        <span class="surah-item-name">${s.tr} Sûresi</span>
+                        <span class="surah-item-sub">${s.cuz}. Cüz • ${s.ayets} Âyet</span>
+                    </div>
+                </div>
+                <div class="surah-item-ar">${s.ar}</div>
+            </div>
+        `).join('');
+
+        surahListGrid.querySelectorAll('.surah-grid-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const no = parseInt(item.getAttribute('data-no'), 10);
+                if (no) {
+                    loadSurah(no, 1, false);
+                    closeSurahModal();
+                }
+            });
+        });
+    }
+
+    // Sûre Yükleme Motoru (Cache destekli)
+    function loadSurah(surahNo, targetAyahNo = 1, autoplay = false) {
+        currentSurahNo = surahNo;
+        const sInfo = allSurahs.find(s => s.no === surahNo) || { no: surahNo, tr: "Sûre", ayets: 7, cuz: 1, yer: "Medenî" };
+
+        // Üst panel başlığını güncelle
+        if (currentSurahBtnTitle) {
+            currentSurahBtnTitle.textContent = `${sInfo.no}. ${sInfo.tr} Sûresi (${sInfo.ayets} Âyet)`;
+        }
+
+        // Âyet Dropdown Seçeneklerini Doldur
+        if (ayahSelectDropdown) {
+            ayahSelectDropdown.innerHTML = '';
+            for (let i = 1; i <= sInfo.ayets; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${i}. Âyet`;
+                ayahSelectDropdown.appendChild(opt);
             }
         }
 
-        const wasPlaying = !audioEl.paused;
-        audioEl.src = src;
-        audioEl.playbackRate = currentPlaybackSpeed;
-        if (wasPlaying) {
-            audioEl.play().catch(e => console.log('Autoplay error:', e));
+        if (surahCache[surahNo]) {
+            currentSurahAyahs = surahCache[surahNo];
+            renderAyah(targetAyahNo, autoplay);
+            return;
         }
+
+        fetch(`/data/quran/surah_${surahNo}.json`)
+            .then(res => res.json())
+            .then(ayahs => {
+                surahCache[surahNo] = ayahs;
+                currentSurahAyahs = ayahs;
+                renderAyah(targetAyahNo, autoplay);
+            })
+            .catch(err => {
+                console.error(`Sûre ${surahNo} verisi alınamadı:`, err);
+            });
     }
 
+    // Âyet Render Etme ve Senkronizasyon
+    function renderAyah(ayahNo, autoplay = false) {
+        if (!currentSurahAyahs || !currentSurahAyahs.length) return;
+
+        let ayah = currentSurahAyahs.find(a => a.a === ayahNo);
+        if (!ayah) ayah = currentSurahAyahs[0];
+        currentAyahNo = ayah.a;
+
+        const sInfo = allSurahs.find(s => s.no === currentSurahNo) || { tr: "Bakara", yer: "Medenî", ayets: currentSurahAyahs.length };
+
+        // Rozetler & Künye
+        if (badgeEl) badgeEl.textContent = `${sInfo.tr.toUpperCase()} SÛRESİ • ${ayah.a}. ÂYET`;
+        if (juzBadgeEl) juzBadgeEl.textContent = `${ayah.c}. CÜZ • ${sInfo.yer.toUpperCase()}`;
+        if (titleEl) titleEl.textContent = `${sInfo.tr} Sûresi, ${ayah.a}. Âyet`;
+
+        // Âyet Dropdown Seçimi
+        if (ayahSelectDropdown) {
+            ayahSelectDropdown.value = ayah.a;
+        }
+
+        // Önceki / Sonraki Buton Durumları
+        if (prevAyahBtn) {
+            prevAyahBtn.disabled = (currentSurahNo === 1 && ayah.a === 1);
+        }
+        if (nextAyahBtn) {
+            nextAyahBtn.disabled = (currentSurahNo === 114 && ayah.a === sInfo.ayets);
+        }
+
+        // Arapça Hat (Kelime spans & Tıklanabilir Dinleme)
+        if (arabicEl) {
+            const words = ayah.words || [];
+            if (words.length > 0) {
+                arabicEl.innerHTML = words.map((item, idx) => 
+                    `<span class="quran-word waiting" id="qWord-${idx}" data-start="${item.s}" data-end="${item.e}" title="${item.s.toFixed(2)}s">${item.w}</span>`
+                ).join(' ');
+
+                // Kelimeye tıklayınca tam o saniyeye atla
+                arabicEl.querySelectorAll('.quran-word').forEach(span => {
+                    span.addEventListener('click', () => {
+                        const s = parseFloat(span.getAttribute('data-start'));
+                        if (!isNaN(s) && audioEl) {
+                            audioEl.currentTime = s;
+                            if (audioEl.paused) togglePlay();
+                            updateKaraoke();
+                        }
+                    });
+                });
+            } else {
+                arabicEl.textContent = ayah.ar;
+            }
+        }
+
+        // Latin Transkripsiyon (Tescilli Okunuş & Canlı Kelime Takibi)
+        if (latinEl) {
+            const words = ayah.words || [];
+            const hasLatinWords = words.length > 0 && words.some(w => w.t);
+            if (hasLatinWords) {
+                latinEl.innerHTML = words.map((item, idx) => 
+                    `<span class="quran-latin-word waiting" id="qLatinWord-${idx}" data-start="${item.s}" data-end="${item.e}" title="${item.s.toFixed(2)}s">${item.t || ''}</span>`
+                ).join(' ');
+
+                // Latin kelimeye tıklayınca tam o saniyeye atla
+                latinEl.querySelectorAll('.quran-latin-word').forEach(span => {
+                    span.addEventListener('click', () => {
+                        const s = parseFloat(span.getAttribute('data-start'));
+                        if (!isNaN(s) && audioEl) {
+                            audioEl.currentTime = s;
+                            if (audioEl.paused) togglePlay();
+                            updateKaraoke();
+                        }
+                    });
+                });
+            } else if (ayah.ok) {
+                latinEl.textContent = ayah.ok;
+            } else if (currentSurahNo === 2 && ayah.a === 255) {
+                latinEl.textContent = "Allâhu lâ ilâhe illâ huve'l-hayyu'l-kayyûm, lâ te'huzuhû sinetun velâ nevm, lehû mâ fî's-semâvâti vemâ fî'l-ard, men zellezî yeşfeu indehû illâ bi-iznih...";
+            } else if (currentSurahNo === 1) {
+                const fatihaLatin = [
+                    "Bismillâhir-rahmânir-rahîm",
+                    "Elhamdulillâhi rabbil-âlemîn",
+                    "Er-rahmânir-rahîm",
+                    "Mâliki yevmid-dîn",
+                    "İyyâke na'budu ve iyyâke neste'în",
+                    "İhdinas-sırâtal-mustakîm",
+                    "Sırâtallezîne en'amte aleyhim gayril-magdûbi aleyhim veled-dâllîn"
+                ];
+                latinEl.textContent = fatihaLatin[ayah.a - 1] || "Şeyh Mişari Râşid el-Afâsî Stüdyo Tilaveti";
+            } else {
+                latinEl.textContent = "Şeyh Mişari Râşid el-Afâsî • Resmi Medine Kral Fehd Mushafı";
+            }
+        }
+
+        // Türkçe Meal
+        if (transEl) {
+            const mealText = currentMealKey === 'elm' ? (ayah.elm || ayah.diy) : (ayah.diy || ayah.elm);
+            transEl.textContent = `“ ${mealText} ”`;
+        }
+
+        // Nebevî Tefekkür Notu
+        if (tefekkurEl) {
+            if (currentSurahNo === 2 && ayah.a === 255) {
+                tefekkurEl.textContent = "Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.";
+            } else {
+                tefekkurEl.textContent = `${sInfo.tr} Sûresi ${ayah.a}. âyet-i kerîmesi; ilahi hikmet, tefekkür ve manevi huzurun Kur'an'daki nurlu kapısıdır.`;
+            }
+        }
+
+        // Audio Kaynağı
+        const wasPlaying = !audioEl.paused;
+        audioEl.src = ayah.audio;
+        audioEl.playbackRate = currentPlaybackSpeed;
+        if (autoplay || wasPlaying) {
+            audioEl.play().catch(e => console.log('Autoplay error:', e));
+        }
+
+        updateKaraoke();
+    }
+
+    // Kelime Kelime Tescilli Senkron Karaoke (video.py Mimarisi & t_eval = curTime + 0.05s)
     function updateKaraoke() {
         if (!audioEl) return;
         const curTime = audioEl.currentTime || 0;
@@ -951,23 +695,79 @@ function initQuranTilavetPlayer() {
             if (durTimeEl) durTimeEl.textContent = formatAudioTime(durTime);
         }
 
-        // Kelime Kelime Tescilli Senkron Karaoke (EzanPlusBot t_eval = curTime + 0.05s)
-        const data = QURAN_SURAHS_DATA[currentSurahKey];
-        if (data && data.words && data.words.length > 0) {
+        const ayah = currentSurahAyahs.find(a => a.a === currentAyahNo);
+        if (ayah && ayah.words && ayah.words.length > 0) {
+            const totalWords = ayah.words.length;
+
+            // Oynatma başlamamışsa ve süre sıfırsa tüm kelimeler beklesin
+            if (audioEl.paused && curTime === 0) {
+                for (let i = 0; i < totalWords; i++) {
+                    const wEl = document.getElementById(`qWord-${i}`);
+                    if (wEl && wEl.className !== 'quran-word waiting') {
+                        wEl.className = 'quran-word waiting';
+                    }
+                    const lEl = document.getElementById(`qLatinWord-${i}`);
+                    if (lEl && lEl.className !== 'quran-latin-word waiting') {
+                        lEl.className = 'quran-latin-word waiting';
+                    }
+                }
+                return;
+            }
+
+            // 50 ms (0.05s) ince görsel avans uygulanır (video.py tescilli standardı & insan algı refleksi)
             const tEval = curTime + 0.05;
-            const words = data.words;
+            const segments = ayah.segments && ayah.segments.length > 0 ? ayah.segments : null;
 
-            for (let i = 0; i < words.length; i++) {
+            let aktifIdx = -1;
+            let lastCompletedIdx = -1;
+
+            if (segments) {
+                for (let j = 0; j < segments.length; j++) {
+                    const seg = segments[j];
+                    const wIdx = seg[0];
+                    const sSec = seg[1];
+                    const eSec = seg[2];
+                    if (tEval >= sSec && tEval < eSec) {
+                        aktifIdx = Math.min(wIdx, totalWords - 1);
+                        break;
+                    } else if (tEval < sSec) {
+                        aktifIdx = lastCompletedIdx;
+                        break;
+                    } else {
+                        lastCompletedIdx = Math.min(wIdx, totalWords - 1);
+                    }
+                }
+                if (aktifIdx === -1) {
+                    aktifIdx = lastCompletedIdx >= 0 ? lastCompletedIdx : (totalWords - 1);
+                }
+            } else {
+                for (let i = 0; i < totalWords; i++) {
+                    const w = ayah.words[i];
+                    if (tEval >= w.s && tEval < w.e) {
+                        aktifIdx = i;
+                        break;
+                    } else if (tEval >= w.e) {
+                        lastCompletedIdx = i;
+                    }
+                }
+                if (aktifIdx === -1) {
+                    aktifIdx = lastCompletedIdx;
+                }
+            }
+
+            for (let i = 0; i < totalWords; i++) {
                 const wEl = document.getElementById(`qWord-${i}`);
-                if (!wEl) continue;
-                const w = words[i];
+                const lEl = document.getElementById(`qLatinWord-${i}`);
 
-                if (tEval >= w.start && tEval < w.end) {
-                    if (wEl.className !== 'quran-word active') wEl.className = 'quran-word active';
-                } else if (tEval >= w.end) {
-                    if (wEl.className !== 'quran-word done') wEl.className = 'quran-word done';
+                if (i === aktifIdx) {
+                    if (wEl && wEl.className !== 'quran-word active') wEl.className = 'quran-word active';
+                    if (lEl && lEl.className !== 'quran-latin-word active') lEl.className = 'quran-latin-word active';
+                } else if (i < aktifIdx) {
+                    if (wEl && wEl.className !== 'quran-word done') wEl.className = 'quran-word done';
+                    if (lEl && lEl.className !== 'quran-latin-word done') lEl.className = 'quran-latin-word done';
                 } else {
-                    if (wEl.className !== 'quran-word waiting') wEl.className = 'quran-word waiting';
+                    if (wEl && wEl.className !== 'quran-word waiting') wEl.className = 'quran-word waiting';
+                    if (lEl && lEl.className !== 'quran-latin-word waiting') lEl.className = 'quran-latin-word waiting';
                 }
             }
         }
@@ -995,9 +795,6 @@ function initQuranTilavetPlayer() {
     }
 
     playBtn.addEventListener('click', togglePlay);
-
-    // Mockup mini play butonu ile senkronize
-    const miniPlayBtn = document.getElementById('miniPlayBtn');
     if (miniPlayBtn) {
         miniPlayBtn.addEventListener('click', togglePlay);
     }
@@ -1043,11 +840,31 @@ function initQuranTilavetPlayer() {
     audioEl.addEventListener('timeupdate', updateKaraoke);
     audioEl.addEventListener('seeked', updateKaraoke);
 
+    // Âyet Bittiğinde Otomatik Akış / Tekrar Mantığı
     audioEl.addEventListener('ended', () => {
         cancelAnimationFrame(karaokeRafId);
+
         if (isRepeatEnabled) {
             audioEl.currentTime = 0;
             audioEl.play().catch(e => console.log('Repeat blocked:', e));
+            return;
+        }
+
+        if (isAutoFlow) {
+            const sInfo = allSurahs.find(s => s.no === currentSurahNo);
+            const totalAyah = sInfo ? sInfo.ayets : currentSurahAyahs.length;
+
+            if (currentAyahNo < totalAyah) {
+                // Sûre içindeki sıradaki âyete geç
+                renderAyah(currentAyahNo + 1, true);
+            } else if (currentSurahNo < 114) {
+                // Sûre bitti, bir sonraki sûrenin 1. âyetine geç
+                loadSurah(currentSurahNo + 1, 1, true);
+            } else {
+                if (progressFill) progressFill.style.width = '0%';
+                if (curTimeEl) curTimeEl.textContent = "0:00";
+                updateKaraoke();
+            }
         } else {
             if (progressFill) progressFill.style.width = '0%';
             if (curTimeEl) curTimeEl.textContent = "0:00";
@@ -1055,6 +872,7 @@ function initQuranTilavetPlayer() {
         }
     });
 
+    // İlerleme Çubuğuna Tıklama (Seek)
     if (progressTrack) {
         progressTrack.addEventListener('click', (e) => {
             const rect = progressTrack.getBoundingClientRect();
@@ -1065,32 +883,57 @@ function initQuranTilavetPlayer() {
         });
     }
 
-    // Sûre Değişimi
-    surahChips.forEach(chip => {
-        chip.addEventListener('click', () => {
-            surahChips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            renderActiveSurah(chip.getAttribute('data-surah'));
-        });
-    });
-
-    // Hafız Değişimi
-    if (reciterSelect) {
-        reciterSelect.addEventListener('change', (e) => {
-            currentReciterKey = e.target.value;
-            updateAudioSource();
+    // Âyet Gezinme Butonları
+    if (prevAyahBtn) {
+        prevAyahBtn.addEventListener('click', () => {
+            if (currentAyahNo > 1) {
+                renderAyah(currentAyahNo - 1, true);
+            } else if (currentSurahNo > 1) {
+                const prevSurahInfo = allSurahs.find(s => s.no === currentSurahNo - 1);
+                const lastAyah = prevSurahInfo ? prevSurahInfo.ayets : 1;
+                loadSurah(currentSurahNo - 1, lastAyah, true);
+            }
         });
     }
 
-    // Meal Değişimi
+    if (nextAyahBtn) {
+        nextAyahBtn.addEventListener('click', () => {
+            const sInfo = allSurahs.find(s => s.no === currentSurahNo);
+            const totalAyah = sInfo ? sInfo.ayets : currentSurahAyahs.length;
+
+            if (currentAyahNo < totalAyah) {
+                renderAyah(currentAyahNo + 1, true);
+            } else if (currentSurahNo < 114) {
+                loadSurah(currentSurahNo + 1, 1, true);
+            }
+        });
+    }
+
+    // Âyet Seçici Dropdown
+    if (ayahSelectDropdown) {
+        ayahSelectDropdown.addEventListener('change', (e) => {
+            const aNo = parseInt(e.target.value, 10);
+            if (aNo) renderAyah(aNo, true);
+        });
+    }
+
+    // Meal Seçimi
     if (mealSelect) {
         mealSelect.addEventListener('change', (e) => {
             currentMealKey = e.target.value;
-            const data = QURAN_SURAHS_DATA[currentSurahKey];
-            const transEl = document.getElementById('mushafTranslationText');
-            if (data && transEl) {
-                transEl.textContent = data.translations[currentMealKey] || data.translations['diyanet'];
+            const ayah = currentSurahAyahs.find(a => a.a === currentAyahNo);
+            if (ayah && transEl) {
+                const mealText = currentMealKey === 'elm' ? (ayah.elm || ayah.diy) : (ayah.diy || ayah.elm);
+                transEl.textContent = `“ ${mealText} ”`;
             }
+        });
+    }
+
+    // Otomatik Akış Modu Toggle
+    if (autoFlowBtn) {
+        autoFlowBtn.addEventListener('click', () => {
+            isAutoFlow = !isAutoFlow;
+            autoFlowBtn.classList.toggle('active', isAutoFlow);
         });
     }
 
@@ -1116,9 +959,6 @@ function initQuranTilavetPlayer() {
             repeatBtn.classList.toggle('active', isRepeatEnabled);
         });
     }
-
-    // İlk Sûreyi Render Et (Âyete'l-Kürsî)
-    renderActiveSurah("ayetel-kursi");
 }
 
 /* --- C. 30 Cüz Çoklu Hatim Takibi --- */
@@ -1247,99 +1087,305 @@ function formatAudioTime(sec) {
 }
 
 /* ==========================================================================
-   6. Günün Hikmeti & Tescilli Külliyat Rotatoru
+   6. Sahih Hadis Külliyatı — 1.900 Riyâzü's-Sâlihîn Hadis Kütüphanesi
    ========================================================================== */
-const TESCİLLİ_KÜLLİYAT = [
-    {
-        kategori: "hadis",
-        ar: "مَنْ لَا يَرْحَمِ النَّاسَ لَا يَرْحَمْهُ اللَّهُ",
-        tr: "“ İnsanlara merhamet etmeyene, Allah da merhamet etmez. ”",
-        kaynak: "RİYÂZÜ'S-SÂLİHÎN • BUHÂRÎ & MÜSLİM",
-        tefekkur: "İslam ahlakı; insanlara şefkatle muamele etmeyi ve merhameti hayatın merkezine koymayı öğütler."
-    },
-    {
-        kategori: "ayet",
-        ar: "فَإِنَّ مَعَ الْعُسْرِ يُسْرًا • إِنَّ مَعَ الْعُسْرِ يُسْرًا",
-        tr: "“ Elbette zorlukla beraber bir kolaylık vardır. Gerçekten zorlukla beraber bir kolaylık vardır. ”",
-        kaynak: "İNŞİRÂH SÛRESİ • 5-6. ÂYET",
-        tefekkur: "Hayatın en çetin imtihanlarında dahi ilahi rahmet kapıdadır; sabır, ferahlığın anahtarıdır."
-    },
-    {
-        kategori: "dua",
-        ar: "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
-        tr: "“ Ey Rabbimiz! Bize dünyada da iyilik ver, ahirette de iyilik ver. Ve bizi cehennem azabından koru. ”",
-        kaynak: "BAKARA SÛRESİ • 201. ÂYET",
-        tefekkur: "Dünya ile ahiret dengesini mükemmel bir ahenkle birleştiren en kapsamlı nebevî münacattır."
-    },
-    {
-        kategori: "hadis",
-        ar: "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",
-        tr: "“ Ameller ancak niyetlere göredir. Herkes için niyet ettiği ne ise o vardır. ”",
-        kaynak: "RİYÂZÜ'S-SÂLİHÎN • BUHÂRÎ, BED'Ü'L-VAHY 1",
-        tefekkur: "Amellerin manevi ağırlığını ve değerini belirleyen tek ölçü; kalbin samimiyeti ve ihlasıdır."
-    },
-    {
-        kategori: "ayet",
-        ar: "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ",
-        tr: "“ Bilesiniz ki kalpler ancak Allah'ı anmakla huzur ve sükûna kavuşur. ”",
-        kaynak: "RA'D SÛRESİ • 28. ÂYET",
-        tefekkur: "Ruhun aradığı gerçek dinginlik ne dünyalık meşgalelerde ne de maddiyattadır; yalnız Hakk'ın zikrindendir."
+let allHadiths = [];
+let currentHadithIndex = 0;
+let hadithSearchDebounce = null;
+let currentHadithFilterTopic = "";
+let hadithSearchResults = [];
+let hadithCurrentPage = 1;
+const HADITHS_PER_PAGE = 8;
+let hadithArabicVisible = false;
+
+function initHadithModule() {
+    const searchInput = document.getElementById('hadithSearchInput');
+    const searchClearBtn = document.getElementById('hadithSearchClearBtn');
+    const randomBtn = document.getElementById('btnRandomHadith');
+    const topicChips = document.querySelectorAll('.hadith-topic-chip');
+    const statusBar = document.getElementById('hadithSearchStatusBar');
+    const statusText = document.getElementById('hadithSearchStatusText');
+    const statusClose = document.getElementById('hadithSearchStatusClose');
+    const resultsGrid = document.getElementById('hadithResultsGrid');
+    const pagination = document.getElementById('hadithResultsPagination');
+    const arabicToggleBtn = document.getElementById('hadithArabicToggleBtn');
+
+    // 1.900 Hadis Verisini Yükle
+    fetch('/data/hadith/riyazus_salihin.json')
+        .then(res => res.json())
+        .then(data => {
+            allHadiths = data;
+            // İlk Hadisi Göster (Hadis #1 / Niyet Hadisi)
+            displayHadith(allHadiths[0], false);
+        })
+        .catch(err => {
+            console.error('Hadis külliyatı yüklenemedi:', err);
+        });
+
+    // Arapça Metin Aç/Kapa Butonu
+    if (arabicToggleBtn) {
+        arabicToggleBtn.addEventListener('click', () => {
+            hadithArabicVisible = !hadithArabicVisible;
+            updateHadithArabicVisibility();
+        });
     }
-];
 
-let aktifKategori = "hepsi";
-let hikmetIndex = 0;
+    // Rastgele Hadis Getir Butonu
+    if (randomBtn) {
+        randomBtn.addEventListener('click', () => {
+            if (!allHadiths.length) return;
+            const randIdx = Math.floor(Math.random() * allHadiths.length);
+            currentHadithIndex = randIdx;
+            displayHadith(allHadiths[randIdx], true);
+        });
+    }
 
-function initWisdomRotator() {
-    const tabBtns = document.querySelectorAll('.wisdom-tab-btn');
-    const refreshBtn = document.getElementById('btnRefreshWisdom');
+    // Arama Çubuğu (Debounce 200ms)
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (searchClearBtn) searchClearBtn.style.display = val ? 'block' : 'none';
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            aktifKategori = btn.getAttribute('data-kat');
-            hikmetGoster(true);
+            clearTimeout(hadithSearchDebounce);
+            hadithSearchDebounce = setTimeout(() => {
+                executeHadithSearch(val);
+            }, 200);
+        });
+    }
+
+    if (searchClearBtn) {
+        searchClearBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            searchClearBtn.style.display = 'none';
+            closeHadithSearchResults();
+        });
+    }
+
+    if (statusClose) {
+        statusClose.addEventListener('click', () => {
+            closeHadithSearchResults();
+        });
+    }
+
+    // Konu Çipleri
+    topicChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            topicChips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            const topic = chip.getAttribute('data-topic') || '';
+            currentHadithFilterTopic = topic;
+
+            if (!topic) {
+                if (searchInput) searchInput.value = '';
+                if (searchClearBtn) searchClearBtn.style.display = 'none';
+                closeHadithSearchResults();
+            } else {
+                if (searchInput) searchInput.value = topic;
+                if (searchClearBtn) searchClearBtn.style.display = 'block';
+                executeHadithSearch(topic);
+            }
         });
     });
 
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => {
-            hikmetIndex = (hikmetIndex + 1) % TESCİLLİ_KÜLLİYAT.length;
-            hikmetGoster(false);
-        });
+    function executeHadithSearch(query) {
+        if (!query || query.length < 2) {
+            closeHadithSearchResults();
+            return;
+        }
+
+        const normQ = normalizeSearchText(query);
+        hadithSearchResults = allHadiths.filter(h => 
+            (h.metin && normalizeSearchText(h.metin).includes(normQ)) ||
+            (h.tam && normalizeSearchText(h.tam).includes(normQ)) ||
+            (h.ravi && normalizeSearchText(h.ravi).includes(normQ)) ||
+            (h.kaynak && normalizeSearchText(h.kaynak).includes(normQ)) ||
+            (h.ar && h.ar.includes(query)) ||
+            (h.bab && normalizeSearchText(h.bab).includes(normQ)) ||
+            String(h.no) === query.trim()
+        );
+
+        hadithCurrentPage = 1;
+        renderHadithResults();
     }
 
-    hikmetGoster(false);
+    function renderHadithResults() {
+        if (!statusBar || !resultsGrid || !pagination) return;
+
+        statusBar.style.display = 'flex';
+        statusText.textContent = `“${searchInput ? searchInput.value : ''}” ile ilgili ${hadithSearchResults.length} sahih hadis bulundu`;
+
+        if (hadithSearchResults.length === 0) {
+            resultsGrid.style.display = 'block';
+            resultsGrid.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--metin-ikincil);">Aradığınız kriterlere uygun hadis bulunamadı. Lütfen farklı bir kelime deneyin.</div>`;
+            pagination.style.display = 'none';
+            return;
+        }
+
+        resultsGrid.style.display = 'grid';
+        const startIdx = (hadithCurrentPage - 1) * HADITHS_PER_PAGE;
+        const pageItems = hadithSearchResults.slice(startIdx, startIdx + HADITHS_PER_PAGE);
+
+        resultsGrid.innerHTML = pageItems.map(item => `
+            <div class="hadith-result-card" data-no="${item.no}">
+                <div class="hadith-result-top">
+                    <span class="hadith-result-badge">HADİS #${item.no}</span>
+                    <span class="hadith-result-source">${item.kaynak ? item.kaynak.split(';')[0].slice(0, 32) : 'Riyâzü\'s-Sâlihîn'}</span>
+                </div>
+                <div class="hadith-result-snippet">“ ${item.metin} ”</div>
+            </div>
+        `).join('');
+
+        resultsGrid.querySelectorAll('.hadith-result-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const no = parseInt(card.getAttribute('data-no'), 10);
+                const targetHadith = allHadiths.find(h => h.no === no);
+                if (targetHadith) {
+                    displayHadith(targetHadith, true);
+                    const stage = document.getElementById('hadithDisplayStage');
+                    if (stage) stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        });
+
+        // Sayfalama
+        const totalPages = Math.ceil(hadithSearchResults.length / HADITHS_PER_PAGE);
+        if (totalPages > 1) {
+            pagination.style.display = 'flex';
+            let pageBtnsHtml = '';
+            for (let p = 1; p <= totalPages; p++) {
+                if (p === 1 || p === totalPages || (p >= hadithCurrentPage - 1 && p <= hadithCurrentPage + 1)) {
+                    pageBtnsHtml += `<button class="hadith-page-btn ${p === hadithCurrentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+                } else if (p === hadithCurrentPage - 2 || p === hadithCurrentPage + 2) {
+                    pageBtnsHtml += `<span style="color: var(--metin-soluk); padding: 0 4px;">...</span>`;
+                }
+            }
+            pagination.innerHTML = pageBtnsHtml;
+
+            pagination.querySelectorAll('.hadith-page-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    hadithCurrentPage = parseInt(btn.getAttribute('data-page'), 10);
+                    renderHadithResults();
+                });
+            });
+        } else {
+            pagination.style.display = 'none';
+        }
+    }
+
+    function closeHadithSearchResults() {
+        if (statusBar) statusBar.style.display = 'none';
+        if (resultsGrid) resultsGrid.style.display = 'none';
+        if (pagination) pagination.style.display = 'none';
+    }
 }
 
-function hikmetGoster(kategoriDegisti) {
-    const contentBox = document.getElementById('wisdomContentBox');
-    if (!contentBox) return;
+// Arapça Metin Görünürlük Denetimi (Başlangıçta Kapalı / Butonla Aç/Kapa)
+function updateHadithArabicVisibility() {
+    const arabicText = document.getElementById('hadithArabicText');
+    const arabicToggleBtn = document.getElementById('hadithArabicToggleBtn');
+    const arabicToggleBtnText = document.getElementById('hadithArabicToggleBtnText');
 
-    let uygunHavuz = TESCİLLİ_KÜLLİYAT;
-    if (aktifKategori !== "hepsi") {
-        uygunHavuz = TESCİLLİ_KÜLLİYAT.filter(item => item.kategori === aktifKategori);
+    if (!arabicText) return;
+    const hasText = (arabicText.textContent || '').trim().length > 0;
+
+    if (!hasText) {
+        arabicText.style.display = 'none';
+        if (arabicToggleBtn) arabicToggleBtn.style.display = 'none';
+        return;
     }
-    if (uygunHavuz.length === 0) uygunHavuz = TESCİLLİ_KÜLLİYAT;
 
-    const item = uygunHavuz[hikmetIndex % uygunHavuz.length];
+    if (arabicToggleBtn) arabicToggleBtn.style.display = 'inline-flex';
 
-    // Pürüzsüz erime (Fade) animasyonu
-    contentBox.style.opacity = '0';
-    setTimeout(() => {
-        const arEl = document.getElementById('wisdomArabic');
-        const quoteEl = document.getElementById('wisdomQuote');
-        const sourceEl = document.getElementById('wisdomSource');
-        const tefekkurEl = document.getElementById('wisdomTefekkur');
+    if (hadithArabicVisible) {
+        arabicText.style.display = 'block';
+        if (arabicToggleBtn) {
+            arabicToggleBtn.classList.add('active');
+            arabicToggleBtn.setAttribute('aria-pressed', 'true');
+        }
+        if (arabicToggleBtnText) arabicToggleBtnText.textContent = 'Arapça Metni Gizle';
+    } else {
+        arabicText.style.display = 'none';
+        if (arabicToggleBtn) {
+            arabicToggleBtn.classList.remove('active');
+            arabicToggleBtn.setAttribute('aria-pressed', 'false');
+        }
+        if (arabicToggleBtnText) arabicToggleBtnText.textContent = 'Arapça Metni Göster';
+    }
+}
 
-        if (arEl) arEl.textContent = item.ar;
-        if (quoteEl) quoteEl.textContent = item.tr;
-        if (sourceEl) sourceEl.textContent = item.kaynak;
-        if (tefekkurEl) tefekkurEl.textContent = `“ ${item.tefekkur} ”`;
+// Aktif Sahih Hadisi Sahnede Göster (Erime Animasyonlu)
+function displayHadith(item, animate = true) {
+    const stage = document.getElementById('hadithDisplayStage');
+    if (!stage || !item) return;
 
-        contentBox.style.opacity = '1';
-    }, 250);
+    const noBadge = document.getElementById('hadithNumberBadge');
+    const sourceBadge = document.getElementById('hadithSourceBadge');
+    const raviText = document.getElementById('hadithRaviText');
+    const arabicText = document.getElementById('hadithArabicText');
+    const turkishText = document.getElementById('hadithTurkishText');
+    const sourceFullText = document.getElementById('hadithSourceFullText');
+    const expBox = document.getElementById('hadithExplanationBox');
+    const expText = document.getElementById('hadithExplanationText');
+
+    const updateDom = () => {
+        if (noBadge) noBadge.textContent = `RİYÂZÜ'S-SÂLİHÎN • HADİS #${item.no} / 1.900`;
+        if (sourceBadge) {
+            let shortSrc = "BUHÂRÎ & MÜSLİM";
+            if (item.kaynak) {
+                if (item.kaynak.includes('Buhârî') && item.kaynak.includes('Müslim')) shortSrc = "BUHÂRÎ & MÜSLİM";
+                else if (item.kaynak.includes('Buhârî')) shortSrc = "SAHÎH-İ BUHÂRÎ";
+                else if (item.kaynak.includes('Müslim')) shortSrc = "SAHÎH-İ MÜSLİM";
+                else if (item.kaynak.includes('Tirmizî')) shortSrc = "SÜNEN-İ TİRMİZÎ";
+                else if (item.kaynak.includes('Ebû Dâvûd')) shortSrc = "SÜNEN-İ EBÛ DÂVÛD";
+                else shortSrc = "RİYÂZÜ'S-SÂLİHÎN";
+            }
+            sourceBadge.textContent = shortSrc;
+        }
+
+        if (raviText) {
+            raviText.textContent = item.ravi ? `${item.ravi} rivayet etti:` : "Resûlullah sallallahu aleyhi ve sellem buyurdu:";
+        }
+
+        if (arabicText) {
+            arabicText.textContent = item.ar || '';
+            updateHadithArabicVisibility();
+        }
+
+        if (turkishText) {
+            turkishText.textContent = `“ ${item.metin} ”`;
+        }
+
+        // Nebevî Açıklama & Tam Rivayet (Açıklama / Sebebi Vürûd / Sahabi Diyaloğu)
+        if (expBox && expText) {
+            const tam = (item.tam || '').trim();
+            const metin = (item.metin || '').trim();
+            if (tam && tam.length > metin.length + 15) {
+                expText.textContent = tam;
+                expBox.style.display = 'block';
+            } else {
+                expBox.style.display = 'none';
+                expText.textContent = '';
+            }
+        }
+
+        if (sourceFullText) {
+            sourceFullText.textContent = item.kaynak || "İmam Nevevî, Riyâzü's-Sâlihîn";
+        }
+    };
+
+    if (animate) {
+        stage.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+        stage.style.opacity = '0';
+        stage.style.transform = 'translateY(6px)';
+
+        setTimeout(() => {
+            updateDom();
+            stage.style.opacity = '1';
+            stage.style.transform = 'translateY(0)';
+        }, 200);
+    } else {
+        updateDom();
+    }
 }
 
 /* ==========================================================================

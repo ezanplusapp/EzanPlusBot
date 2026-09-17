@@ -28,6 +28,8 @@ GECICI_MEDYA_HATA_KODLARI = {2207003, 2207052}
 def _cdn_adlandir(url: str) -> str:
     """Verilen URL'den barındırıcı CDN servisini belirler."""
     u = str(url).lower()
+    if "r2" in u or "cloudflarestorage" in u or "media.dailybrief" in u or "media.ezanplus" in u:
+        return "r2"
     if "uguu" in u:
         return "uguu"
     if "litterbox" in u:
@@ -37,6 +39,7 @@ def _cdn_adlandir(url: str) -> str:
     if "ibb" in u or "imgbb" in u:
         return "imgbb"
     return "diger"
+
 
 
 def get_meta_bilgileri() -> tuple[str, str, str]:
@@ -72,7 +75,23 @@ def gecici_medya_yukle(dosya_yolu: str | Path, haric_cdnler: Optional[set[str]] 
     }
     cdn_hatalari: List[str] = []
 
-    # 1. Öncelik: Uguu.se (Yüksek hızlı, doğrudan dosya linki, Meta & Threads tam uyumlu)
+    # 1. Öncelik: Cloudflare R2 (Özel Domain, S3 SigV4, Meta & Threads doğrudan erişim)
+    if "r2" not in haric:
+        try:
+            from .r2 import r2_hazir_mi, r2ye_yukle
+            if r2_hazir_mi():
+                alt = "video" if p.suffix.lower() == ".mp4" else "sosyal"
+                r2_res = r2ye_yukle(p, alt_klasor=alt, zaman_asimi=40)
+                url = r2_res.get("url")
+                if url and url.startswith("http"):
+                    log.info(f"Medya Cloudflare R2 CDN'e başarıyla yüklendi: {url}")
+                    return url
+                cdn_hatalari.append(f"R2 boş link döndü: {r2_res}")
+        except Exception as e:
+            cdn_hatalari.append(f"R2: {e}")
+            log.warning(f"Cloudflare R2 CDN yükleme hatası: {e}, sonraki yedek CDN deneniyor...")
+
+    # 2. Öncelik: Uguu.se (Yedek CDN #1 - Yüksek hızlı, doğrudan dosya linki, Meta & Threads tam uyumlu)
     if "uguu" not in haric:
         try:
             with open(p, "rb") as f:
@@ -214,21 +233,23 @@ def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> 
 
             # Container hazır olana kadar bekle (azami 30 saniye)
             gecerli = False
-            for _ in range(15):
+            for poll_no in range(1, 16):
                 time.sleep(2)
                 try:
                     status_res = requests.get(
                         f"{GRAPH_API_URL}/{container_id}",
-                        params={"fields": "status_code,status,error_subcode", "access_token": token},
+                        params={"fields": "status_code,status", "access_token": token},
                         timeout=15,
                     )
                     s_data = status_res.json()
                     status_code = s_data.get("status_code")
-                    if status_code == "FINISHED":
+                    log.info(f"Container durum kontrolü ({poll_no}/15): status_code={status_code}, status={s_data.get('status')}")
+
+                    if status_code == "FINISHED" or (status_code is None and status_res.status_code == 200 and "error" not in s_data):
                         gecerli = True
                         break
                     elif status_code in ("ERROR", "EXPIRED"):
-                        s_sub = s_data.get("error_subcode")
+                        s_sub = s_data.get("error_subcode") or s_data.get("error", {}).get("error_subcode")
                         if (s_sub in GECICI_MEDYA_HATA_KODLARI or "media" in str(s_data).lower()) and is_yerel_dosya and deneme_no < maks_deneme:
                             log.warning(f"Container işleme hatası ({s_data}). Alternatif CDN ile tekrar deneniyor...")
                             break
@@ -386,6 +407,81 @@ def facebook_post_paylas(metin: str, gorsel_yolu: Optional[str | Path] = None) -
     return data
 
 
+def facebook_reels_paylas(
+    video_yolu: str | Path,
+    caption: str = "",
+) -> Dict[str, Any]:
+    """
+    Facebook 'Ezan Plus App' Sayfasına 9:16 dikey videoyu Facebook Reels olarak yükler ve yayınlar.
+    Açıklama metni (caption) doğrudan 'description' alanına aktarılır.
+    """
+    _, page_id, token = get_meta_bilgileri()
+    page_token = get_env("FACEBOOK_PAGE_ACCESS_TOKEN") or token
+    if not page_id:
+        raise ValueError("FACEBOOK_PAGE_ID bulunamadı!")
+
+    v_path = Path(video_yolu)
+    if not v_path.exists():
+        raise FileNotFoundError(f"Facebook Reels videosu bulunamadı: {video_yolu}")
+
+    dosya_boyutu = v_path.stat().st_size
+    log.info(f"Facebook Reels yükleme başlatılıyor ({dosya_boyutu / (1024*1024):.2f} MB)...")
+
+    # 1. Adım: Reels Yükleme Başlat
+    init_res = requests.post(
+        f"{GRAPH_API_URL}/{page_id}/video_reels",
+        data={
+            "upload_phase": "start",
+            "access_token": page_token,
+        },
+        timeout=30
+    )
+    init_data = init_res.json()
+    if "video_id" not in init_data:
+        raise RuntimeError(f"Facebook Reels başlatma hatası: {init_data}")
+
+    video_id = init_data["video_id"]
+    upload_url = init_data.get("upload_url")
+    if not upload_url:
+        raise RuntimeError(f"Facebook Reels upload_url alınamadı: {init_data}")
+
+    # 2. Adım: Video Baytlarını Yükle
+    log.info(f"Facebook Reels video baytları aktarılıyor (Video ID: {video_id})...")
+    with open(v_path, "rb") as f:
+        video_bytes = f.read()
+
+    headers = {
+        "Authorization": f"OAuth {page_token}",
+        "offset": "0",
+        "file_size": str(dosya_boyutu),
+        "Content-Type": "application/octet-stream",
+    }
+    upload_res = requests.post(upload_url, headers=headers, data=video_bytes, timeout=120)
+    log.info(f"Facebook video upload yanıtı: {upload_res.status_code}")
+    if upload_res.status_code not in (200, 201):
+        raise RuntimeError(f"Facebook Reels video yükleme başarısız ({upload_res.status_code}): {upload_res.text}")
+
+    # 3. Adım: Reels Yayınla (Finish Phase)
+    log.info(f"Facebook Reels yayınlanıyor (Video ID: {video_id})...")
+    finish_res = requests.post(
+        f"{GRAPH_API_URL}/{page_id}/video_reels",
+        data={
+            "upload_phase": "finish",
+            "access_token": page_token,
+            "video_id": video_id,
+            "video_state": "PUBLISHED",
+            "description": caption,
+        },
+        timeout=30
+    )
+    finish_data = finish_res.json()
+    if not finish_data.get("success") and "id" not in finish_data and "video_id" not in finish_data:
+        raise RuntimeError(f"Facebook Reels finish hatası: {finish_data}")
+
+    log.info(f"Facebook Reels başarıyla yayınlandı! Video ID: {video_id}")
+    return {"id": video_id, "video_id": video_id, "success": True, "raw": finish_data}
+
+
 def instagram_story_paylas(
     medya_yolu_veya_url: str | Path,
     is_video: bool = False,
@@ -495,21 +591,23 @@ def instagram_story_paylas(
 
                 # Container hazır olana kadar bekle (azami 30 saniye)
                 gecerli = False
-                for _ in range(15):
+                for poll_no in range(1, 16):
                     time.sleep(2)
                     try:
                         status_res = requests.get(
                             f"{GRAPH_API_URL}/{container_id}",
-                            params={"fields": "status_code,status,error_subcode", "access_token": token},
+                            params={"fields": "status_code,status", "access_token": token},
                             timeout=15,
                         )
                         s_data = status_res.json()
                         status_code = s_data.get("status_code")
-                        if status_code == "FINISHED":
+                        log.info(f"Story container durum kontrolü ({poll_no}/15): status_code={status_code}, status={s_data.get('status')}")
+
+                        if status_code == "FINISHED" or (status_code is None and status_res.status_code == 200 and "error" not in s_data):
                             gecerli = True
                             break
                         elif status_code in ("ERROR", "EXPIRED"):
-                            s_sub = s_data.get("error_subcode")
+                            s_sub = s_data.get("error_subcode") or s_data.get("error", {}).get("error_subcode")
                             if (s_sub in GECICI_MEDYA_HATA_KODLARI or "media" in str(s_data).lower()) and is_yerel and deneme_no < maks_deneme:
                                 log.warning(f"Story container işleme hatası ({s_data}). Alternatif CDN deneniyor...")
                                 break

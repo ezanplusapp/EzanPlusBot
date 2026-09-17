@@ -85,34 +85,37 @@ class TestDenetleyici(unittest.TestCase):
         from src import db
         # 1. Hatalı ve yasaklı kelimeler barındıran bir taslak kaydet
         pid = db.paylasim_ekle(
-            kategori="hadis",
+            kategori="kelime",
             format_tipi="post_4_5",
-            turkce_metin="Müslüman Müslümanın kardeşidir.",
-            baslik="Buhârî, Mezâlim, 3",
-            arapca_metin="الْمُسْلِمُ أَخُو الْمُسْلِمِ",
-            kaynak="Buhârî ve Müslim",
-            tefekkur="Kardeşlik hukuku, imanın en kıymetli meyvesidir.",
+            turkce_metin="İman ve ihlas ile yapılan amellerin bereketi.",
+            baslik="Bereket",
+            arapca_metin="بَرَكَة",
+            kaynak="Kur'an Sözlüğü • Bereket",
+            tefekkur="Bereket azı çoğaltan ilahi bir lütuftur.",
             caption="Bu içerik yapay zeka bot tarafından üretildi.",
             gorsel_yollari=[],
             durum="taslak",
         )
+        try:
+            # 2. Denetim hataları bulmalı
+            ilk_denetim = denetleyici.denetle_paylasim(pid)
+            self.assertFalse(ilk_denetim.gecerli)
+            self.assertTrue(any("Yasaklı bot/yapay zeka ifadesi" in h for h in ilk_denetim.hatalar))
 
-        # 2. Denetim hataları bulmalı
-        ilk_denetim = denetleyici.denetle_paylasim(pid)
-        self.assertFalse(ilk_denetim.gecerli)
-        self.assertTrue(any("Yasaklı bot/yapay zeka ifadesi" in h for h in ilk_denetim.hatalar))
+            # 3. Otomatik onarımı çalıştır
+            onarildi, duzeltmeler = denetleyici.otomatik_onar(pid)
+            self.assertTrue(onarildi, f"Onarım başarısız oldu: {duzeltmeler}")
+            self.assertTrue(any("temizlendi" in d for d in duzeltmeler))
 
-        # 3. Otomatik onarımı çalıştır
-        onarildi, duzeltmeler = denetleyici.otomatik_onar(pid)
-        self.assertTrue(onarildi, f"Onarım başarısız oldu: {duzeltmeler}")
-        self.assertTrue(any("temizlendi" in d for d in duzeltmeler))
-
-        # 4. Veritabanını kontrol et
-        guncel = db.paylasim_getir(pid)
-        self.assertNotIn("bot", guncel["caption"].lower())
-        self.assertNotIn("yapay zeka", guncel["caption"].lower())
-        self.assertIn("#ezanplus", guncel["caption"].lower())
-        self.assertEqual(len(guncel["gorsel_yollari"]), 2)  # Hem 4:5 hem 9:16 üretildi!
+            # 4. Veritabanını kontrol et
+            guncel = db.paylasim_getir(pid)
+            self.assertNotIn("bot", guncel["caption"].lower())
+            self.assertNotIn("yapay zeka", guncel["caption"].lower())
+            self.assertIn("#ezanplus", guncel["caption"].lower())
+            self.assertEqual(len(guncel["gorsel_yollari"]), 2)  # Hem 4:5 hem 9:16 üretildi!
+        finally:
+            with db.baglanti_al() as con:
+                con.execute("DELETE FROM paylasimlar WHERE id = ?", (pid,))
 
 
 if __name__ == "__main__":

@@ -97,21 +97,25 @@ def test_v18_hibrit_kartlar():
 
 def test_veritabani_kaydi():
     pid = db.paylasim_ekle(
-        kategori="hadis",
-        format_tipi="post_4_5",
-        turkce_metin="Test hadis metni",
-        baslik="Buhârî, Rikâk, 1",
-        kaynak="Buhârî, Rikâk, 1",
+        kategori="kelime",
+        format_tipi="gorsel_4_5",
+        turkce_metin="Test kelime metni",
+        baslik="Test Başlık",
+        kaynak="Kur'an Sözlüğü",
         tefekkur="Test tefekkür",
         caption="Test caption #ezanplus",
-        gorsel_yollari=["data/cikti/test_unit_hadis_45.png"],
+        gorsel_yollari=["data/cikti/test_unit_kelime_45.png"],
         durum="taslak",
     )
-    assert pid > 0
-    kayit = db.paylasim_getir(pid)
-    assert kayit is not None
-    assert kayit["kategori"] == "hadis"
-    assert kayit["format"] == "post_4_5"
+    try:
+        assert pid > 0
+        kayit = db.paylasim_getir(pid)
+        assert kayit is not None
+        assert kayit["kategori"] == "kelime"
+        assert kayit["format"] == "gorsel_4_5"
+    finally:
+        with db.baglanti_al() as con:
+            con.execute("DELETE FROM paylasimlar WHERE id = ?", (pid,))
 
 
 if __name__ == "__main__":

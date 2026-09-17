@@ -275,19 +275,17 @@ def denetle_reels_mizanpaj(
     metrikler: Dict[str, Any] = {}
 
     try:
-        from .uretim.video import _SayfaVerisi, _meal_parcala, akilli_sayfa_araliklari, arapca_kelimeleri_ayristir
+        from .uretim.video import (
+            _SayfaVerisi, _meal_parcala, akilli_sayfa_araliklari,
+            arapca_kelimeleri_ayristir, sayfa_sayisi_belirle, latin_okunus_temizle
+        )
 
         ar_kelimeler = arapca_kelimeleri_ayristir(arapca_metin)
-        tr_kelimeler = (arapca_okunus or "").split()
+        tr_kelimeler = [latin_okunus_temizle(w) for w in (arapca_okunus or "").split()]
         toplam_kelime = len(ar_kelimeler)
 
-        # Sayfa bölme algoritması (14 kelimeye kadar tek sayfa, 15+ kelimede çoklu sayfa)
-        if toplam_kelime <= 14:
-            sayfa_sayisi = 1
-        elif toplam_kelime <= 28:
-            sayfa_sayisi = 2
-        else:
-            sayfa_sayisi = math.ceil(toplam_kelime / 14)
+        # Akıllı sayfa bölme (metin kutularının safe area'larını dinamik korur)
+        sayfa_sayisi = sayfa_sayisi_belirle(ar_kelimeler, turkce_meal)
 
         sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, arapca_metin, None, sayfa_sayisi)
         split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]
@@ -314,6 +312,13 @@ def denetle_reels_mizanpaj(
                 tef=tefekkur_notu or "Kalpleri mutmain kılan yegane hakikat Allah'ı anmaktır.",
                 hafiz_adi="Mişari Râşid el-Afâsî",
             )
+
+            # Okunuş ile Meal bandı arasında Safe Area ve Çakışma kontrolü
+            if getattr(sv, "okunus_cakismasi", False):
+                hatalar.append(
+                    f"Sayfa {p_idx + 1}/{sayfa_sayisi}: Latin okunuş satırı ile Kırmızı Keten Meal Bandı arasında ÇAKIŞMA tespit edildi! "
+                    f"Safe area ihlali: fade_1_start ({sv.fade_1_start}px) < tr_bottom + 24 ({sv.tr_bottom + 24}px)."
+                )
 
             # Net serbest meal boşluğu (Meal ile Tefekkür arasındaki emniyet tamponu)
             net_serbest = getattr(sv, "net_serbest_meal", 50)
@@ -647,67 +652,7 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
                 kategori = kayit.get("kategori", "hadis")
                 dosya_eki = int(time.time())
 
-                if kategori == "hadis":
-                    p_4_5 = sablon_ciz.hadis_karti_ciz(
-                        hadis_metni=turkce_metin,
-                        kaynak_ravi=kayit.get("kaynak"),
-                        tefekkur_notu=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
-                        cikti_dosya_adi=f"hadis_4_5_fix_{dosya_eki}.png",
-                        format_tipi="4:5",
-                        arapca_metin=guncellemeler.get("arapca_metin") or kayit.get("arapca_metin"),
-                    )
-                    p_9_16 = sablon_ciz.hadis_karti_ciz(
-                        hadis_metni=turkce_metin,
-                        kaynak_ravi=kayit.get("kaynak"),
-                        tefekkur_notu=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
-                        cikti_dosya_adi=f"hadis_9_16_fix_{dosya_eki}.png",
-                        format_tipi="9:16",
-                        arapca_metin=guncellemeler.get("arapca_metin") or kayit.get("arapca_metin"),
-                    )
-                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
-                    duzeltmeler.append("Hadis kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
-
-                elif kategori == "ayet":
-                    p_4_5 = sablon_ciz.ayet_karti_ciz(
-                        sure_ayet=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Ayeti"),
-                        turkce_meal=turkce_metin,
-                        arapca_metin=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
-                        tefekkur_notu=str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or ""),
-                        cikti_dosya_adi=f"ayet_4_5_fix_{dosya_eki}.png",
-                        format_tipi="4:5",
-                    )
-                    p_9_16 = sablon_ciz.ayet_karti_ciz(
-                        sure_ayet=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Ayeti"),
-                        turkce_meal=turkce_metin,
-                        arapca_metin=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
-                        tefekkur_notu=str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or ""),
-                        cikti_dosya_adi=f"ayet_9_16_fix_{dosya_eki}.png",
-                        format_tipi="9:16",
-                    )
-                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
-                    duzeltmeler.append("Ayet kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
-
-                elif kategori == "dua":
-                    p_4_5 = sablon_ciz.dua_karti_ciz(
-                        dua_basligi=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Duası"),
-                        turkce_anlam=turkce_metin,
-                        arapca_metin=kayit.get("arapca_metin"),
-                        okunus_veya_fazilet=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
-                        cikti_dosya_adi=f"dua_4_5_fix_{dosya_eki}.png",
-                        format_tipi="4:5",
-                    )
-                    p_9_16 = sablon_ciz.dua_karti_ciz(
-                        dua_basligi=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Günün Duası"),
-                        turkce_anlam=turkce_metin,
-                        arapca_metin=kayit.get("arapca_metin"),
-                        okunus_veya_fazilet=guncellemeler.get("tefekkur") or kayit.get("tefekkur"),
-                        cikti_dosya_adi=f"dua_9_16_fix_{dosya_eki}.png",
-                        format_tipi="9:16",
-                    )
-                    guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
-                    duzeltmeler.append("Dua kartları standart 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
-
-                elif kategori == "kelime":
+                if kategori == "kelime":
                     p_4_5 = sablon_ciz.kelime_karti_ciz(
                         kelime_tr=str(guncellemeler.get("baslik") or kayit.get("baslik") or "Kur'an Sözlüğü"),
                         kelime_ar=str(guncellemeler.get("arapca_metin") or kayit.get("arapca_metin") or ""),
@@ -726,6 +671,8 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
                     )
                     guncellemeler["gorsel_yollari"] = [str(p_4_5), str(p_9_16)]
                     duzeltmeler.append("Kur'an Sözlüğü kartları 4:5 Feed ve 9:16 Story formatlarında yeniden render edildi.")
+                else:
+                    log.info(f"'{kategori}' kategorisi video formatında yayınlandığı için statik görsel kart çizimi atlandı.")
 
             except Exception as e:
                 log.error(f"Otomatik kart yeniden render hatası: {e}")

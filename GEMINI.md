@@ -209,13 +209,14 @@ Tek bir onay ile tüm büyük sosyal medya kanallarına eş zamanlı ve formata 
                   ┌───────────────► 1. Instagram Reels / Post (Video: 9:16 | Görsel: 4:5)
                   ├───────────────► 2. Instagram Story (Dedicated 1080x1920 Tam Ekran)
 [Ezan Plus Motoru]├───────────────► 3. Threads (@ezanplusapp Zincir Gönderi + 4:5 Görsel)
-                  ├───────────────► 4. Facebook Sayfası (Ezan Plus + 4:5 Görsel)
+                  ├───────────────► 4. Facebook Sayfası (Video: Facebook Reels | Görsel: 4:5 Post)
                   ├───────────────► 5. YouTube Shorts (Ezan Plus Kanalı + 9:16 Video)
-                  └───────────────► 6. TikTok (@ezanplusapp - Direct Post)
+                  └───────────────► 6. TikTok (@ezanplusapp - Taslak/Inbox veya Direct Post)
 ```
 
 1. **Format Duyarlı Dağıtım (`src/telegram/yonetici.py`):**
    - Görsel paylaşımlarda (`gorsel_yollari = [p_4_5, p_9_16]`), Instagram Feed, Threads ve Facebook'a kareye yakın mükemmel akış formatı olan **4:5 (`gorsel_yollari[0]`)** gönderilir.
+   - Dikey video paylaşımlarında (`reels_9_16`), Instagram'a Reels + Story, YouTube'a Shorts, Threads'e Video, **Facebook'a Facebook Reels (`facebook_reels_paylas`)** ve TikTok'a Taslak/Direct Video aktarılır.
    - Instagram Story paylaşımında kırpılma olmadan kusursuz görünmesi için doğrudan **9:16 dikey kart (`gorsel_yollari[1]`)** yüklenir.
 2. **Güvenilir CDN Medya Barındırma Katmanı (`gecici_medya_yukle`):**
    - Meta Graph API doğrudan yerel dosya kabul etmediği için (`image_url` parametresi) yüksek hızlı geçici CDN katmanı kullanılır.
@@ -228,9 +229,9 @@ Tek bir onay ile tüm büyük sosyal medya kanallarına eş zamanlı ve formata 
    - **Container Hazırlık Yoklaması (Readiness Polling):** Feed ve Story container'ları oluşturulduktan sonra `media_publish` çağrılmadan önce `status_code == 'FINISHED'` olana kadar maksimum 15 iterasyon (4'er saniye, toplam 60 saniye) yoklama yapılır; `ERROR` durumunda işlem erken durdurulur.
    - **Story Takibi ve Yayından Kaldırma:** Story ID'si veritabanında `instagram_story_post_id` sütununda saklanır; `/kaldir` tetiklendiğinde Meta API üzerinden hem Feed hem Story silinir.
 4. **Threads Zincir Gönderi (`threads.py`):** 500 karakter sınırı `metni_parcala()` algoritması ile aşılır; 450 karakterlik mantıklı parçalar halinde ana post altına `(1/3)`, `(2/3)` zincirleme eklenir.
-5. **Facebook Sayfası (`meta.py`):** `FACEBOOK_PAGE_ACCESS_TOKEN` ile süresiz token üzerinden zengin metin ve 4:5 görselle paylaşım.
+5. **Facebook Sayfası (`meta.py`):** Dikey videolarda `/{page_id}/video_reels` uç noktası üzerinden `description=caption` ile tam açıklamalı **Facebook Reels**; tekil görsel postlarda `/{page_id}/photos` ile 4:5 fotoğraf postu yayınlanır.
 6. **YouTube Shorts (`youtube.py`):** Google YouTube Data API v3 OAuth 2.0 ile dikey video (#Shorts).
-7. **TikTok (`tiktok.py`):** TikTok Content Posting API v2 ile video paylaşımı.
+7. **TikTok (`tiktok.py`):** TikTok Content Posting API v2 ile **Taslak / Gelen Kutusu (Inbox Mode - `/v2/post/publish/inbox/video/init/`)** modu varsayılandır; video kullanıcının TikTok mobil uygulamasına doğrudan taslak olarak aktarılır. Destekleyen onaylı hesaplarda Direct Post moduna geçilebilir.
 
 ---
 

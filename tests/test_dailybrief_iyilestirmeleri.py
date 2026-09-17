@@ -87,7 +87,10 @@ class TestDailyBriefIyilestirmeleri(unittest.TestCase):
 
         with patch("requests.get", return_value=sahte_yanit) as mock_get, \
              patch("pathlib.Path.exists", return_value=False), \
-             patch.dict(os.environ, {"THREADS_ACCESS_TOKEN": "TH_OLD_TOKEN"}):
+             patch.dict(os.environ, {
+                 "THREADS_USER_ID": "17841400000000",
+                 "THREADS_ACCESS_TOKEN": "mock_valid_old_threads_access_key_12345"
+             }):
             
             token, gun = threads.jetonu_yenile()
             self.assertEqual(token, "TH_NEW_LONG_LIVED_TOKEN_123")

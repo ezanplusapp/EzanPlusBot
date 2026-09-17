@@ -94,12 +94,7 @@ def _statik_taban_ciz(
     draw = ImageDraw.Draw(im)
     W, H = GENISLIK_9_16, YUKSEKLIK_9_16
 
-    # 1. ARKA PLAN GEOMETRİSİ
-    draw.rectangle([W - 240, 0, W, 32], fill=KIRMIZI)
-    draw.rectangle([0, 140, 26, 440], fill=ISLAM_YESILI)
-    draw.rectangle([W - 26, 680, W, 880], fill=ALTIN)
-    draw.arc([W - 680, -100, W + 360, 940], start=0, end=360, fill="#E6DFC6", width=2)
-    draw.arc([-340, H - 700, 320, H - 60], start=0, end=180, fill=ISLAM_YESILI, width=28)
+    # 1. ARKA PLAN: Saf Mushaf Krem Zemin (BG_KREM) - Sade, ferah ve asil editoryal tuval
 
     # 2. ÜST MARKA ALANI (114x114 Logo + Ezan Plus Lora)
     logo_yolu = IKONLAR / "logo.png"
@@ -255,6 +250,47 @@ def arapca_kelimeleri_ayristir(metin: str) -> List[str]:
     return sonuc
 
 
+LATIN_TRANSLITERASYON_HARITASI = {
+    'ḍ': 'd', 'Ḍ': 'D',
+    'ż': 'z', 'Ż': 'Z',
+    'ẓ': 'z', 'Ẓ': 'Z',
+    'ẕ': 'z', 'Ẕ': 'Z',
+    'ṭ': 't', 'Ṭ': 'T',
+    'ṣ': 's', 'Ṣ': 'S',
+    'ḥ': 'h', 'Ḥ': 'H',
+    'ḫ': 'h', 'Ḫ': 'H',
+    'ṯ': 's', 'Ṯ': 'S',
+    'ḏ': 'd', 'Ḏ': 'D',
+    'ġ': 'g', 'Ġ': 'G',
+    'ā': 'â', 'Ā': 'Â',
+    'ī': 'î', 'Ī': 'Î',
+    'ū': 'û', 'Ū': 'Û',
+    '‘': "'", '’': "'",
+    'ʾ': "'", 'ʿ': "'",
+    '`': "'", '´': "'",
+    'ـ': '',  # Arapça tatweel/kashida
+}
+
+
+def latin_okunus_temizle(metin: str) -> str:
+    """
+    Latin okunuş metnini Manrope/UI fontlarında eksik glif / tofu kutusu (■) oluşturabilecek
+    tüm akademik transliterasyon harflerinden arındırır, standart Türkçe Latin karakterlerine dönüştürür.
+    """
+    if not metin:
+        return ""
+    import unicodedata
+    sonuc = []
+    for ch in metin:
+        if ch in LATIN_TRANSLITERASYON_HARITASI:
+            sonuc.append(LATIN_TRANSLITERASYON_HARITASI[ch])
+        elif unicodedata.combining(ch):
+            continue
+        else:
+            sonuc.append(ch)
+    return "".join(sonuc)
+
+
 def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
     """
     Türkçe Latin okunuşu ile Arapça kelimeleri 1:1 hizalar.
@@ -267,6 +303,9 @@ def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
         return []
     if not tr_list:
         return [""] * len(ar_list)
+
+    # Glif eksikliği (tofu kutusu) engeli için kelimeleri temizle
+    tr_list = [latin_okunus_temizle(w.strip()) for w in tr_list if w.strip()]
 
     num_ar = len(ar_list)
     if len(tr_list) == num_ar:
@@ -828,6 +867,15 @@ class _SayfaVerisi:
             lines.append(cur_line)
         return lines
 
+    @staticmethod
+    def tahmini_satir_sayisi(page_ar: List[str], max_text_w: int = 840) -> int:
+        """Arapça kelimelerin tahmini satır sayısını hesaplar."""
+        if not page_ar:
+            return 0
+        pt = _SayfaVerisi.uygun_pt_bul(page_ar, max_text_w)
+        lines = _SayfaVerisi.satirlari_dengeli_bol(page_ar, pt, max_text_w)
+        return len(lines)
+
     def __init__(
         self,
         p_idx: int,
@@ -1071,10 +1119,23 @@ class _SayfaVerisi:
         meal_blok_h = len(meal_wrapped_lines) * self.meal_h
         kalan_orta = ay_y - tr_bottom
 
-        # Meal Fontu Koruması: Alan daraldığında meal küçültülmez, Arapça alanı yukarıda daraltılmıştır.
-        # Yalnızca aşırı istisnai durumlarda acil durum payı (35px) kontrolü:
-        min_gerekli_pay = 35
-        while (kalan_orta - meal_blok_h < min_gerekli_pay) and self.pt_meal > 34:
+        # SAFE AREA HESAPLAMASI:
+        # Kırmızı Keten Meal Bandı kendi dikey kutucuğunda yaşamalıdır:
+        # Üst sınır: tr_bottom + min_gap_okunus
+        # Alt sınır: ay_y - min_gap_tef
+        min_gap_okunus = 24
+        min_gap_tef = 24
+        band_top_floor = tr_bottom + min_gap_okunus
+        band_bottom_ceiling = ay_y - min_gap_tef
+        usable_band_h = max(60, band_bottom_ceiling - band_top_floor)
+
+        # 1. Metin satır sayısına ve puntocuğuna göre dinamik dolgular (Dinamik Keten Bandı)
+        pad_y = min(32, max(16, int(self.pt_meal * 0.36)))
+        fade_len = min(28, max(14, int(usable_band_h * 0.12)))
+
+        # Kırmızı keten bandın toplam yüksekliği serbest alana sığana kadar
+        # meal fontunu ve satır aralığını kademeli küçült
+        while (meal_blok_h + 2 * pad_y + 2 * fade_len > usable_band_h) and self.pt_meal > 30:
             self.pt_meal -= 2
             self.meal_h = int(self.pt_meal * 1.34)
             self.font_meal_reg = font_al(FONT_BASLIK, self.pt_meal, agirlik=400)
@@ -1083,26 +1144,23 @@ class _SayfaVerisi:
                 meal_tokens, self.font_meal_reg, self.font_meal_bold, self.kart_ic_w - 60, draw_t
             )
             meal_blok_h = len(meal_wrapped_lines) * self.meal_h
+            pad_y = min(28, max(12, int(self.pt_meal * 0.30)))
+            fade_len = min(24, max(12, int(usable_band_h * 0.10)))
 
-        serbest_meal = max(20, kalan_orta - meal_blok_h)
+        # Sıkışık durumlarda iç dolguları orantılı daralt
+        toplam_ekler = 2 * fade_len + 2 * pad_y
+        serbest_kalan = usable_band_h - meal_blok_h
+        if toplam_ekler > serbest_kalan and serbest_kalan > 20:
+            oran = max(0.4, serbest_kalan / max(1, toplam_ekler))
+            pad_y = max(8, int(pad_y * oran))
+            fade_len = max(8, int(fade_len * oran))
+
+        serbest_meal = max(15, usable_band_h - meal_blok_h - 2 * pad_y - 2 * fade_len)
         self.serbest_meal = serbest_meal
 
-        # 1. Metin satır sayısına ve puntocuğuna göre dinamik dolgular (Dinamik Keten Bandı)
-        pad_y = min(36, max(20, int(self.pt_meal * 0.40)))
-        fade_len = min(32, max(18, int(serbest_meal * 0.16)))
-        min_gap_okunus = 22
-        min_gap_tef = 24
-
-        # Sıkışık alanlarda dolguları orantılı dengele
-        toplam_ekler = 2 * fade_len + 2 * pad_y + min_gap_okunus + min_gap_tef
-        if toplam_ekler > serbest_meal:
-            oran = max(0.6, (serbest_meal - min_gap_okunus - min_gap_tef) / max(1, 2 * fade_len + 2 * pad_y))
-            pad_y = max(14, int(pad_y * oran))
-            fade_len = max(14, int(fade_len * oran))
-
-        # 2. Meal metnini kalan alanda optik olarak ortala (alt elmas için hafif 4px yukarı kaldır)
-        center_y = (tr_bottom + ay_y) // 2
-        my = center_y - (meal_blok_h // 2) - 4
+        # 2. Meal metnini kullanılabilir bant alanı içinde optik olarak ortala
+        center_y = (band_top_floor + band_bottom_ceiling) // 2
+        my = center_y - (meal_blok_h // 2)
 
         # 3. Katı kırmızı (solid) sınırları: Metin satırlarını DOĞRUDAN ve TAMAMEN sarar!
         solid_top = my - pad_y
@@ -1114,19 +1172,10 @@ class _SayfaVerisi:
         fade_2_start = solid_bottom
         fade_2_end = solid_bottom + fade_len
 
-        # 5. Güvenli sınır kilitleri (Okunuş ve tefekkür ayracına taşmayı kesin engeller)
-        if fade_1_start < tr_bottom + min_gap_okunus:
-            shift_down = (tr_bottom + min_gap_okunus) - fade_1_start
-            fade_1_start += shift_down
-            fade_1_end += shift_down
-            solid_top += shift_down
-            my += shift_down
-            solid_bottom += shift_down
-            fade_2_start += shift_down
-            fade_2_end += shift_down
-
-        if fade_2_end > ay_y - min_gap_tef:
-            shift_up = fade_2_end - (ay_y - min_gap_tef)
+        # 5. GÜVENLİ SINIR KİLİTLERİ (MUTLAK KUTU VE SAFE AREA GARANTİSİ)
+        # A) Alt tavan kontrolü:
+        if fade_2_end > band_bottom_ceiling:
+            shift_up = fade_2_end - band_bottom_ceiling
             fade_1_start -= shift_up
             fade_1_end -= shift_up
             solid_top -= shift_up
@@ -1134,6 +1183,29 @@ class _SayfaVerisi:
             solid_bottom -= shift_up
             fade_2_start -= shift_up
             fade_2_end -= shift_up
+
+        # B) MUTLAK TABAN KİLİDİ: fade_1_start ASLA band_top_floor'un altına inemez!
+        # (Okunuş satırını yutmayı veya üstüne taşmayı %100 fiziksel olarak engeller)
+        if fade_1_start < band_top_floor:
+            shift_down = band_top_floor - fade_1_start
+            fade_1_start += shift_down
+            fade_1_end += shift_down
+            solid_top += shift_down
+            my += shift_down
+            solid_bottom += shift_down
+            fade_2_start += shift_down
+            fade_2_end += shift_down
+            # Eğer alt tavana değerse alt degradeyi daralt; ASLA yukarı okunuşa kaydırma!
+            if fade_2_end > band_bottom_ceiling:
+                fade_2_end = band_bottom_ceiling
+                fade_2_start = min(fade_2_start, fade_2_end - 4)
+
+        self.fade_1_start = fade_1_start
+        self.fade_2_end = fade_2_end
+        self.tr_bottom = tr_bottom
+        self.ay_y = ay_y
+        self.net_serbest_meal = ay_y - fade_2_end
+        self.okunus_cakismasi = (fade_1_start < tr_bottom + min_gap_okunus)
 
         band_h = max(100, fade_2_end - fade_1_start)
         band_x = 56
@@ -1240,6 +1312,37 @@ class _SayfaVerisi:
         return kare
 
 
+def sayfa_sayisi_belirle(ar_kelimeler: List[str], turkce_meal: str) -> int:
+    """
+    Âyetin kelime sayısına, Türkçe meal uzunluğuna ve dikey satır yüküne göre
+    her metin kutusunun kendi güvenli alanını (safe area) koruyabilmesi için
+    en ideal sayfa sayısını dinamik belirler.
+    """
+    toplam_kelime = len(ar_kelimeler)
+    if toplam_kelime <= 0:
+        return 1
+
+    meal_temiz = re.sub(r"\*\*|[“”\"']", "", turkce_meal or "").strip()
+    meal_len = len(meal_temiz)
+
+    if toplam_kelime <= 10:
+        # 10 kelimeye kadar olan âyetler tek sayfada ferahça sunulur (istisnai 200+ karakter meal hariç)
+        return 2 if meal_len >= 200 else 1
+    elif toplam_kelime <= 14:
+        # 11-14 kelime: Dikey yük denetimi
+        # Kehf 32 gibi 14 kelimelik fakat meali 3+ satır (>= 110 karakter) tutan veya
+        # Arapça/Latin hat satırı 3 olan âyetlerde okunuş ve meal çakışmasını
+        # önlemek için kesinlikle 2 sayfaya bölünür.
+        tahmini_ar_satir = _SayfaVerisi.tahmini_satir_sayisi(ar_kelimeler, max_text_w=840)
+        if meal_len >= 110 or tahmini_ar_satir >= 3:
+            return 2
+        return 1
+    elif toplam_kelime <= 28:
+        return 2
+    else:
+        return math.ceil(toplam_kelime / 14)
+
+
 def reels_videosu_uret(
     sure_ayet: str,
     turkce_meal: str,
@@ -1285,9 +1388,9 @@ def reels_videosu_uret(
     toplam_kelime = len(ar_kelimeler)
 
     if latin_kelimeler and len(latin_kelimeler) == toplam_kelime:
-        tr_kelimeler = [w.strip() for w in latin_kelimeler]
+        tr_kelimeler = [latin_okunus_temizle(w.strip()) for w in latin_kelimeler]
     else:
-        tr_ham = [w.strip() for w in tr_str.split() if w.strip()]
+        tr_ham = [latin_okunus_temizle(w.strip()) for w in tr_str.split() if w.strip()]
         tr_kelimeler = turkce_okunus_hizala(tr_ham, ar_kelimeler)
 
     # Kelime zaman damgaları verilmemişse otomatik tespit et (Sıfır desenkron garantisi)
@@ -1333,15 +1436,7 @@ def reels_videosu_uret(
     kelime_zamanlari = kelime_zamanlarini_hizala(kelime_zamanlari, toplam_kelime, toplam_sure)
 
     # 2. Sayfa Sayısını ve Aralıkları Belirle (Akıllı Kıraat & Çoklu Sayfa Motoru)
-    # 14 kelimeye kadar olan âyetler (Bakara 127 gibi) tek sayfada ferahça ve kesintisiz sunulur;
-    # 15 kelime ve üzeri uzun âyetlerde metin secavend duraklarına ve hafızın nefes
-    # aralıklarına göre anlam bütünlüğü korunarak 2-3 sayfaya bölünür.
-    if toplam_kelime <= 14:
-        sayfa_sayisi = 1
-    elif toplam_kelime <= 28:
-        sayfa_sayisi = 2
-    else:
-        sayfa_sayisi = math.ceil(toplam_kelime / 14)
+    sayfa_sayisi = sayfa_sayisi_belirle(ar_kelimeler, turkce_meal)
 
     sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, ar_str, kelime_zamanlari, sayfa_sayisi)
     split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]
@@ -1349,7 +1444,18 @@ def reels_videosu_uret(
 
     # 3. Sayfa Verilerini Hazırla (Tüm sayfalar için birleşik Arapça punto ile tutarlı boyut)
     page_ar_list = [ar_kelimeler[w_s:w_e] for w_s, w_e in sayfa_araliklari]
-    uygun_ptler = [_SayfaVerisi.uygun_pt_bul(words, max_text_w=840) for words in page_ar_list]
+    im_scratch = Image.new("RGB", (100, 100))
+    d_scratch = ImageDraw.Draw(im_scratch)
+    uygun_ptler = []
+    for p_idx, (w_s, w_e) in enumerate(sayfa_araliklari):
+        p_meal = meal_parcalari[p_idx] if p_idx < len(meal_parcalari) else turkce_meal
+        p_meal_tokens = parse_markdown_bold(f"“{p_meal.strip()}”")
+        p_meal_wrapped, _ = wrap_mixed_tokens(
+            p_meal_tokens, font_al(FONT_BASLIK, 44, agirlik=400), font_al(FONT_BASLIK, 44, agirlik=700), 840, d_scratch
+        )
+        p_pt = _SayfaVerisi.uygun_pt_bul(ar_kelimeler[w_s:w_e], max_text_w=840, meal_satir_sayisi=len(p_meal_wrapped))
+        uygun_ptler.append(p_pt)
+
     if pt_ar_override:
         birlesik_pt = pt_ar_override
     else:

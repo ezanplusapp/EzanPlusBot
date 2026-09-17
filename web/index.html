@@ -52,11 +52,11 @@
             
             <nav class="nav-links">
                 <a href="#vakitler" class="nav-link">Vakitler</a>
+                <a href="#tilavet" class="nav-link">Kur'an-ı Kerim</a>
+                <a href="#hadisler" class="nav-link">Hadis Külliyatı</a>
+                <a href="#ozellikler" class="nav-link">12 Özellik</a>
                 <a href="#galeri" class="nav-link">Ekranlar</a>
-                <a href="#tilavet" class="nav-link">Tilavet</a>
-                <a href="#ozellikler" class="nav-link">Neden Biz?</a>
                 <a href="#sss" class="nav-link">SSS</a>
-                <a href="privacy-policy.html" class="nav-link">Gizlilik</a>
             </nav>
             
             <div class="nav-actions">
@@ -531,114 +531,152 @@
             <!-- TAB 1: CANLI TİLAVET VE KELİME TAKİBİ -->
             <div class="quran-tab-panel active" id="quranPanel-player">
                 <div class="mushaf-master-card">
-                    
-                    <!-- Üst Seçici Çubuğu: Sûreler, Hafızlar, Mealler -->
-                    <div class="mushaf-controls-header">
-                        <!-- Sûre Seçimi -->
-                        <div class="mushaf-selector-group">
-                            <span class="selector-label">SÛRE / ÂYET SEÇİMİ:</span>
-                            <div class="surah-chips-scroll" id="surahChips">
-                                <button class="surah-chip active" data-surah="ayetel-kursi">Âyete'l-Kürsî (Bakara 255)</button>
-                                <button class="surah-chip" data-surah="fatiha">Fâtiha (1)</button>
-                                <button class="surah-chip" data-surah="insirah">İnşirâh (5-6)</button>
-                                <button class="surah-chip" data-surah="yasin">Yâsîn (58)</button>
-                                <button class="surah-chip" data-surah="mulk">Mülk (1)</button>
-                                <button class="surah-chip" data-surah="ihlas">İhlâs (1)</button>
-                            </div>
-                        </div>
-
-                        <!-- Hafız ve Meal Seçimi (İkili Dropdown) -->
-                        <div class="mushaf-reciter-meal-row">
-                            <div class="reciter-dropdown-wrap">
-                                <span class="sub-label">KÂRÎ / HAFIZ:</span>
-                                <select class="mushaf-select" id="reciterSelect" aria-label="Hafız Seçin">
-                                    <option value="alafasy" selected>Şeyh Mişari Râşid el-Afâsî (Kelime Senkronlu Külliyat)</option>
-                                </select>
+                    <div class="mushaf-layout-split">
+                        
+                        <!-- Sol / Yan Menü Çubuğu (Desktop Sidebar / Mobile Top Cluster) -->
+                        <aside class="mushaf-side-nav-bar">
+                            <div class="mushaf-side-header">
+                                <span class="mushaf-side-tag">TİLAVET KONTROL</span>
+                                <h4 class="mushaf-side-title">Mushaf & Kârî</h4>
                             </div>
 
-                            <div class="meal-dropdown-wrap">
-                                <span class="sub-label">TÜRKÇE MEAL:</span>
-                                <select class="mushaf-select" id="mealSelect" aria-label="Meal Seçin">
-                                    <option value="diyanet" selected>Diyanet İşleri Başkanlığı</option>
-                                    <option value="yazir">Elmalılı Hamdi Yazır</option>
-                                    <option value="ozturk">Yaşar Nuri Öztürk</option>
-                                    <option value="yuksel">Edip Yüksel</option>
-                                </select>
+                            <!-- 1. Sûre Seçici (114 Sûre Fihristini Açar) -->
+                            <div class="mushaf-sidebar-block">
+                                <span class="sidebar-block-label">SÛRE FİHRİSTİ</span>
+                                <button class="mushaf-surah-picker-btn" id="mushafSurahPickerBtn" aria-label="114 Sûre Fihristini Aç">
+                                    <span class="picker-book-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                    </span>
+                                    <div class="picker-title-wrap">
+                                        <span class="picker-sub">114 SÛRE • 30 CÜZ</span>
+                                        <span class="picker-current-surah" id="currentSurahBtnTitle">1. Fâtiha Sûresi (7 Âyet)</span>
+                                    </div>
+                                    <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </button>
+                            </div>
+
+                            <!-- 2. Âyet Gezintisi (Önceki Âyet, Âyet Seçici Dropdown, Sonraki Âyet) -->
+                            <div class="mushaf-sidebar-block">
+                                <span class="sidebar-block-label">ÂYET SEÇİMİ</span>
+                                <div class="mushaf-ayah-nav-cluster">
+                                    <button class="mushaf-step-btn" id="prevAyahBtn" title="Önceki Âyet" aria-label="Önceki Âyet">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                    </button>
+                                    
+                                    <div class="mushaf-ayah-indicator">
+                                        <select class="mushaf-ayah-select" id="ayahSelectDropdown" aria-label="Âyet Seçimi"></select>
+                                    </div>
+
+                                    <button class="mushaf-step-btn" id="nextAyahBtn" title="Sonraki Âyet" aria-label="Sonraki Âyet">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 3. Tilavet Oynatıcısı (Oynat, Süre, Hız, İlerleme Çubuğu) -->
+                            <div class="mushaf-sidebar-block">
+                                <span class="sidebar-block-label">TİLAVET OYNATICI</span>
+                                <div class="mushaf-player-sidebar-card">
+                                    <div class="mushaf-player-main-row">
+                                        <button class="mushaf-play-btn" id="mushafPlayBtn" title="Tilaveti Oynat / Durdur" aria-label="Oynat">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+                                            </svg>
+                                        </button>
+
+                                        <div class="mushaf-equalizer" id="mushafEqualizer">
+                                            <span class="m-eq-bar"></span>
+                                            <span class="m-eq-bar"></span>
+                                            <span class="m-eq-bar"></span>
+                                            <span class="m-eq-bar"></span>
+                                            <span class="m-eq-bar"></span>
+                                        </div>
+
+                                        <div class="mushaf-player-options">
+                                            <button class="mushaf-speed-btn" id="mushafSpeedBtn" title="Oynatma Hızı">1.0x</button>
+                                            <button class="mushaf-repeat-btn active" id="mushafRepeatBtn" title="Âyet Tekrarı">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mushaf-progress-container">
+                                        <div class="mushaf-progress-track" id="mushafProgressTrack">
+                                            <div class="mushaf-progress-fill" id="mushafProgressFill"></div>
+                                        </div>
+                                        <div class="mushaf-time-row">
+                                            <span id="mushafCurTime">0:00</span>
+                                            <span class="mushaf-playing-surah-title" id="mushafPlayingTitle">Bakara Sûresi, 255. Âyet</span>
+                                            <span id="mushafDurTime">0:52</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. Kârî & Meal & Kesintisiz Akış Modu -->
+                            <div class="mushaf-sidebar-block">
+                                <span class="sidebar-block-label">KÂRÎ & MEAL AYARLARI</span>
+                                <div class="mushaf-settings-cluster">
+                                    <div class="mushaf-reciter-tag" title="Şeyh Mişari Râşid el-Afâsî Stüdyo Tilaveti">
+                                        <span class="reciter-dot"></span>
+                                        <span class="reciter-name">Şeyh Mişari Râşid</span>
+                                    </div>
+
+                                    <div class="mushaf-mini-select-wrap">
+                                        <span class="mini-label">MEAL:</span>
+                                        <select class="mushaf-mini-select" id="mealSelect" aria-label="Meal Seçin">
+                                            <option value="diy" selected>Diyanet</option>
+                                            <option value="elm">Elmalılı</option>
+                                        </select>
+                                    </div>
+
+                                    <button class="mushaf-auto-flow-btn active" id="autoNextAyahToggle" title="Sıradaki Âyete Otomatik Geç (Kesintisiz Tilavet Akışı)">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                                        <span>Otomatik Akış</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </aside>
+
+                        <!-- Sağ: Ana Tilavet Sahnesi -->
+                        <div class="mushaf-main-content-col">
+                            <!-- Âyet Sahnesi: Parşömen Kadranı -->
+                            <div class="mushaf-parchment-stage">
+                                <div class="mushaf-stage-ornament-top">
+                                    <span class="mushaf-badge" id="mushafAyahBadge">BAKARA SÛRESİ • 255. ÂYET</span>
+                                    <span class="mushaf-juz-badge" id="mushafJuzBadge">3. CÜZ • MEDENÎ</span>
+                                </div>
+
+                                <!-- Medine Uthmani Hat (Kelime Senkron Karaoke) -->
+                                <div class="mushaf-arabic-text" id="mushafArabicText" dir="rtl">
+                                    <!-- JS ile kelimeler doldurulacak -->
+                                </div>
+
+                                <!-- Latin Transkripsiyon (Okunuş) -->
+                                <div class="mushaf-latin-text" id="mushafLatinText">
+                                    <!-- JS ile okunuş doldurulacak -->
+                                </div>
+
+                                <!-- Ayraç -->
+                                <div class="mushaf-divider">
+                                    <span class="mushaf-divider-line"></span>
+                                    <span class="mushaf-divider-diamond">◆</span>
+                                    <span class="mushaf-divider-line"></span>
+                                </div>
+
+                                <!-- Türkçe Meal -->
+                                <div class="mushaf-translation-text" id="mushafTranslationText">
+                                    <!-- JS ile meal doldurulacak -->
+                                </div>
+
+                                <!-- Nebevî Tefekkür Notu -->
+                                <div class="mushaf-tefekkur-box" id="mushafTefekkurBox">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    <span id="mushafTefekkurText">Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Âyet Sahnesi: Parşömen Kadranı -->
-                    <div class="mushaf-parchment-stage">
-                        <div class="mushaf-stage-ornament-top">
-                            <span class="mushaf-badge" id="mushafAyahBadge">BAKARA SÛRESİ • 255. ÂYET</span>
-                            <span class="mushaf-juz-badge" id="mushafJuzBadge">3. CÜZ • MEDENÎ</span>
-                        </div>
-
-                        <!-- Medine Uthmani Hat (Kelime Senkron Karaoke) -->
-                        <div class="mushaf-arabic-text" id="mushafArabicText" dir="rtl">
-                            <!-- JS ile kelimeler doldurulacak -->
-                        </div>
-
-                        <!-- Ayraç -->
-                        <div class="mushaf-divider">
-                            <span class="mushaf-divider-line"></span>
-                            <span class="mushaf-divider-diamond">◆</span>
-                            <span class="mushaf-divider-line"></span>
-                        </div>
-
-                        <!-- Latin Transkripsiyon -->
-                        <div class="mushaf-latin-text" id="mushafLatinText">
-                            <!-- JS ile okunuş doldurulacak -->
-                        </div>
-
-                        <!-- Türkçe Meal -->
-                        <div class="mushaf-translation-text" id="mushafTranslationText">
-                            <!-- JS ile meal doldurulacak -->
-                        </div>
-
-                        <!-- Nebevî Tefekkür Notu -->
-                        <div class="mushaf-tefekkur-box" id="mushafTefekkurBox">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                            <span id="mushafTefekkurText">Âyete'l-Kürsî; tevhidin, ilahi kudretin ve sarsılmaz ilmin Kur'an'daki en azametli ifadesidir.</span>
-                        </div>
-                    </div>
-
-                    <!-- Alt Oynatıcı Çubuğu -->
-                    <div class="mushaf-player-bar">
-                        <button class="mushaf-play-btn" id="mushafPlayBtn" title="Tilaveti Oynat / Durdur" aria-label="Oynat">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
-                            </svg>
-                        </button>
-
-                        <div class="mushaf-equalizer" id="mushafEqualizer">
-                            <span class="m-eq-bar"></span>
-                            <span class="m-eq-bar"></span>
-                            <span class="m-eq-bar"></span>
-                            <span class="m-eq-bar"></span>
-                            <span class="m-eq-bar"></span>
-                        </div>
-
-                        <div class="mushaf-progress-container">
-                            <div class="mushaf-progress-track" id="mushafProgressTrack">
-                                <div class="mushaf-progress-fill" id="mushafProgressFill"></div>
-                            </div>
-                            <div class="mushaf-time-row">
-                                <span id="mushafCurTime">0:00</span>
-                                <span class="mushaf-playing-surah-title" id="mushafPlayingTitle">Bakara Sûresi, 255. Âyet</span>
-                                <span id="mushafDurTime">0:52</span>
-                            </div>
-                        </div>
-
-                        <div class="mushaf-player-options">
-                            <button class="mushaf-speed-btn" id="mushafSpeedBtn" title="Oynatma Hızı">1.0x</button>
-                            <button class="mushaf-repeat-btn active" id="mushafRepeatBtn" title="Âyet Tekrarı">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-                            </button>
-                        </div>
-                    </div>
-
                 </div>
             </div>
 
@@ -749,44 +787,140 @@
     </section>
 
     <!-- ====================================================================
-         5. Günün Hikmeti & Tescilli Külliyat Rotatoru
+         4.5. 114 Sûre & 30 Cüz Fihristi Modal Paneli
          ==================================================================== -->
-    <section class="wisdom-section" id="hikmet">
+    <div class="surah-modal-backdrop" id="surahModalBackdrop" style="display: none;">
+        <div class="surah-modal-card">
+            <div class="surah-modal-header">
+                <div class="surah-modal-title-side">
+                    <span class="modal-mini-badge">MUSHAF-I ŞERİF FİHRİSTİ</span>
+                    <h3 class="surah-modal-heading">114 Sûre & 30 Cüz</h3>
+                </div>
+                <button class="surah-modal-close-btn" id="surahModalCloseBtn" aria-label="Fihristi Kapat">&times;</button>
+            </div>
+
+            <div class="surah-modal-search-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="surahSearchInput" placeholder="Sûre adı veya numarası ile ara... (örn: Yasin, Bakara, 36, Mülk, İhlas)" autocomplete="off">
+                <button class="surah-search-clear" id="surahSearchClear" style="display:none;">&times;</button>
+            </div>
+
+            <!-- Cüz Hızlı Filtre Çipleri -->
+            <div class="surah-cuz-chips-scroll" id="surahCuzChips">
+                <button class="cuz-filter-chip active" data-cuz="0">Tüm Sûreler</button>
+            </div>
+
+            <!-- 114 Sûre Listesi Gridi -->
+            <div class="surah-list-grid" id="surahListGrid"></div>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         5. Sahih Hadis Külliyatı — 1.900 Riyâzü's-Sâlihîn Hadis Kütüphanesi
+         ==================================================================== -->
+    <section class="hadith-library-section" id="hadisler">
         <div class="container">
-            <div class="wisdom-card">
-                
-                <div class="wisdom-header-nav">
-                    <div class="wisdom-tabs">
-                        <button class="wisdom-tab-btn active" data-kat="hepsi">Tümü</button>
-                        <button class="wisdom-tab-btn" data-kat="hadis">Sahih Hadis</button>
-                        <button class="wisdom-tab-btn" data-kat="ayet">Kur'an Âyeti</button>
-                        <button class="wisdom-tab-btn" data-kat="dua">Günün Duası</button>
+            <div class="section-header-center">
+                <span class="section-tag">RİYÂZÜ'S-SÂLİHÎN KÜLLİYATI</span>
+                <h2 class="section-title">1.900 Sahih Hadis Kütüphanesi</h2>
+                <p class="section-subtitle">
+                    İmam Nevevî'nin Buhârî, Müslim, Ebû Dâvûd, Tirmizî, Nesâî ve İbn Mâce'den derlediği 1.900 sahih hadis. Canlı kelime araması, râvi ve kaynak künyeleriyle tescilli Nebevî rehber.
+                </p>
+            </div>
+
+            <div class="hadith-master-card">
+                <!-- Arama ve Kontrol Konsolu -->
+                <div class="hadith-controls-bar">
+                    <div class="hadith-search-wrap">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="hadithSearchInput" placeholder="1.900 Hadis içinde ara... (örn: niyet, merhamet, anne, namaz, sabır, Ebû Hüreyre)" autocomplete="off">
+                        <button class="hadith-search-clear-btn" id="hadithSearchClearBtn" style="display: none;">&times;</button>
                     </div>
-                    
-                    <button class="btn-refresh-wisdom" id="btnRefreshWisdom">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                        </svg>
-                        <span>Farklı Bir Hikmet Getir</span>
-                    </button>
-                </div>
-                
-                <!-- Dinamik İçerik Alanı -->
-                <div class="wisdom-content-box" id="wisdomContentBox">
-                    <div class="wisdom-arabic" id="wisdomArabic">
-                        مَنْ لَا يَرْحَمِ النَّاسَ لَا يَرْحَمْهُ اللَّهُ
-                    </div>
-                    <div class="wisdom-quote" id="wisdomQuote">
-                        “ İnsanlara merhamet etmeyene, Allah da merhamet etmez. ”
-                    </div>
-                    <div class="wisdom-source" id="wisdomSource">
-                        RİYÂZÜ'S-SÂLİHÎN • BUHÂRÎ & MÜSLİM
-                    </div>
-                    <div class="wisdom-tefekkur" id="wisdomTefekkur">
-                        “ İslam ahlakı; insanlara şefkatle muamele etmeyi ve merhameti hayatın merkezine koymayı öğütler. ”
+
+                    <div class="hadith-action-buttons">
+                        <button class="btn-random-hadith" id="btnRandomHadith" title="Farklı Bir Sahih Hadis Getir">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            <span>Farklı Hadis Getir</span>
+                        </button>
                     </div>
                 </div>
-                
+
+                <!-- Konu / Bâb Hızlı Filtre Çipleri -->
+                <div class="hadith-topics-scroll" id="hadithTopicChips">
+                    <button class="hadith-topic-chip active" data-topic="">Tüm Külliyat (1.900)</button>
+                    <button class="hadith-topic-chip" data-topic="niyet">İhlâs & Niyet</button>
+                    <button class="hadith-topic-chip" data-topic="tövbe">Tövbe & İstiğfar</button>
+                    <button class="hadith-topic-chip" data-topic="sabır">Sabır & Şükür</button>
+                    <button class="hadith-topic-chip" data-topic="namaz">Namaz & Cemaat</button>
+                    <button class="hadith-topic-chip" data-topic="merhamet">Merhamet & Şefkat</button>
+                    <button class="hadith-topic-chip" data-topic="sadaka">Sadaka & İnfak</button>
+                    <button class="hadith-topic-chip" data-topic="anne">Anne-Baba & Sıla-i Rahim</button>
+                    <button class="hadith-topic-chip" data-topic="ilim">İlim & Kur'an</button>
+                    <button class="hadith-topic-chip" data-topic="dua">Dua & Zikir</button>
+                </div>
+
+                <!-- Arama Sonuçları Bildirim Şeridi -->
+                <div class="hadith-search-status-bar" id="hadithSearchStatusBar" style="display: none;">
+                    <span id="hadithSearchStatusText"></span>
+                    <button class="hadith-search-status-close" id="hadithSearchStatusClose">Sonuçları Gizle &times;</button>
+                </div>
+
+                <!-- Arama Sonuçları Izgarası (Arama Yapıldığında Görünür) -->
+                <div class="hadith-results-grid" id="hadithResultsGrid" style="display: none;"></div>
+                <div class="hadith-results-pagination" id="hadithResultsPagination" style="display: none;"></div>
+
+                <!-- Aktif Sahih Hadis Kartı Sahnesi (V20 Mimarisi) -->
+                <div class="hadith-display-stage" id="hadithDisplayStage">
+                    <div class="hadith-stage-meta-row">
+                        <div class="hadith-badges-cluster">
+                            <span class="hadith-number-badge" id="hadithNumberBadge">RİYÂZÜ'S-SÂLİHÎN • HADİS #1 / 1.900</span>
+                            <span class="hadith-source-badge" id="hadithSourceBadge">BUHÂRÎ & MÜSLİM</span>
+                        </div>
+                        <button class="hadith-arabic-toggle-btn" id="hadithArabicToggleBtn" title="Arapça Metni Göster / Gizle" aria-pressed="false">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                            <span id="hadithArabicToggleBtnText">Arapça Metni Göster</span>
+                        </button>
+                    </div>
+
+                    <!-- Sahabi Râvisi -->
+                    <div class="hadith-ravi-line" id="hadithRaviLine">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        <span id="hadithRaviText">Mü’minlerin emîri Ebû Hafs Ömer ibni Hattâb radıyallahu anh rivayet etti:</span>
+                    </div>
+
+                    <!-- Arapça Veciz / Tam Lafız (Başlangıçta Kapalı / Butonla Açılır) -->
+                    <div class="hadith-arabic-text" id="hadithArabicText" dir="rtl" style="display: none;">
+                        إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى
+                    </div>
+
+                    <!-- Altın Ayraç -->
+                    <div class="hadith-divider">
+                        <span class="h-div-line"></span>
+                        <span class="h-div-diamond">◆</span>
+                        <span class="h-div-line"></span>
+                    </div>
+
+                    <!-- Türkçe Hadis-i Şerif Meali -->
+                    <div class="hadith-turkish-text" id="hadithTurkishText">
+                        “ Yapılan işler niyetlere göre değerlenir. Herkes yaptığı işin karşılığını niyetine göre alır. Kimin niyeti Allah’a ve Resûlü’ne varmaksa, eline geçecek sevap da Allah’a ve Resûlü’ne hicret sevabıdır. ”
+                    </div>
+
+                    <!-- Nebevî Açıklama & Tam Rivayet (Açıklama / Sebebi Vürûd / Sahabi Diyaloğu) -->
+                    <div class="hadith-explanation-box" id="hadithExplanationBox" style="display: none;">
+                        <div class="hadith-explanation-header">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            <span>TAM RİVAYET & NEBEVÎ AÇIKLAMA</span>
+                        </div>
+                        <div class="hadith-explanation-body" id="hadithExplanationText"></div>
+                    </div>
+
+                    <!-- Muteber Kaynak Referansı -->
+                    <div class="hadith-source-full-line" id="hadithSourceFullLine">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span id="hadithSourceFullText">Buhârî, Bed’ü’l-vahy 1, Îmân 41; Müslim, İmâret 155. Ebû Dâvûd, Tirmizî, Nesâî, İbni Mâce</span>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
@@ -1310,24 +1444,29 @@
                         İslami ibadet, Kur'an tilaveti, doğru namaz vakitleri ve manevi tefekkür odaklı yeni nesil premium mobil uygulama ekosistemi.
                     </p>
                     <div class="footer-social-links">
-                        <a href="https://instagram.com/ezanplus" target="_blank" rel="noopener" class="footer-social-icon" title="Instagram">
+                        <a href="https://www.instagram.com/ezanplusapp/" target="_blank" rel="noopener" class="footer-social-icon" title="Instagram (@ezanplusapp)">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.79-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                             </svg>
                         </a>
-                        <a href="https://tiktok.com/@ezanplus" target="_blank" rel="noopener" class="footer-social-icon" title="TikTok">
+                        <a href="https://www.tiktok.com/@ezanplusapp" target="_blank" rel="noopener" class="footer-social-icon" title="TikTok (@ezanplusapp)">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
                             </svg>
                         </a>
-                        <a href="https://threads.net/@ezanplus" target="_blank" rel="noopener" class="footer-social-icon" title="Threads">
+                        <a href="https://www.threads.net/@ezanplusapp" target="_blank" rel="noopener" class="footer-social-icon" title="Threads (@ezanplusapp)">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12.186 24C5.438 24 0 18.675 0 12.038 0 5.4 5.438.075 12.186.075c6.544 0 11.51 5.025 11.814 11.663h-3.413c-.3-4.688-3.9-8.25-8.4-8.25-4.8 0-8.775 3.975-8.775 8.55 0 4.575 3.975 8.55 8.775 8.55 3.638 0 6.675-2.288 7.95-5.55h3.563c-1.463 5.175-6.188 9-11.514 9z"/>
                             </svg>
                         </a>
-                        <a href="https://youtube.com/@ezanplus" target="_blank" rel="noopener" class="footer-social-icon" title="YouTube">
+                        <a href="https://www.youtube.com/@EzanPlus" target="_blank" rel="noopener" class="footer-social-icon" title="YouTube (@EzanPlus)">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                        </a>
+                        <a href="https://www.facebook.com/1330570496796354" target="_blank" rel="noopener" class="footer-social-icon" title="Facebook (Ezan Plus App)">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                             </svg>
                         </a>
                     </div>
@@ -1337,9 +1476,10 @@
                     <h5>Gezinme</h5>
                     <ul class="footer-links-list">
                         <li><a href="#vakitler">Namaz Vakitleri</a></li>
+                        <li><a href="#tilavet">Kur'an-ı Kerim</a></li>
+                        <li><a href="#hadisler">Hadis Külliyatı</a></li>
+                        <li><a href="#ozellikler">12 Manevi Direk</a></li>
                         <li><a href="#galeri">Uygulama Ekranları</a></li>
-                        <li><a href="#tilavet">Kur'an Tilaveti</a></li>
-                        <li><a href="#ozellikler">Neden Ezan Plus?</a></li>
                         <li><a href="#sss">Sıkça Sorulan Sorular</a></li>
                     </ul>
                 </div>
