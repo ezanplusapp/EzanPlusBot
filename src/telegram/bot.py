@@ -1414,7 +1414,8 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
 
     elif ana_komut in ("/kota", "/rapor", "/kullanim"):
         from .. import kota_uretici
-        kota_uretici.kota_gonder(chat_id=str(chat_id))
+        kat = parametre.strip().lower() if parametre else "menu"
+        kota_uretici.kota_gonder(chat_id=str(chat_id), kategori=kat)
 
     elif ana_komut == "/ayet":
         if not _coklu_komut_engeli("/ayet", chat_id):
@@ -2021,10 +2022,16 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                     callback_cevapla(cq_id, "📊 Sistem durumu getiriliyor...", alert=False)
                     mesaj_gonder(durum_raporu_olustur(), chat_id=str(chat_id))
 
-                elif data in ("cmd_kota", "kota_goster", "kota_tazele", "rapor_goster", "rapor_tazele"):
-                    callback_cevapla(cq_id, "📈 Kota raporu hazırlanıyor...", alert=False)
+                elif data in ("cmd_kota", "kota_goster", "kota_tazele", "rapor_goster", "rapor_tazele", "kota_menu"):
+                    callback_cevapla(cq_id, "📈 Kota menüsü hazırlanıyor...", alert=False)
                     from .. import kota_uretici
-                    kota_uretici.kota_gonder(mesaj_id=msg_id, chat_id=str(chat_id))
+                    kota_uretici.kota_gonder(mesaj_id=msg_id, chat_id=str(chat_id), kategori="menu")
+
+                elif data.startswith("kota_kat:"):
+                    kat = data.split(":", 1)[1]
+                    callback_cevapla(cq_id, f"📈 Kategori {kat} hazırlanıyor...", alert=False)
+                    from .. import kota_uretici
+                    kota_uretici.kota_gonder(mesaj_id=msg_id, chat_id=str(chat_id), kategori=kat)
 
                 elif data == "cmd_yardim":
                     callback_cevapla(cq_id, "ℹ️ Yardım rehberi getiriliyor...", alert=False)
