@@ -154,7 +154,7 @@ Tüm tekil görsel post üretimi `src/uretim/kart.py` motoru üzerinden gerçekl
 ### B. V20 Sahih Hadis Kartı (`hadis_karti_ciz`) — Sisli Adaçayı Zümrüdü Mimarisi
 1. **Sabit Soft Pastel Zemin (Sisli Adaçayı Zümrüdü):**
    - Merkez `(34, 66, 52)` (`#224234`) ➔ Dış kenar `(18, 40, 32)` (`#122820`) organik radyal gradyan parşömen dokusu.
-   - Keten zemin bandı, Cosine tül degrade ve altın odak elmasları.
+   - Keten zemin bandı, Cosine tül degrade, narin uygulama ikonu filigranı ve altın odak elmasları.
 2. **Taç Başlık Standardı:**
    - Sabit, vakur ve taşma yapmayan Nebevî taç başlık: **`“ Resûlullah (s.a.v.) Buyurdu ”`** (Lora Bold 34pt 9:16 / 28pt 4:5 + auto-fit güvencesi).
    - Sahabi râvisi taç başlığa eklenmez; ilmî usule uygun olarak alt kaynak bloğunda yer alır (`{KAYNAK} • RÂVİ: {RAVİ}`).

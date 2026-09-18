@@ -238,19 +238,18 @@ def build_v20_base_layout(
     fdraw.text(((w - dw) / 2, fili_y), fili_str, font=f_dev_ar, fill=(255, 255, 255, 13))
     im.paste(fili_top, (0, 0), fili_top)
 
-    # 9. Dua Eden Eller Filigranı (Dua kategorisi için)
-    if not is_hadis:
-        hands_mask = extract_dua_hands_mask()
-        if hands_mask is not None:
-            fili_meal = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            center_meal_y = (fade_1_end + fade_2_start) // 2
-            target_w = 480 if is_916 else 380
-            aspect = hands_mask.height / hands_mask.width
-            target_h = int(target_w * aspect)
-            hands_resized = hands_mask.resize((target_w, target_h), Image.Resampling.LANCZOS)
-            color_layer = Image.new("RGBA", (target_w, target_h), (180, 83, 9, 20 if is_916 else 18))
-            fili_meal.paste(color_layer, ((w - target_w) // 2, center_meal_y - target_h // 2), hands_resized)
-            im.paste(fili_meal, (0, 0), fili_meal)
+    # 9. Uygulama İkonu / Dua Eden Eller Filigranı (Türkçe Meal Arkası)
+    hands_mask = extract_dua_hands_mask()
+    if hands_mask is not None:
+        fili_meal = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        center_meal_y = (fade_1_end + fade_2_start) // 2
+        target_w = 480 if is_916 else 380
+        aspect = hands_mask.height / hands_mask.width
+        target_h = int(target_w * aspect)
+        hands_resized = hands_mask.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        color_layer = Image.new("RGBA", (target_w, target_h), (180, 83, 9, 20 if is_916 else 18))
+        fili_meal.paste(color_layer, ((w - target_w) // 2, center_meal_y - target_h // 2), hands_resized)
+        im.paste(fili_meal, (0, 0), fili_meal)
 
     draw = ImageDraw.Draw(im)
 
