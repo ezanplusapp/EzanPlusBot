@@ -91,6 +91,13 @@ jobs:
             TIKTOK_REFRESH_TOKEN=${{ secrets.TIKTOK_REFRESH_TOKEN }}
             FISH_AUDIO_API_KEY=${{ secrets.FISH_AUDIO_API_KEY }}
             FISH_AUDIO_VOICE_ID=${{ secrets.FISH_AUDIO_VOICE_ID }}
+            ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}
+            ELEVENLABS_VOICE_ID=${{ secrets.ELEVENLABS_VOICE_ID }}
+            R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+            R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+            R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+            R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+            R2_PUBLIC_DOMAIN=${{ secrets.R2_PUBLIC_DOMAIN }}
             IMGBB_API_KEY=${{ secrets.IMGBB_API_KEY }}
           YT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN_JSON }}
@@ -128,9 +135,9 @@ jobs:
             fi
           fi
 
-          ARGS="--tur $TUR --bekleme 2700"
-          if [ "$AUTO" = "true" ] || [ "$TUR" = "kelime" ]; then
-            ARGS="$ARGS --otomatik"
+          ARGS="--tur $TUR --bekleme 2700 --otomatik"
+          if [ "$AUTO" = "false" ]; then
+            ARGS="--tur $TUR --bekleme 2700"
           fi
           if [ -n "$TEMA" ]; then
             ARGS="$ARGS --tema '$TEMA'"
