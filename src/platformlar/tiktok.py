@@ -332,8 +332,16 @@ def tiktok_foto_yukle(
     Görsel kartları (4:5 ve/veya 9:16) TikTok Fotoğraf Modu (Photo Mode / Carousel) olarak yükler.
     Cloudflare R2 üzerinden genel JPEG URL'leri sağlayarak /v2/post/publish/content/init/ endpoint'ini kullanır.
     """
-    if not gorsel_yollari:
-        raise ValueError("Yüklenecek görsel bulunamadı!")
+    # TikTok için en uygun dikey görseli/görselleri seç
+    # Eğer listede 9:16 dikey format varsa ("9_16" içeren), 4:5 feed görselini eleyip
+    # yalnızca 9:16 dikey görseli kullan. Böylece aynı kartın iki farklı boyutu
+    # tek bir TikTok slaytında mükerrer ve uyumsuz en/boy oranıyla görünmez.
+    gorseller = [Path(g) for g in gorsel_yollari if Path(g).exists()]
+    dokuz_onalti = [p for p in gorseller if "9_16" in p.name or "story" in p.name.lower()]
+    secilen_gorseller = dokuz_onalti if dokuz_onalti else gorseller
+
+    if not secilen_gorseller:
+        raise ValueError("Yüklenecek geçerli görsel bulunamadı!")
 
     from PIL import Image
     from .r2 import r2ye_yukle
@@ -345,11 +353,7 @@ def tiktok_foto_yukle(
     gecici_dosyalar: List[Path] = []
 
     try:
-        for g_yol in gorsel_yollari:
-            p = Path(g_yol)
-            if not p.exists():
-                continue
-
+        for p in secilen_gorseller:
             # TikTok PNG kabul etmez; JPEG olarak dönüştür
             if p.suffix.lower() not in (".jpg", ".jpeg"):
                 jpg_p = p.with_suffix(".jpg")
@@ -369,7 +373,13 @@ def tiktok_foto_yukle(
         if not r2_foto_urlleri:
             raise RuntimeError("TikTok Fotoğraf Modu için geçerli görsel R2'ye yüklenemedi!")
 
-        caption_fmt = baslik_ve_etiketleri_birlestir(baslik, aciklama, maks_karakter=2000)
+        # TikTok Photo Mode Kuralı (API v2):
+        # title: Maksimum 90 karakter (kısa manşet başlığı)
+        # description: Maksimum 4000 karakter (tam metin, tefekkür ve etiketler)
+        caption_fmt = baslik_ve_etiketleri_birlestir(baslik, aciklama, maks_karakter=4000)
+        temiz_baslik = (baslik or "Ezan Plus").strip()
+        if len(temiz_baslik) > 85:
+            temiz_baslik = temiz_baslik[:82] + "..."
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -381,7 +391,8 @@ def tiktok_foto_yukle(
 
         payload = {
             "post_info": {
-                "title": caption_fmt,
+                "title": temiz_baslik,
+                "description": caption_fmt,
                 "privacy_level": "PUBLIC_TO_EVERYONE",
                 "disable_comment": False,
                 "auto_add_music": True,

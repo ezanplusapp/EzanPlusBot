@@ -11,7 +11,7 @@ from pathlib import Path
 from src import db, hata_bildir
 from src.telegram import bot as telegram_bot
 from src.telegram import yonetici
-from src.platformlar import meta, threads
+from src.platformlar import meta, threads, tiktok, youtube, r2
 
 
 class TestHataBildirVeTelafi(unittest.TestCase):
@@ -153,7 +153,11 @@ class TestHataBildirVeTelafi(unittest.TestCase):
             with patch.object(meta, "instagram_gorsel_paylas", return_value={"id": "ig_new_999"}) as mock_ig, \
                  patch.object(meta, "instagram_story_paylas", return_value={"id": "story_new_999"}) as mock_story, \
                  patch.object(meta, "facebook_post_paylas") as mock_fb, \
-                 patch.object(threads, "threads_zincir_paylas", return_value={"id": "th_new_999"}) as mock_th:
+                 patch.object(threads, "threads_zincir_paylas", return_value={"id": "th_new_999"}) as mock_th, \
+                 patch.object(tiktok, "tiktok_foto_yukle", return_value={"publish_id": "tt_mock_999"}) as mock_tt_foto, \
+                 patch.object(tiktok, "tiktok_video_yukle", return_value={"publish_id": "tt_mock_999"}) as mock_tt_vid, \
+                 patch.object(youtube, "youtube_shorts_yukle", return_value={"video_id": "yt_mock_999"}) as mock_yt, \
+                 patch.object(r2, "r2ye_yukle", return_value={"url": "https://media.ezanplus.ozbornstudio.com/mock.jpg"}) as mock_r2:
 
                 sonuclar = yonetici.yayinla_telafi(pid, hedef_kanal="hepsi")
 
