@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 import imageio_ffmpeg
 
-from ..ayar import KOK_DIZIN
+from ..ayar import KOK_DIZIN, get_env
 
 log = logging.getLogger(__name__)
 
@@ -191,10 +191,50 @@ def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[int, f
 
 
 # =========================================================
-#  Fish Audio — Türkçe Hadis ve Dua Seslendirme Motoru
+#  Türkçe Hadis ve Dua Stüdyo Seslendirme Motoru
+#  Birincil: ElevenLabs (Adam sesi, multilingual v2)
+#  Yedek (Fallback): Fish Audio S2.1 (Mazlum Kiper)
 # =========================================================
 
-DEFAULT_FISH_VOICE_ID = "a6d624c6b8de45d2b89eb0da9a691872"  # Mazlum Kiper (Usta Belgesel & Tiyatro)
+DEFAULT_ELEVENLABS_VOICE_ID = "J17lijyP1BHYcM7ld0Rg"  # Adam (Tok, vakur Türkçe İstanbul spiker - Multilingual v2)
+DEFAULT_FISH_VOICE_ID = "a6d624c6b8de45d2b89eb0da9a691872"  # Mazlum Kiper (Yedek)
+
+
+def _elevenlabs_chars_to_words(characters: list, start_times: list, end_times: list) -> list:
+    """
+    ElevenLabs karakter bazlı hizalamalarını kelime bazlı zaman damgalarına dönüştürür.
+    Dönen format: [{'text': 'kelime', 'start': 0.12, 'end': 0.45}, ...]
+    """
+    words = []
+    cur_chars = []
+    w_start = None
+    last_end = None
+    for ch, s, e in zip(characters, start_times, end_times):
+        if ch.isspace():
+            if cur_chars:
+                w_str = "".join(cur_chars).strip()
+                if w_str:
+                    words.append({
+                        "text": w_str,
+                        "start": round(float(w_start), 3),
+                        "end": round(float(last_end), 3)
+                    })
+                cur_chars = []
+                w_start = None
+        else:
+            if w_start is None:
+                w_start = s
+            cur_chars.append(ch)
+            last_end = e
+    if cur_chars:
+        w_str = "".join(cur_chars).strip()
+        if w_str:
+            words.append({
+                "text": w_str,
+                "start": round(float(w_start), 3),
+                "end": round(float(last_end), 3)
+            })
+    return words
 
 
 def turkce_kisaltmalari_genislet(metin: str) -> str:
@@ -386,6 +426,125 @@ def hadis_metninden_kaynaklari_temizle(metin: str) -> str:
     return m.strip('“”\"\' —-')
 
 
+KORUNACAK_OZEL_ISIMLER = {
+    "Allah", "Allah’ın", "Allah'ın", "Allah’a", "Allah'a", "Allah’tan", "Allah'tan", 
+    "Allah’ı", "Allah'ı", "Allah’la", "Allah'la", "Allahım", "Allah'ım", "Allah’ım",
+    "Allahümme", "Allâhümme", "Allāhümme", "Allâhumme", "Allāh", "Celle", "Celaluhu",
+    "Cenâb-ı", "Cenâb-ı Hak", "Hak", "Hak Teâlâ", "Teâlâ", "Teâlâ’nın", "Teâlâ'nın", 
+    "Teâlâ’ya", "Teâlâ'ya", "Teâlâ’dan", "Teâlâ'dan", "Teâlâ’yı", "Teâlâ'yı",
+    "Rabb", "Rabbi", "Rabbim", "Rabbimiz", "Rabbine", "Rabbin",
+    "Resûlullah", "Resûlallah", "Resûl-i", "Resûlü", "Peygamber", "Peygamberimiz", "Nebî", "Efendimiz",
+    "Muhammed", "Muhammed’e", "Muhammed'e", "Muhammed’in", "Muhammed'in", "Muhammed’i", "Muhammed'i",
+    "Ahmet", "Mustafa", "Hazreti", "Hz.",
+    "Ebû", "Ebü’l-Abbâs", "Ebü", "Ebü’d-Derdâ", "Ebû Zer", "Ümmü", "Ömer", "Ali", "Osman", 
+    "Bekir", "Abdullah", "Hureyre", "Hüreyre", "Âişe", "Aişe", "Enes", "Câbir", "Sa'd", "Sa`d", 
+    "Zübeyr", "Muâz", "Hattâb", "Huzeyfe", "Selmân", "Bilâl", "Talha", "Abbâs", "Hasan", "Hüseyin",
+    "Fâtıma", "Zeyd", "Abdurrahman", "Üsâme", "Hatice", "Meryem", "Âsiye",
+    "Mekke", "Medine", "Kâbe", "Kudüs", "Arafat", "Müzdelife", "Mina", "Uhud", "Bedir",
+    "Cebrâil", "Mîkâil", "İsrâfil", "Azrâil",
+    "Âdem", "İbrâhim", "İsmâil", "İshâk", "Yâkub", "Yûsuf", "Mûsâ", "Hârûn", "Dâvûd", "Süleymân",
+    "Eyyûb", "Yûnus", "İlyâs", "Zekeriyyâ", "Yahyâ", "Îsâ", "Nûh",
+    "Kur'an", "Kur’an", "Kur'an-ı", "Kur’an-ı", "Tevrat", "İncil", "Zebur",
+    "Buhârî", "Müslim", "Tirmizî", "Nesâî", "Dârimî", "Muvatta", "Riyâzü’s-Sâlihîn"
+}
+
+KUCULECEK_ZAMIR_VE_KELIMELER = {
+    # 2. Şahıs (Dua ve Hadislerde Allah'a hitaben büyük yazılmış olanlar)
+    "Sana": "sana", "Senin": "senin", "Senden": "senden", "Sensin": "sensin", "Sen": "sen", "Sende": "sende",
+    "Seninle": "seninle", "Siz": "siz", "Size": "size", "Sizi": "sizi", "Sizin": "sizin", "Sizde": "sizde", "Sizden": "sizden",
+    # 3. Şahıs zamirleri
+    "O'na": "o'na", "O’na": "o'na", "O'ndan": "o'ndan", "O’ndan": "o'ndan", 
+    "O'nun": "o'nun", "O’nun": "o'nun", "O’nundur": "o'nundur", "O'nundur": "o'nundur",
+    "Ona": "ona", "Onun": "onun", "Ondan": "ondan", "Onlar": "onlar", "Onları": "onları", "Onlara": "onlara", "Onların": "onların",
+    "O": "o", "Kendisi": "kendisi", "Kendisine": "kendisine", "Kendini": "kendini", "Kendine": "kendine", "Kendinden": "kendinden",
+    # 1. Şahıs zamirleri
+    "Ben": "ben", "Beni": "beni", "Bana": "bana", "Benim": "benim", "Bende": "bende", "Benden": "benden",
+    "Biz": "biz", "Bize": "bize", "Bizi": "bizi", "Bizim": "bizim", "Bizde": "bizde", "Bizden": "bizden",
+    # İşaret ve miktar sözcükleri
+    "Bu": "bu", "Buna": "buna", "Bunu": "bunu", "Bunun": "bunun", "Bunda": "bunda", "Bundan": "bundan",
+    "Bunlar": "bunlar", "Bunları": "bunları", "Bunlara": "bunlara", "Bunların": "bunların",
+    "Şu": "şu", "Şuna": "şuna", "Şunu": "şunu", "Şunun": "şunun", "Şunlar": "şunlar",
+    "Bir": "bir", "Biri": "biri", "Birisi": "birisi", "Birine": "birine", "Birini": "birini", "Birinin": "birinin",
+    "Birkaçı": "birkaçı", "Birçok": "birçok", "Birtakım": "birtakım",
+    "Her": "her", "Herkes": "herkes", "Herkesin": "herkesin", "Hepsi": "hepsi", "Hepsini": "hepsini", "Hepsine": "hepsine",
+    "İki": "iki", "Üç": "üç", "Dört": "dört", "Beş": "beş",
+    # Bağlaçlar, edatlar ve zarflar
+    "Eğer": "eğer", "Şayet": "şayet", "Fakat": "fakat", "Lakin": "lakin", "Lâkin": "lâkin", "Ama": "ama",
+    "Çünkü": "çünkü", "Oysa": "oysa", "Madem": "madem", "Zira": "zira",
+    "Daha": "daha", "Sonra": "sonra", "Şimdi": "şimdi", "Artık": "artık", "Önce": "önce",
+    "Böylece": "böylece", "Şöylece": "şöylece", "Nasıl": "nasıl", "Neden": "neden", "Niçin": "niçin",
+    "Şüphesiz": "şüphesiz", "Muhakkak": "muhakkak", "Elbette": "elbette", "Gerçekten": "gerçekten",
+    "Ne": "ne", "Kim": "kim", "Kime": "kime", "Kimi": "kimi", "Kimse": "kimse", "Kimsenin": "kimsenin",
+    "Evet": "evet", "Hayır": "hayır", "Peki": "peki", "Yine": "yine", "Yoksa": "yoksa", "Hem": "hem", "İşte": "işte",
+    # Diyalog ve fiil kipleri
+    "Diye": "diye", "Dedi": "dedi", "Dedim": "dedim", "Dediler": "dediler", "Deyince": "deyince",
+    "Sordu": "sordu", "Sordum": "sordum", "Buyurdu": "buyurdu", "Buyurdular": "buyurdular",
+    # Yaygın dini kavramlar (cümle içi)
+    "Müslüman": "müslüman", "Müslümanın": "müslümanın", "Müslümana": "müslümana",
+    "Mümin": "mümin", "Mümine": "mümine", "Müminin": "müminin",
+    "Mü’min": "mü’min", "Mü’mine": "mü’mine", "Mü’minin": "mü’minin",
+    "İnsan": "insan", "İnsanın": "insanın", "İnsana": "insana",
+    "Cennet": "cennet", "Cennete": "cennete", "Cennetin": "cennetin",
+    "Cehennem": "cehennem", "Cehenneme": "cehenneme", "Cehennemin": "cehennemin",
+}
+
+
+def turkce_metin_harf_duzelt(metin: str) -> str:
+    """
+    Hadis ve dua metinlerindeki alakasız cümle içi büyük harfleri edebi ve doğal Türkçeye normalize eder.
+    - Cümle başı veya doğrudan alıntı başlangıcı olmayan zamirleri (Sana -> sana, O'na -> o'na, Ben -> ben) küçültür.
+    - Metne sızmış bâb/kitap atıflarını (hadis_metninden_kaynaklari_temizle ile) temizler.
+    - Kutsal isimleri (Allah, Resûlullah, Cenâb-ı Hak, sahâbî adları, Kâbe vb.) titizlikle muhafaza eder.
+    """
+    if not metin:
+        return ""
+    import re
+
+    # 1. Kalıntı kaynakları ayıkla
+    metin = hadis_metninden_kaynaklari_temizle(metin)
+
+    # 2. Token bazlı akıllı cümle çözümleme
+    tokens = re.split(r'(\s+)', metin)
+    yeni_tokens = []
+    cumle_basi = True
+
+    for token in tokens:
+        if not token or token.isspace():
+            yeni_tokens.append(token)
+            continue
+
+        m_on = re.match(r'^([“\"\'\(\[—\*\-]+)(.*)$', token)
+        if m_on:
+            on_ek, kalan = m_on.groups()
+        else:
+            on_ek, kalan = "", token
+
+        m_arka = re.match(r'^(.*?)([”\"\'\)\]\*\.,;:!?—\-]+)$', kalan)
+        if m_arka:
+            kelime, arka_ek = m_arka.groups()
+        else:
+            kelime, arka_ek = kalan, ""
+
+        alıntı_baslangici = any(c in on_ek for c in ["“", '"'])
+
+        if kelime in ("Diye", "Dedi", "Dedim", "Dediler", "Deyince"):
+            kelime = KUCULECEK_ZAMIR_VE_KELIMELER[kelime]
+        elif not cumle_basi and not alıntı_baslangici and kelime in KUCULECEK_ZAMIR_VE_KELIMELER:
+            if kelime not in KORUNACAK_OZEL_ISIMLER:
+                kelime = KUCULECEK_ZAMIR_VE_KELIMELER[kelime]
+
+        yeni_tokens.append(f"{on_ek}{kelime}{arka_ek}")
+
+        if any(c in arka_ek for c in [".", "!", "?", "…"]):
+            cumle_basi = True
+        elif ":" in arka_ek:
+            cumle_basi = True
+        else:
+            cumle_basi = False
+
+    return "".join(yeni_tokens)
+
+
 def turkce_tts_uret(
     metin: str,
     cikti_yolu: Optional[Path] = None,
@@ -393,23 +552,24 @@ def turkce_tts_uret(
     icerik_id: Optional[str] = None,
     ses_id: Optional[str] = None,
     hiz: float = 0.9,
-    model: str = "s2.1-pro-free",
+    model: Optional[str] = None,
     ton_promptu: Optional[str] = None,
     zaman_damgasi_al: bool = True,
     overwrite: bool = False
 ) -> Path:
     """
-    Fish Audio API kullanarak Türkçe Hadis veya Dua metnini yüksek kaliteli MP3 sesine dönüştürür.
+    Türkçe Hadis veya Dua metnini yüksek kaliteli MP3 sesine ve kelime zaman damgalarına dönüştürür.
+    Birincil Motor: ElevenLabs (Adam sesi, multilingual v2, kelime zaman damgalı).
+    Yedek / Fallback Motor: Fish Audio S2.1 (Mazlum Kiper sesi).
+
     Zaman damgası aktifken (zaman_damgasi_al=True) kelime kelime milisaniye zamanlarını
     aynı isimli .json dosyasına kaydeder (Video karaoke senkronizasyonu için).
-    ton_promptu: Fish Audio S2.1 modeline duygu ve manevi atmosfer direktifi verir.
-    Metin hash'ine duyarlı önbellek mekanizmasıyla mükerrer çağrıları engellerken,
+    Metin hash'ine duyarlı kalıcı disk önbellek mekanizmasıyla mükerrer çağrıları engellerken,
     metin değiştiğinde %100 güncel ses üretimini garanti eder.
     """
     import base64
     import json
     import hashlib
-    from ..ayar import get_env
 
     # 1. Metni fonetik ve duraklama açısından hazırla
     if kategori == "dua":
@@ -419,8 +579,20 @@ def turkce_tts_uret(
     else:
         temiz_metin = turkce_fonetik_temizle(metin)
 
-    # 2. Çıktı yolunu belirle (Temiz metin ve hız hash'i ile tam eşleşme garantisi)
-    active_voice_id = ses_id or get_env("FISH_AUDIO_VOICE_ID", DEFAULT_FISH_VOICE_ID)
+    # 2. Hangi sağlayıcının (ElevenLabs vs Fish Audio) kullanılacağını belirle
+    elevenlabs_key = get_env("ELEVENLABS_API_KEY")
+    fish_key = get_env("FISH_AUDIO_API_KEY")
+
+    if not elevenlabs_key and not fish_key:
+        raise ValueError("Ne ELEVENLABS_API_KEY ne de FISH_AUDIO_API_KEY .env dosyasında tanımlı değil!")
+
+    # Aktif ses ID ve motor belirleme
+    if elevenlabs_key:
+        active_voice_id = ses_id or get_env("ELEVENLABS_VOICE_ID", DEFAULT_ELEVENLABS_VOICE_ID)
+    else:
+        active_voice_id = ses_id or get_env("FISH_AUDIO_VOICE_ID", DEFAULT_FISH_VOICE_ID)
+
+    # Çıktı yolunu belirle (Temiz metin, hız ve aktif ses hash'i ile tam eşleşme garantisi)
     metin_hash = hashlib.md5(f"{temiz_metin}_{hiz}_{active_voice_id}".encode("utf-8")).hexdigest()[:8]
 
     if cikti_yolu is None:
@@ -437,51 +609,121 @@ def turkce_tts_uret(
 
     json_yolu = cikti_yolu.with_suffix(".json")
 
-    # 3. Önbellek kontrolü
+    # 3. Kalıcı Disk Önbellek Kontrolü (0 Duplicate API Call)
     if not overwrite and cikti_yolu.exists() and cikti_yolu.stat().st_size > 1000:
-        log.info(f"Fish Audio sesi zaten mevcut (Önbellek): {cikti_yolu}")
+        log.info(f"Türkçe TTS sesi zaten mevcut (Kalıcı Önbellek): {cikti_yolu}")
         return cikti_yolu
 
-    # 4. API Yapılandırması
-    api_key = get_env("FISH_AUDIO_API_KEY")
-    if not api_key:
-        raise ValueError("FISH_AUDIO_API_KEY .env dosyasında tanımlı değil!")
+    # 4. Birincil Motor: ElevenLabs
+    elevenlabs_basarili = False
+    # 4. Birincil Motor: ElevenLabs (3 Kademeli Yeniden Deneme & Dayanıklılık)
+    elevenlabs_basarili = False
+    if elevenlabs_key:
+        el_voice_id = ses_id or get_env("ELEVENLABS_VOICE_ID", DEFAULT_ELEVENLABS_VOICE_ID)
+        el_model = model or "eleven_multilingual_v2"
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{el_voice_id}/with-timestamps"
+        headers = {
+            "xi-api-key": elevenlabs_key,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "text": temiz_metin,
+            "model_id": el_model,
+            "voice_settings": {
+                "stability": 0.60,
+                "similarity_boost": 0.75,
+                "style": 0.0,
+                "use_speaker_boost": True,
+                "speed": hiz
+            },
+            "language_code": "tr"
+        }
 
-    active_voice_id = ses_id or get_env("FISH_AUDIO_VOICE_ID", DEFAULT_FISH_VOICE_ID)
+        son_el_hata = None
+        for deneme in range(1, 4):
+            try:
+                log.info(f"🎙️ ElevenLabs TTS çağrılıyor (Deneme {deneme}/3) [{kategori} - Voice: {el_voice_id}]: {temiz_metin[:40]}...")
+                resp = requests.post(url, headers=headers, json=payload, timeout=60)
+                if resp.status_code == 200:
+                    res_data = resp.json()
+                    audio_b64 = res_data.get("audio_base64", "")
+                    if audio_b64:
+                        raw_audio = base64.b64decode(audio_b64)
+                        if len(raw_audio) > 1000:
+                            cikti_yolu.write_bytes(raw_audio)
+                            if zaman_damgasi_al:
+                                align = res_data.get("alignment", {})
+                                chars = align.get("characters", [])
+                                starts = align.get("character_start_times_seconds", [])
+                                ends = align.get("character_end_times_seconds", [])
+                                all_segments = _elevenlabs_chars_to_words(chars, starts, ends)
+                                if all_segments:
+                                    json_yolu.write_text(
+                                        json.dumps(all_segments, ensure_ascii=False, indent=2),
+                                        encoding="utf-8"
+                                    )
+                                    log.info(f"ElevenLabs kelime zaman damgaları kaydedildi ({len(all_segments)} kelime): {json_yolu}")
+                            log.info(f"ElevenLabs sesi başarıyla üretildi: {cikti_yolu} ({len(raw_audio)} bayt)")
+                            elevenlabs_basarili = True
+                            return cikti_yolu
+                else:
+                    son_el_hata = f"HTTP {resp.status_code}: {resp.text}"
+                    log.warning(f"ElevenLabs API Hatası (Deneme {deneme}/3) [{resp.status_code}]: {resp.text}")
+                    # Eğer yetki (401) veya kota aşımı (402) ise tekrar denemek faydasızdır, hemen fallback'e geç
+                    if resp.status_code in (401, 402):
+                        break
+            except Exception as e:
+                son_el_hata = str(e)
+                log.warning(f"ElevenLabs TTS ağ/bağlantı hatası (Deneme {deneme}/3): {e}")
 
-    # Fish Audio S2.1 Duygu / Ulvi Ton Promptlama Entegrasyonu
+            if deneme < 3 and not elevenlabs_basarili:
+                import time
+                time.sleep(2 * deneme)
+
+        if not elevenlabs_basarili:
+            log.warning(f"🚨 ElevenLabs 3 denemede de başarılı olamadı ({son_el_hata}). Son çare olarak Fish Audio fallback devreye alınıyor...")
+
+    if elevenlabs_basarili:
+        return cikti_yolu
+
+    # 5. Fallback Motor: Fish Audio S2.1
+    if not fish_key:
+        raise RuntimeError("ElevenLabs başarısız oldu ve FISH_AUDIO_API_KEY bulunamadı!")
+
+    log.info(f"🔄 Fish Audio fallback motoruna geçiliyor ({kategori})...")
+    fish_voice_id = ses_id if (ses_id and not elevenlabs_key) else get_env("FISH_AUDIO_VOICE_ID", DEFAULT_FISH_VOICE_ID)
+    fish_model = "s2.1-pro-free"
+
+    # Fish Audio S2.1 Duygu / Ulvi Ton Promptlama
+    fish_metin = temiz_metin
     if ton_promptu and ton_promptu.strip():
         tag = ton_promptu.strip()
         if not (tag.startswith("[") and tag.endswith("]")):
             tag = f"[{tag}]"
-        temiz_metin = f"{tag} {temiz_metin}"
+        fish_metin = f"{tag} {fish_metin}"
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
+    fish_headers = {
+        "Authorization": f"Bearer {fish_key}",
         "Content-Type": "application/json",
-        "model": model
+        "model": fish_model
     }
-
-    payload = {
-        "text": temiz_metin,
-        "reference_id": active_voice_id,
+    fish_payload = {
+        "text": fish_metin,
+        "reference_id": fish_voice_id,
         "format": "mp3",
         "prosody": {
             "speed": hiz
         }
     }
 
-    # 5. Kelime Zaman Damgalı Akış (Stream with timestamp)
     if zaman_damgasi_al:
         try:
             url = "https://api.fish.audio/v1/tts/stream/with-timestamp"
-            log.info(f"Fish Audio TTS (Zaman Damgalı) çağrılıyor ({kategori}): {temiz_metin[:40]}...")
-            resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+            log.info(f"Fish Audio TTS (Zaman Damgalı Fallback) çağrılıyor: {fish_metin[:40]}...")
+            resp = requests.post(url, headers=fish_headers, json=fish_payload, stream=True, timeout=60)
             if resp.status_code == 200:
                 full_audio = bytearray()
-                # Fish Audio akışında her chunk_seq için güncel hizalamaları ve zaman ofsetlerini topla
                 chunk_alignments: Dict[int, Tuple[float, list]] = {}
-
                 for line in resp.iter_lines():
                     if not line:
                         continue
@@ -500,7 +742,6 @@ def turkce_tts_uret(
 
                 if len(full_audio) > 1000:
                     cikti_yolu.write_bytes(full_audio)
-                    # Tüm chunk_seq parçalarındaki kelimeleri zaman ofsetlerini ekleyerek birleştir
                     all_segments = []
                     for seq in sorted(chunk_alignments.keys()):
                         offset, segs = chunk_alignments[seq]
@@ -510,30 +751,27 @@ def turkce_tts_uret(
                                 "start": round(float(seg.get("start", 0.0)) + offset, 3),
                                 "end": round(float(seg.get("end", 0.0)) + offset, 3),
                             })
-
                     if all_segments:
                         json_yolu.write_text(
                             json.dumps(all_segments, ensure_ascii=False, indent=2),
                             encoding="utf-8"
                         )
-                        log.info(f"Kelime zaman damgaları kaydedildi ({len(all_segments)} kelime): {json_yolu}")
-                    log.info(f"Fish Audio sesi başarıyla üretildi: {cikti_yolu} ({len(full_audio)} bayt)")
+                    log.info(f"Fish Audio fallback sesi üretildi: {cikti_yolu} ({len(full_audio)} bayt)")
                     return cikti_yolu
         except Exception as e:
-            log.warning(f"Fish Audio zaman damgalı akış hatası, standart API deneniyor: {e}")
+            log.warning(f"Fish Audio zaman damgalı akış hatası: {e}")
 
-    # Fallback: Standart TTS
-    log.info(f"Fish Audio standart TTS çağrılıyor ({kategori}): {temiz_metin[:40]}...")
-    resp = requests.post("https://api.fish.audio/v1/tts", headers=headers, json=payload, timeout=60)
-
+    # Fish Audio Standart Fallback
+    log.info(f"Fish Audio standart TTS çağrılıyor: {fish_metin[:40]}...")
+    resp = requests.post("https://api.fish.audio/v1/tts", headers=fish_headers, json=fish_payload, timeout=60)
     if resp.status_code == 200:
         cikti_yolu.write_bytes(resp.content)
-        log.info(f"Fish Audio sesi başarıyla üretildi: {cikti_yolu} ({len(resp.content)} bayt)")
+        log.info(f"Fish Audio sesi üretildi: {cikti_yolu} ({len(resp.content)} bayt)")
         return cikti_yolu
     else:
-        hata_mesaji = f"Fish Audio API Hatası ({resp.status_code}): {resp.text}"
-        log.error(hata_mesaji)
-        raise RuntimeError(hata_mesaji)
+        hata = f"Tüm TTS sağlayıcıları başarısız oldu! Fish Audio ({resp.status_code}): {resp.text}"
+        log.error(hata)
+        raise RuntimeError(hata)
 
 
 def turkce_kelime_zamanlari_getir(mp3_veya_json_yolu: Path) -> list:

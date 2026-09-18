@@ -258,7 +258,9 @@ class TestDailyBriefIyilestirmeleri(unittest.TestCase):
              patch.object(db, "paylasim_ekle", return_value=112), \
              patch.object(telegram_bot, "yayinla_hepsi", return_value={"instagram": True}) as mock_yayinla, \
              patch.object(telegram_bot, "yayin_detay_karti_gonder") as mock_detay, \
-             patch.object(telegram_bot, "onay_istegi_gonder") as mock_onay:
+             patch.object(telegram_bot, "onay_istegi_gonder") as mock_onay, \
+             patch.object(telegram_bot, "mesaj_gonder"), \
+             patch.object(telegram_bot, "caption_ve_buton_guncelle"):
 
             d_sonuc = MagicMock()
             d_sonuc.gecerli = True
@@ -268,8 +270,8 @@ class TestDailyBriefIyilestirmeleri(unittest.TestCase):
             pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram="Vakar")
 
             self.assertEqual(pid, 112)
-            mock_yayinla.assert_called_once_with(112)
-            mock_detay.assert_called_once_with(112, {"instagram": True})
+            self.assertEqual(mock_yayinla.call_args[0][0], 112)
+            self.assertIn("durum_cb", mock_yayinla.call_args[1])
             mock_onay.assert_not_called()
 
     def test_kelimeyi_paylasildi_isaretle_kavram(self):

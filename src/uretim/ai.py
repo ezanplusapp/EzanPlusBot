@@ -435,9 +435,10 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
         raise RuntimeError("Hadis veritabanından geçerli hadis seçilemedi!")
 
     hadis_metni = (secilen_hadis.get("hadis_metni") or secilen_hadis.get("turkce_tam") or "").strip()
-    from .ses import turkce_kisaltmalari_genislet, hadis_metninden_kaynaklari_temizle
+    from .ses import turkce_kisaltmalari_genislet, hadis_metninden_kaynaklari_temizle, turkce_metin_harf_duzelt
     hadis_metni = hadis_metninden_kaynaklari_temizle(hadis_metni)
     hadis_metni = turkce_kisaltmalari_genislet(hadis_metni)
+    hadis_metni = turkce_metin_harf_duzelt(hadis_metni)
     hadis_metni = hadis_metni.strip("“”\"' —-")
     kaynak_ref = secilen_hadis["kaynak_ref"]
     ravi = turkce_kisaltmalari_genislet(secilen_hadis.get("ravi", ""))
@@ -487,10 +488,10 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
     vurgulu = str(veri.get("hadis_vurgulu") or "").strip()
     # Metin bütünlüğü kontrolü: Gemini tek bir harf/kelime dahi değiştirdiyse orijinal tescilli metne geri dön
     if vurgulu and re.sub(r'[\*\s\.,;!?:“"\'”]', '', vurgulu.lower()) == re.sub(r'[\*\s\.,;!?:“"\'”]', '', hadis_metni.lower()):
-        veri["hadis_metni"] = hadis_metninden_kaynaklari_temizle(vurgulu)
+        veri["hadis_metni"] = turkce_metin_harf_duzelt(hadis_metninden_kaynaklari_temizle(vurgulu))
     else:
-        veri["hadis_metni"] = hadis_metninden_kaynaklari_temizle(hadis_metni)
-    veri["hadis_metni_orijinal"] = hadis_metninden_kaynaklari_temizle(hadis_metni)
+        veri["hadis_metni"] = turkce_metin_harf_duzelt(hadis_metninden_kaynaklari_temizle(hadis_metni))
+    veri["hadis_metni_orijinal"] = turkce_metin_harf_duzelt(hadis_metninden_kaynaklari_temizle(hadis_metni))
     veri["kaynak_ravi"] = kaynak_ref
     veri["kaynak"] = kaynak_ref
     veri["ravi"] = ravi
@@ -563,14 +564,14 @@ def dua_icerigi_uret(
     if not secilen_dua:
         raise RuntimeError("Dualar külliyatından geçerli bir dua seçilemedi!")
 
-    from .ses import dua_fonetik_ve_es_hazirla, turkce_kisaltmalari_genislet
+    from .ses import dua_fonetik_ve_es_hazirla, turkce_kisaltmalari_genislet, turkce_metin_harf_duzelt
     dua_basligi = turkce_kisaltmalari_genislet(secilen_dua["dua_basligi"])
     kategori = secilen_dua["kategori"]
     kimin_duasi = turkce_kisaltmalari_genislet(secilen_dua.get("kimin_duasi", ""))
     from .kart import arapca_glif_temizle
     arapca_metin = arapca_glif_temizle(secilen_dua["arapca_metin"])
     arapca_okunus = secilen_dua["arapca_okunus"]
-    turkce_anlam = turkce_kisaltmalari_genislet(dua_fonetik_ve_es_hazirla(secilen_dua["turkce_anlam"]))
+    turkce_anlam = turkce_metin_harf_duzelt(turkce_kisaltmalari_genislet(dua_fonetik_ve_es_hazirla(secilen_dua["turkce_anlam"])))
     kaynak_ref = secilen_dua["kaynak_ref"]
     fazilet_notu = secilen_dua["fazilet_notu"]
     dua_id = secilen_dua["id"]

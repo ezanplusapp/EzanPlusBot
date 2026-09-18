@@ -43,7 +43,7 @@ class TestInstabotOzellikleri(unittest.TestCase):
         self.assertTrue(reels_k["youtube"])
 
         post_k = telegram_bot.varsayilan_kanallar("post_4_5")
-        self.assertNotIn("tiktok", post_k)
+        self.assertTrue(post_k["tiktok"])
         self.assertNotIn("youtube", post_k)
         self.assertTrue(post_k["instagram"])
         self.assertTrue(post_k["threads"])
@@ -267,6 +267,98 @@ class TestInstabotOzellikleri(unittest.TestCase):
         res = telegram_bot._istek("sendMessage", data={"chat_id": "123", "text": "<b>Test unclosed tag"})
         self.assertEqual(res.get("message_id"), 9999)
         self.assertEqual(mock_post.call_count, 2)
+
+    # -------------------------------------------------------------------------
+    # 10. CANLI YAYIN DAĞITIM İLERLEME METNİ VE CALLBACK PARİTESİ
+    # -------------------------------------------------------------------------
+    def test_yayin_durum_metni_olustur_format(self):
+        """Instabot standardında canlı ilerleme metni ve platform durumlarının doğru formatlandığını doğrular."""
+        durumlar = {
+            "tiktok": "✅ Yayında",
+            "instagram": "⏳ Yükleniyor...",
+            "threads": "⏱️ Sırada",
+            "facebook": "⏱️ Sırada",
+        }
+        metin = telegram_bot.yayin_durum_metni_olustur(
+            paylasim_id=310,
+            adim=2,
+            toplam_adim=4,
+            durum_haritasi=durumlar,
+            baslik="Riyâzü's-Sâlihîn • 310. Hadis",
+            baslangic_ts=datetime.now().timestamp() - 5.2,
+            format_tipi="reels_9_16",
+        )
+        self.assertIn("YAYIN DAĞITIMI SÜRÜYOR... (#310)", metin)
+        self.assertIn("310. Hadis", metin)
+        self.assertIn("[▰▰▱▱] %50 (2/4)", metin)
+        self.assertIn("TikTok (@ezanplusapp):</b> ✅ Yayında", metin)
+        self.assertIn("Instagram Reels:</b> ⏳ Yükleniyor...", metin)
+        self.assertIn("Geçen Süre:", metin)
+
+    def test_yayinla_hepsi_durum_cb_cagrilir(self):
+        """yayinla_hepsi çalışırken durum_cb'nin platform adımlarında tetiklendiğini doğrular."""
+        pid = db.paylasim_ekle(
+            kategori="hadis",
+            format_tipi="post_4_5",
+            turkce_metin="Müminler kardeştir.",
+            baslik="Kardeşlik Hadisi",
+            durum="taslak",
+            gorsel_yollari=["/tmp/test_feed.png"],
+        )
+        try:
+            cagrilar = []
+            def mock_cb(adim, toplam, kanal, durumlar):
+                cagrilar.append((adim, toplam, kanal, dict(durumlar)))
+
+            with patch("src.platformlar.meta.instagram_gorsel_paylas", return_value={"id": "ig_111"}), \
+                 patch("src.platformlar.meta.instagram_story_paylas", return_value={"id": "story_222"}), \
+                 patch("src.platformlar.threads.threads_zincir_paylas", return_value={"id": "th_333"}), \
+                 patch("src.platformlar.meta.facebook_post_paylas", return_value={"id": "fb_444"}), \
+                 patch("src.denetleyici.denetle_paylasim") as mock_denetle:
+
+                mock_d = MagicMock()
+                mock_d.gecerli = True
+                mock_denetle.return_value = mock_d
+
+                res = yonetici.yayinla_hepsi(pid, oncesinde_onayla=False, kanallar={"instagram": True, "facebook": True, "threads": False, "instagram_story": False, "tiktok": False}, durum_cb=mock_cb)
+
+                self.assertIn("instagram", res)
+                self.assertIn("facebook", res)
+                self.assertGreaterEqual(len(cagrilar), 2)
+                # Callback adım ve durum_haritasi içerir
+                son_cagri = cagrilar[-1]
+                self.assertEqual(son_cagri[1], 2)  # toplam_adim = 2
+                self.assertIn("facebook", son_cagri[3])
+                self.assertEqual(son_cagri[3]["facebook"], "✅ Yayında")
+        finally:
+            with db.baglanti_al() as con:
+                con.execute("DELETE FROM paylasimlar WHERE id = ?", (pid,))
+
+    # -------------------------------------------------------------------------
+    # 11. CANLI YAYIN GÖRÜNTÜLEME VE DETAY BUTONLARI
+    # -------------------------------------------------------------------------
+    def test_telafi_butonlari_canli_izleme_linkleri(self):
+        """Başarıyla yayınlanan platformlar için doğrudan görüntüleme linklerinin eklendiğini doğrular."""
+        sonuclar = {
+            "instagram": "ig_123",
+            "threads": "th_456",
+            "facebook": "fb_789",
+            "tiktok": "tt_101",
+            "youtube": "yt_202",
+            "youtube_url": "https://youtube.com/shorts/test1234",
+        }
+        butonlar = telegram_bot.telafi_butonlari_kur(paylasim_id=77, sonuclar=sonuclar, format_tipi="reels_9_16")
+
+        url_listesi = [b["url"] for satir in butonlar for b in satir if "url" in b]
+        text_listesi = [b["text"] for satir in butonlar for b in satir if "text" in b]
+
+        self.assertTrue(any("instagram.com" in u for u in url_listesi))
+        self.assertTrue(any("threads.net" in u for u in url_listesi))
+        self.assertTrue(any("facebook.com" in u for u in url_listesi))
+        self.assertTrue(any("tiktok.com" in u for u in url_listesi))
+        self.assertTrue(any("youtube.com" in u for u in url_listesi))
+        self.assertTrue(any("Instagram'da Gör" in t for t in text_listesi))
+        self.assertTrue(any("Threads'te Gör" in t for t in text_listesi))
 
 
 if __name__ == "__main__":

@@ -91,9 +91,11 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
   - *Mixed Bold Tipografi (`wrap_mixed_tokens`):* Vurgulanan kelimeler Ibarra Real Nova Bold (700 weight, `#111827`) ile; diğer kısımlar Regular (400 weight, `#1C1917`) ile çizilir.
 * **Akıllı Noktalama & Tırnak Regexi:** `noktalama_regex = re.compile(r'^([,\.;:!?\)’”"]+)(.*)$')` kuralı sayesinde tek/çift tırnaklar ve noktalama işaretleri önceki kelimeye yapışık kalır; satır başlarında sarkan noktalama veya ayrık tırnak hatası oluşmaz.
 
-### F. Türkçe Hadis ve Dua Stüdyo Ses Motoru (Fish Audio S2.1 Mimarisi)
-* **Motor & Modül:** `src/uretim/ses.py` (`turkce_tts_uret`, `turkce_fonetik_temizle`, `turkce_kelime_zamanlari_getir`).
-* **Varsayılan Kurumsal Ses:** **Mazlum Kiper** (`a6d624c6b8de45d2b89eb0da9a691872`). Usta tiyatrocu ve efsanevi belgesel spikeri ses rengi; sentetik yapaylıktan tamamen arınmış, tok, vakur ve derin bir manevi otorite sunar.
+### F. Türkçe Hadis ve Dua Stüdyo Ses Motoru (ElevenLabs & Fish Audio Çift Motor Mimarisi)
+* **Motor & Modül:** `src/uretim/ses.py` (`turkce_tts_uret`, `turkce_fonetik_temizle`, `turkce_kelime_zamanlari_getir`, `_elevenlabs_chars_to_words`).
+* **Birincil Kurumsal Ses:** **Adam** (`J17lijyP1BHYcM7ld0Rg`, ElevenLabs Multilingual v2 - Turkish Istanbul). Tok, vakur, son derece etkileyici ve doğal Türkçe spiker tınısı; sentetik yapaylıktan tamamen arınmış, kalbe dokunan editoryal bir ses sunar.
+  - **Ayar Standartları:** `stability = 0.60`, `similarity_boost = 0.75`, `style = 0.0`, `use_speaker_boost = True`, `speed = 0.90`, `language_code = "tr"`.
+* **Yedek (Fallback) Kurumsal Ses:** **Mazlum Kiper** (`a6d624c6b8de45d2b89eb0da9a691872`, Fish Audio S2.1). ElevenLabs kotası bittiğinde veya API hatasında otonom devreye girerek sıfır kesinti sağlar.
 * **Hız Standartı (`hiz = 0.9`):** Hadis ve dua metinlerinin vakarını, akıcılığını ve tefekkür derinliğini korumak için konuşma hızı `0.9x` olarak tescillenmiştir.
 * **Akıllı Fonetik & Kısaltma Genişletme Standartları (`turkce_kisaltmalari_genislet` & `turkce_fonetik_temizle` & `dua_fonetik_ve_es_hazirla`):**
   - **Sıfır "Hetz" Garantisi & Kısaltma Genişletme:** `Hz.` veya `Hz` kısaltması spikerin İngilizce/mekanik olarak "hetz" veya "h-z" okumasını engellemek amacıyla istisnasız **"Hazreti"** olarak genişletilir (`Hz. Peygamber` ➔ `Hazreti Peygamber`, `Hz. Âişe` ➔ `Hazreti Âişe`).
@@ -105,14 +107,14 @@ Tüm dikey video üretimi `src/uretim/video.py` motoru üzerinden gerçekleştir
     * `(k.v.)` ➔ `kerremallahu vecheh`, `(k.s.)` ➔ `kaddesallahu sırrah`, `(rh.a.)` ➔ `rahmetullahi aleyh`
     * `vb.` ➔ `ve benzeri`, `vs.` ➔ `ve saire`, `bkz.` ➔ `bakınız`
   - **Ses ve Altyazı 1:1 Bütünlüğü:** Kısaltmalar hem TTS sese hem de ekrandaki meal mizanpajına (`multipage.py`) aynı anda yansıtılır; seslendirilen ile ekrandaki kelime sayısı ve sırası 1:1 eşlenerek karaoke indis kayması ve metin uyuşmazlığı %100 önlenir.
-  - **Şapkalı Harf Koruması:** `â`, `î`, `û` harfleri korunur; Fish Audio S2.1 modelinin uzun ünlüleri (`takvâ`, `hidâyet`, `ahlâk`) vakur ve asil şekilde uzatarak okuması sağlanır.
+  - **Şapkalı Harf Koruması:** `â`, `î`, `û` harfleri korunur; uzun ünlülerin (`takvâ`, `hidâyet`, `ahlâk`) vakur ve asil şekilde uzatarak okunması sağlanır.
   - **Es ve Nefes Durakları:** Dualarda seslendirmenin kalbe dokunması için nida ve münacat öbeklerinden sonra otomatik virgül durakları eklenir (`dua_fonetik_ve_es_hazirla`).
   - Markdown kalın/italik işaretleri (`**`, `*`) temizlenir.
-* **Kelime Kelime Senkron Saniye Zaman Damgaları (`/v1/tts/stream/with-timestamp`):**
-  - Ses üretimi Fish Audio SSE akış API'si üzerinden gerçekleştirilir.
+* **Kelime Kelime Senkron Saniye Zaman Damgaları:**
+  - ElevenLabs `/v1/text-to-speech/{voice_id}/with-timestamps` API'si üzerinden karakter zaman damgaları kelime bazlı JSON'a dönüştürülür.
   - Üretilen MP3 ses dosyası ile eşzamanlı olarak `.json` formatında her kelimenin kesin başlangıç ve bitiş saniye zaman damgaları yerel diske kaydedilir (`data/sesler/hadis/{id}_{hash}.json` / `data/sesler/dua/{id}_{hash}.json`).
-* **Metin Hash'li Kesin Önbellek Garantisi:**
-  - Ses ve zaman dosyaları `metin_hash` özetini içerir (`{id}_{hash}.mp3`). Metin veya hız değiştiğinde ses %100 sıfırdan tescillenir; ses-metin uyumsuzluğu mimari olarak imkansızdır.
+* **Metin & Ses ID Hash'li Kalıcı Disk Önbellek Garantisi:**
+  - Ses ve zaman dosyaları `metin_hash` özetini içerir (`{id}_{hash}.mp3`). Özet içeriğinde temiz metin, okuma hızı ve aktif ses ID'si yer aldığından aynı ses için mükerrer API çağrısı %100 engellenir (sıfır kota israfı). Metin veya ses değiştiğinde ise yeni dosya üretilir.
 * **Sıfır Bozuk Glif Garantisi (`arapca_glif_temizle`):**
   - Amiri fontunda karşılığı bulunmayan tüm Latin noktalama işaretleri (`:`, `-`, `?`, tırnaklar) temizlenir veya resmi Arapça Unicode karşılıklarına (`،`, `؛`, `؟`) dönüştürülür; dikey dikdörtgen (tofu kutusu) oluşması %100 engellenmiştir.
 

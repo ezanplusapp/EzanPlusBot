@@ -16,30 +16,31 @@ export default {
     const tsiHours = (utcHours + 3) % 24;
     const saatEtiket = `${String(tsiHours).padStart(2, '0')}:${String(utcMinutes).padStart(2, '0')} TSİ`;
 
-    // 6 Dağıtım Slotu Eşlemesi (15 dakikalık akıllı yoklama ile)
+    // 6 Dağıtım Slotu Eşlemesi (Exact Cron & Saat Yedekli)
     let tur = null;
     let slotAdi = null;
+    const cron = event.cron;
 
-    if (utcHours === 8 && utcMinutes >= 25 && utcMinutes <= 35) {
+    if (cron === "30 8 * * *" || (utcHours === 8 && utcMinutes >= 25 && utcMinutes <= 35)) {
       tur = "reels";
       slotAdi = "1. Slot: Kur'an Tilaveti Reels 1 (11:30 TSİ)";
-    } else if (utcHours === 10 && utcMinutes >= 40 && utcMinutes <= 50) {
+    } else if (cron === "45 10 * * *" || (utcHours === 10 && utcMinutes >= 40 && utcMinutes <= 50)) {
       tur = "hadis";
       slotAdi = "2. Slot: Sahih Hadis-i Şerif Kartı (13:45 TSİ)";
-    } else if (utcHours === 13 && utcMinutes >= 25 && utcMinutes <= 35) {
+    } else if (cron === "30 13 * * *" || (utcHours === 13 && utcMinutes >= 25 && utcMinutes <= 35)) {
       tur = "reels";
       slotAdi = "3. Slot: Kur'an Tilaveti Reels 2 (16:30 TSİ)";
-    } else if (utcHours === 15 && utcMinutes >= 40 && utcMinutes <= 50) {
+    } else if (cron === "45 15 * * *" || (utcHours === 15 && utcMinutes >= 40 && utcMinutes <= 50)) {
       tur = "dua";
       slotAdi = "4. Slot: Günün Duası Kartı (18:45 TSİ)";
-    } else if (utcHours === 17 && utcMinutes >= 25 && utcMinutes <= 35) {
+    } else if (cron === "30 17 * * *" || (utcHours === 17 && utcMinutes >= 25 && utcMinutes <= 35)) {
       tur = "reels";
       slotAdi = "5. Slot: Kur'an Tilaveti Reels 3 (20:30 TSİ)";
-    } else if (utcHours === 19 && utcMinutes >= 0 && utcMinutes <= 10) {
+    } else if (cron === "0 19 * * *" || (utcHours === 19 && utcMinutes >= 0 && utcMinutes <= 10)) {
       tur = "kelime";
       slotAdi = "6. Slot: Kur'an Sözlüğü Kartı (22:00 TSİ)";
     } else {
-      console.log(`[Zamanlayıcı] ${saatEtiket} - Aktif bir yayın slotu yok, atlanıyor.`);
+      console.log(`[Zamanlayıcı] ${saatEtiket} (cron: ${cron}) - Aktif bir yayın slotu yok, atlanıyor.`);
       return;
     }
 

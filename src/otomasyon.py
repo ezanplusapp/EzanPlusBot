@@ -17,10 +17,72 @@ from .uretim import ai as icerik_uret
 from .uretim import kart as sablon_ciz
 from .uretim import ses as ses_getir
 from .uretim import video as video_motoru
-from .ayar import KOK_DIZIN
+from .ayar import KOK_DIZIN, get_env
 from .telegram import bot as telegram_bot
 
 log = logging.getLogger(__name__)
+
+
+def otomatik_yayinla_ve_raporla(paylasim_id: int, durum_mesaj_id: Optional[int] = None) -> Dict[str, Any]:
+    """
+    İnstabot parite standardında canlı yayın dağıtımı ve raporlaması yapar.
+    Ayrı mesaj atmak yerine tek bir canlı mesajı gerçek zamanlı günceller (0.8s throttling ve canlı butonlar).
+    """
+    _, chat_id = telegram_bot.get_token_ve_chat_id()
+    kayit = db.paylasim_getir(paylasim_id) or {}
+    b_str = kayit.get("baslik") or f"Paylaşım #{paylasim_id}"
+    f_tip = kayit.get("format", "reels_9_16")
+    t_start = time.time()
+
+    canli_mid = durum_mesaj_id
+    if not canli_mid and chat_id:
+        canli_mid = telegram_bot.mesaj_gonder(
+            f"⏳ <b>YAYIN DAĞITIMI BAŞLATILIYOR (#{paylasim_id})...</b>\nLütfen bekleyin...",
+            chat_id=str(chat_id)
+        )
+
+    _son_edit = [0.0]
+    def _oto_yayin_cb(adim: int, toplam_adim: int, aktif_kanal: str, durumlar: Dict[str, str]):
+        if not canli_mid or not chat_id:
+            return
+        now = time.time()
+        if (adim < toplam_adim) and (now - _son_edit[0] < 0.8):
+            time.sleep(max(0.0, 0.8 - (now - _son_edit[0])))
+        _son_edit[0] = time.time()
+
+        live_txt = telegram_bot.yayin_durum_metni_olustur(
+            paylasim_id=paylasim_id,
+            adim=adim,
+            toplam_adim=toplam_adim,
+            durum_haritasi=durumlar,
+            baslik=b_str,
+            baslangic_ts=t_start,
+            format_tipi=f_tip,
+        )
+        live_btns = telegram_bot.canli_yayin_butonlari_kur(durumlar)
+        telegram_bot.caption_ve_buton_guncelle(chat_id, canli_mid, live_txt, butonlar=live_btns)
+
+    sonuclar = telegram_bot.yayinla_hepsi(paylasim_id, durum_cb=_oto_yayin_cb)
+    gecen_sure = time.time() - t_start
+
+    # Canlı ilerleme metin mesajını temizle
+    if canli_mid and chat_id:
+        try:
+            telegram_bot.mesaj_sil(chat_id, canli_mid)
+        except Exception as e_sil:
+            log.debug(f"Canlı ilerleme mesajı silinemedi: {e_sil}")
+
+    # Nihai videoyu/görseli ve açıklamayı içeren detay kartını Telegram grubuna ilet
+    try:
+        telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar, dagitim_suresi=gecen_sure)
+    except Exception as e_detay:
+        log.error(f"Yayın detay kartı gönderilemedi (#{paylasim_id}): {e_detay}")
+        basari_metni = telegram_bot.yayin_raporu_metni_kur(kayit, sonuclar, dagitim_suresi=gecen_sure)
+        yeni_butonlar = telegram_bot.telafi_butonlari_kur(paylasim_id, sonuclar, f_tip)
+        if chat_id:
+            telegram_bot.mesaj_gonder(basari_metni, chat_id=str(chat_id), butonlar=yeni_butonlar)
+
+    return sonuclar
 
 
 def reels_icerigi_olustur_ve_gonder(
@@ -123,14 +185,12 @@ def reels_icerigi_olustur_ve_gonder(
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
     if auto_publish:
-        log.info("5/5: Kur'an tilaveti otomatik yayınlanıyor ve Telegram'a yayın detay kartı iletiliyor...")
-        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
-        try:
-            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
-        except Exception as e:
-            log.error(f"Reels #{paylasim_id} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+        log.info("5/5: Kur'an tilaveti otomatik olarak canlı takiple yayınlanıyor...")
+        sonuclar = otomatik_yayinla_ve_raporla(paylasim_id, durum_mesaj_id=durum_mesaj_id)
         log.info(f"Reels tilaveti başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
     else:
+        if durum_mesaj_id and chat_id:
+            telegram_bot.mesaj_sil(chat_id, durum_mesaj_id)
         telegram_bot.onay_istegi_gonder(paylasim_id)
         log.info(f"Reels #{paylasim_id} Telegram grubuna onaya sunuldu!")
 
@@ -246,14 +306,12 @@ def gorsel_icerik_olustur_ve_gonder(
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
     if auto_publish:
-        log.info(f"Görsel post ({kategori.upper()}) doğrudan tüm platformlara otomatik yayınlanıyor...")
-        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
-        try:
-            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
-        except Exception as e:
-            log.error(f"{kategori.upper()} #{paylasim_id} yayınlandı fakat Telegram yayın detay kartı iletilemedi: {e}")
+        log.info(f"Görsel post ({kategori.upper()}) doğrudan tüm platformlara canlı takiple yayınlanıyor...")
+        sonuclar = otomatik_yayinla_ve_raporla(paylasim_id, durum_mesaj_id=durum_mesaj_id)
         log.info(f"{kategori.upper()} postu başarıyla yayınlandı ve Telegram'a raporlandı! Paylaşım ID: {paylasim_id}")
     else:
+        if durum_mesaj_id and chat_id:
+            telegram_bot.mesaj_sil(chat_id, durum_mesaj_id)
         telegram_bot.onay_istegi_gonder(paylasim_id)
         log.info(f"Görsel post ({kategori.upper()} Çift Format 4:5 + 9:16) hazırlandı ve onaya sunuldu! Paylaşım ID: {paylasim_id}")
     return paylasim_id
@@ -281,8 +339,8 @@ def hadis_videosu_olustur_ve_gonder(
 
     hadis_id = icerik.get("hadis_id")
     turkce_metin = icerik.get("hadis_metni", "")
-    from .uretim.ses import hadis_metninden_kaynaklari_temizle
-    turkce_metin = hadis_metninden_kaynaklari_temizle(turkce_metin)
+    from .uretim.ses import hadis_metninden_kaynaklari_temizle, turkce_metin_harf_duzelt
+    turkce_metin = turkce_metin_harf_duzelt(hadis_metninden_kaynaklari_temizle(turkce_metin))
     kaynak_ravi = icerik.get("kaynak_ravi", "Hadis-i Şerif")
     tefekkur_notu = icerik.get("tefekkur_notu")
     caption = icerik.get("instagram_caption", "")
@@ -290,10 +348,11 @@ def hadis_videosu_olustur_ve_gonder(
     arapca_okunus = icerik.get("arapca_okunus")
     ravi = icerik.get("ravi")
 
+    spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
     if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 2, 4, "Mazlum Kiper sesi ve kelime zamanları üretiliyor...")
+        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 2, 4, f"{spiker_adi} sesi ve kelime zamanları üretiliyor...")
 
-    log.info(f"2/5: Mazlum Kiper spiker sesi ve kelime zaman damgaları üretiliyor ({kaynak_ravi})...")
+    log.info(f"2/5: {spiker_adi} spiker sesi ve kelime zaman damgaları üretiliyor ({kaynak_ravi})...")
     ses_id_etiketi = f"hadis_{hadis_id}" if hadis_id else f"hadis_{dosya_eki}"
     ses_yolu = ses_getir.turkce_tts_uret(
         metin=turkce_metin,
@@ -365,16 +424,14 @@ def hadis_videosu_olustur_ve_gonder(
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
     if auto_publish:
-        log.info(f"Hadis Videosu #{paylasim_id} otomatik olarak tüm platformlara yayınlanıyor...")
-        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
-        try:
-            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
-        except Exception as e:
-            log.error(f"Telegram yayın detay kartı iletilemedi: {e}")
+        log.info(f"Hadis Videosu #{paylasim_id} otomatik olarak tüm platformlara canlı takiple yayınlanıyor...")
+        sonuclar = otomatik_yayinla_ve_raporla(paylasim_id, durum_mesaj_id=durum_mesaj_id)
+        log.info(f"Hadis Videosu #{paylasim_id} başarıyla yayınlandı ve Telegram'a raporlandı!")
     else:
+        if durum_mesaj_id and chat_id:
+            telegram_bot.mesaj_sil(chat_id, durum_mesaj_id)
         telegram_bot.onay_istegi_gonder(paylasim_id)
         log.info(f"Hadis Videosu #{paylasim_id} Telegram grubuna onaya sunuldu!")
-
     return paylasim_id
 
 
@@ -399,7 +456,8 @@ def dua_videosu_olustur_ve_gonder(
     icerik = icerik_uret.dua_icerigi_uret(ruh_hali=ruh_hali)
 
     baslik = icerik.get("dua_basligi", "Günün Duası")
-    turkce_anlam = icerik.get("turkce_anlam", "")
+    from .uretim.ses import turkce_metin_harf_duzelt
+    turkce_anlam = turkce_metin_harf_duzelt(icerik.get("turkce_anlam", ""))
     arapca_metin = icerik.get("arapca_metin")
     arapca_okunus = icerik.get("arapca_okunus")
     fazilet = icerik.get("fazilet_notu") or icerik.get("okunus_veya_fazilet")
@@ -410,10 +468,11 @@ def dua_videosu_olustur_ve_gonder(
     kaynak_ref = icerik.get("kaynak_ref") or baslik
     caption = icerik.get("instagram_caption", "")
 
+    spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
     if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 2, 4, "Mazlum Kiper sesi ve kelime zamanları üretiliyor...")
+        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 2, 4, f"{spiker_adi} sesi ve kelime zamanları üretiliyor...")
 
-    log.info(f"2/5: Mazlum Kiper spiker sesi ve kelime zaman damgaları üretiliyor ({baslik})...")
+    log.info(f"2/5: {spiker_adi} spiker sesi ve kelime zaman damgaları üretiliyor ({baslik})...")
     ses_yolu = ses_getir.turkce_tts_uret(
         metin=turkce_anlam,
         kategori="dua",
@@ -480,13 +539,12 @@ def dua_videosu_olustur_ve_gonder(
     log.info(f"🛡️ Kalite kontrolü BAŞARILI: {denetim.metrikler}")
 
     if auto_publish:
-        log.info(f"Dua Videosu #{paylasim_id} otomatik olarak tüm platformlara yayınlanıyor...")
-        sonuclar = telegram_bot.yayinla_hepsi(paylasim_id)
-        try:
-            telegram_bot.yayin_detay_karti_gonder(paylasim_id, sonuclar)
-        except Exception as e:
-            log.error(f"Telegram yayın detay kartı iletilemedi: {e}")
+        log.info(f"Dua Videosu #{paylasim_id} otomatik olarak tüm platformlara canlı takiple yayınlanıyor...")
+        sonuclar = otomatik_yayinla_ve_raporla(paylasim_id, durum_mesaj_id=durum_mesaj_id)
+        log.info(f"Dua Videosu #{paylasim_id} başarıyla yayınlandı ve Telegram'a raporlandı!")
     else:
+        if durum_mesaj_id and chat_id:
+            telegram_bot.mesaj_sil(chat_id, durum_mesaj_id)
         telegram_bot.onay_istegi_gonder(paylasim_id)
         log.info(f"Dua Videosu #{paylasim_id} Telegram grubuna onaya sunuldu!")
 
@@ -496,7 +554,7 @@ def dua_videosu_olustur_ve_gonder(
 def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
     """
     Mevcut Hadis veya Dua paylaşımının tescilli metin ve külliyat verisini koruyarak,
-    Mazlum Kiper seslendirmesini alternatif bir manevi ton direktifi ile sıfırdan yeniden üretir,
+    Adam (ElevenLabs / Mazlum Kiper fallback) seslendirmesini alternatif bir manevi ton direktifi ile sıfırdan yeniden üretir,
     videoyu kelime kelime senkronize ederek tekrar render eder.
     """
     import random
@@ -590,14 +648,24 @@ def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
     return yeni_video_yolu
 
 
-def hadis_postu_olustur_ve_gonder(tema: Optional[str] = None, format_tipi: str = "video", auto_publish: bool = False) -> int:
+def hadis_postu_olustur_ve_gonder(
+    tema: Optional[str] = None,
+    format_tipi: str = "video",
+    auto_publish: bool = False,
+    durum_mesaj_id: Optional[int] = None,
+) -> int:
     """Sahih Hadis-i Şerif V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
-    return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=auto_publish)
+    return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=auto_publish, durum_mesaj_id=durum_mesaj_id)
 
 
-def dua_postu_olustur_ve_gonder(ruh_hali: Optional[str] = None, format_tipi: str = "video", auto_publish: bool = False) -> int:
+def dua_postu_olustur_ve_gonder(
+    ruh_hali: Optional[str] = None,
+    format_tipi: str = "video",
+    auto_publish: bool = False,
+    durum_mesaj_id: Optional[int] = None,
+) -> int:
     """Günün Duası / Manevi Niyaz V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
-    return dua_videosu_olustur_ve_gonder(ruh_hali=ruh_hali, auto_publish=auto_publish)
+    return dua_videosu_olustur_ve_gonder(ruh_hali=ruh_hali, auto_publish=auto_publish, durum_mesaj_id=durum_mesaj_id)
 
 
 def kelime_postu_olustur_ve_gonder(

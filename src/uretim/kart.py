@@ -1066,8 +1066,8 @@ def hadis_karti_ciz(
     cfg = HADIS_SABIT_PALET
     max_w = 930 if is_916 else 920
 
-    from .ses import turkce_kisaltmalari_genislet
-    hadis_metni = turkce_kisaltmalari_genislet(hadis_metni)
+    from .ses import turkce_kisaltmalari_genislet, turkce_metin_harf_duzelt
+    hadis_metni = turkce_metin_harf_duzelt(turkce_kisaltmalari_genislet(hadis_metni))
     if ravi:
         ravi = turkce_kisaltmalari_genislet(ravi)
 
@@ -1514,8 +1514,8 @@ def dua_karti_ciz(
     cfg = DUA_SABIT_PALET
     max_w = 930 if is_916 else 920
 
-    from .ses import turkce_kisaltmalari_genislet
-    turkce_anlam = turkce_kisaltmalari_genislet(turkce_anlam)
+    from .ses import turkce_kisaltmalari_genislet, turkce_metin_harf_duzelt
+    turkce_anlam = turkce_metin_harf_duzelt(turkce_kisaltmalari_genislet(turkce_anlam))
     dua_basligi = turkce_kisaltmalari_genislet(dua_basligi)
     if kimin_duasi:
         kimin_duasi = turkce_kisaltmalari_genislet(kimin_duasi)

@@ -75,5 +75,42 @@ class TestFacebookReelsAndTikTokInbox(unittest.TestCase):
         init_call = mock_post.call_args_list[0]
         self.assertEqual(init_call[0][0], tiktok.INBOX_INIT_URL)
 
+    @patch("src.platformlar.r2.r2ye_yukle")
+    @patch("src.platformlar.tiktok.requests.post")
+    @patch("src.platformlar.tiktok.yetki_al")
+    def test_tiktok_foto_yukle(self, mock_auth, mock_post, mock_r2):
+        mock_auth.return_value = {"access_token": "tt_tok_photo"}
+        mock_r2.return_value = {"url": "https://r2.ezanplus.com/test.jpg"}
+
+        res_init = MagicMock()
+        res_init.status_code = 200
+        res_init.json.return_value = {
+            "error": {"code": "ok"},
+            "data": {"publish_id": "pub_photo_888"}
+        }
+
+        res_status = MagicMock()
+        res_status.status_code = 200
+        res_status.json.return_value = {
+            "data": {"status": "SEND_TO_USER_INBOX"}
+        }
+
+        mock_post.side_effect = [res_init, res_status]
+
+        test_file = Path("tests/test_gorsel.png")
+        res = tiktok.tiktok_foto_yukle([test_file], baslik="Test Fotoğraf Başlığı", aciklama="Açıklama #test", taslak_modu=True)
+
+        self.assertEqual(res["publish_id"], "pub_photo_888")
+        self.assertEqual(res["status"], "SEND_TO_USER_INBOX")
+        self.assertEqual(res["mod"], "inbox")
+
+        # Verify endpoint and payload
+        init_call = mock_post.call_args_list[0]
+        self.assertEqual(init_call[0][0], tiktok.PHOTO_INIT_URL)
+        payload = init_call[1]["json"]
+        self.assertEqual(payload["media_type"], "PHOTO")
+        self.assertEqual(payload["post_mode"], "MEDIA_UPLOAD")
+        self.assertEqual(payload["source_info"]["photo_images"], ["https://r2.ezanplus.com/test.jpg"])
+
 if __name__ == "__main__":
     unittest.main()

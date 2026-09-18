@@ -25,6 +25,7 @@ AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/"
 TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
 DIRECT_POST_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
 INBOX_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
+PHOTO_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/content/init/"
 STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
 
 SCOPES = "user.info.basic,video.upload,video.publish"
@@ -309,8 +310,8 @@ def tiktok_video_yukle(
         status = st_data.get("data", {}).get("status")
         log.info(f"TikTok işlenme durumu: {status}")
 
-        if status == "PUBLISH_COMPLETE":
-            if kullanilan_mod == "inbox":
+        if status in ("PUBLISH_COMPLETE", "SEND_TO_USER_INBOX"):
+            if kullanilan_mod == "inbox" or status == "SEND_TO_USER_INBOX":
                 log.info(f"🎉 TikTok videosu başarıyla TASLAK / GELEN KUTUSUNA iletildi! Publish ID: {publish_id}")
             else:
                 log.info(f"🎉 TikTok videosu başarıyla yayınlandı! Publish ID: {publish_id}")
@@ -319,6 +320,121 @@ def tiktok_video_yukle(
             raise RuntimeError(f"TikTok yükleme başarısız oldu: {st_data}")
 
     return {"publish_id": publish_id, "status": "PROCESSING", "mod": kullanilan_mod}
+
+
+def tiktok_foto_yukle(
+    gorsel_yollari: List[str | Path],
+    baslik: str,
+    aciklama: Optional[str] = None,
+    taslak_modu: bool = True,
+) -> Dict[str, Any]:
+    """
+    Görsel kartları (4:5 ve/veya 9:16) TikTok Fotoğraf Modu (Photo Mode / Carousel) olarak yükler.
+    Cloudflare R2 üzerinden genel JPEG URL'leri sağlayarak /v2/post/publish/content/init/ endpoint'ini kullanır.
+    """
+    if not gorsel_yollari:
+        raise ValueError("Yüklenecek görsel bulunamadı!")
+
+    from PIL import Image
+    from .r2 import r2ye_yukle
+
+    token_data = yetki_al()
+    access_token = token_data["access_token"]
+
+    r2_foto_urlleri: List[str] = []
+    gecici_dosyalar: List[Path] = []
+
+    try:
+        for g_yol in gorsel_yollari:
+            p = Path(g_yol)
+            if not p.exists():
+                continue
+
+            # TikTok PNG kabul etmez; JPEG olarak dönüştür
+            if p.suffix.lower() not in (".jpg", ".jpeg"):
+                jpg_p = p.with_suffix(".jpg")
+                with Image.open(p) as img:
+                    rgb_img = img.convert("RGB")
+                    rgb_img.save(jpg_p, "JPEG", quality=95)
+                gecici_dosyalar.append(jpg_p)
+                yuklenecek = jpg_p
+            else:
+                yuklenecek = p
+
+            r2_res = r2ye_yukle(yuklenecek, alt_klasor="sosyal", zaman_asimi=30)
+            url = r2_res.get("url")
+            if url:
+                r2_foto_urlleri.append(url)
+
+        if not r2_foto_urlleri:
+            raise RuntimeError("TikTok Fotoğraf Modu için geçerli görsel R2'ye yüklenemedi!")
+
+        caption_fmt = baslik_ve_etiketleri_birlestir(baslik, aciklama, maks_karakter=2000)
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+        }
+
+        kullanilan_mod = "inbox" if taslak_modu else "direct"
+        post_mode = "MEDIA_UPLOAD" if taslak_modu else "DIRECT_POST"
+
+        payload = {
+            "post_info": {
+                "title": caption_fmt,
+                "privacy_level": "PUBLIC_TO_EVERYONE",
+                "disable_comment": False,
+                "auto_add_music": True,
+            },
+            "source_info": {
+                "source": "PULL_FROM_URL",
+                "photo_cover_index": 0,
+                "photo_images": r2_foto_urlleri,
+            },
+            "post_mode": post_mode,
+            "media_type": "PHOTO",
+        }
+
+        log.info(f"TikTok Fotoğraf Modu başlatılıyor [{kullanilan_mod.upper()}] ({len(r2_foto_urlleri)} görsel)...")
+        res = requests.post(PHOTO_INIT_URL, headers=headers, json=payload, timeout=30)
+        res_data = res.json()
+
+        if res_data.get("error", {}).get("code") != "ok":
+            raise RuntimeError(f"TikTok foto init hatası: {res_data}")
+
+        publish_id = res_data.get("data", {}).get("publish_id")
+        if not publish_id:
+            raise RuntimeError(f"TikTok publish_id alınamadı: {res_data}")
+
+        # Durum takibi
+        log.info(f"TikTok fotoğrafı işleniyor (Publish ID: {publish_id})...")
+        for _ in range(30):
+            time.sleep(5)
+            st_res = requests.post(
+                STATUS_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+                json={"publish_id": publish_id},
+                timeout=15,
+            )
+            st_data = st_res.json()
+            status = st_data.get("data", {}).get("status")
+            log.info(f"TikTok fotoğraf işlenme durumu: {status}")
+
+            if status in ("PUBLISH_COMPLETE", "SEND_TO_USER_INBOX"):
+                log.info(f"🎉 TikTok fotoğrafı başarıyla {kullanilan_mod} modunda iletildi! Publish ID: {publish_id}")
+                return {"publish_id": publish_id, "status": status, "mod": kullanilan_mod}
+            elif status == "FAILED":
+                raise RuntimeError(f"TikTok fotoğraf yükleme başarısız: {st_data}")
+
+        return {"publish_id": publish_id, "status": "PROCESSING", "mod": kullanilan_mod}
+
+    finally:
+        for g_tmp in gecici_dosyalar:
+            try:
+                if g_tmp.exists():
+                    g_tmp.unlink()
+            except Exception:
+                pass
 
 
 def auth_url_uret() -> str:

@@ -6,13 +6,15 @@ Instagram Reels + Story, Threads, Facebook Sayfası, YouTube Shorts ve TikTok'a 
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+import threading
+from typing import Any, Callable, Dict, List, Optional
 
 from .. import db
-from ..platformlar import meta, threads, youtube, tiktok
+from ..platformlar import meta, threads, youtube, tiktok, r2
 
 log = logging.getLogger(__name__)
 
@@ -57,9 +59,11 @@ def yayinla_hepsi(
     paylasim_id: int,
     oncesinde_onayla: bool = True,
     kanallar: Optional[Any] = None,
+    durum_cb: Optional[Callable[[int, int, str, Dict[str, str]], None]] = None,
 ) -> Dict[str, Any]:
     """
     Onaylanan içeriği Instagram, Threads, Facebook, YouTube ve TikTok'ta eş zamanlı yayınlar.
+    Canlı durum callback'i (durum_cb) verilmişse adım adım ilerleme ve platform durumlarını bildirir.
     """
     kayit = db.paylasim_getir(paylasim_id)
     if not kayit:
@@ -81,6 +85,8 @@ def yayinla_hepsi(
                 f"⚠️ Paylaşım #{paylasim_id} zaten 'yayinlandi' durumunda! "
                 "Mükerrer yayını önlemek için doğrudan telafi kontrolüne yönlendiriliyor..."
             )
+            if durum_cb is not None:
+                return yayinla_telafi(paylasim_id, hedef_kanal="hepsi", durum_cb=durum_cb)
             return yayinla_telafi(paylasim_id, hedef_kanal="hepsi")
 
     # Yayın Öncesi Son Güvenlik & Kalite Kapısı
@@ -111,103 +117,218 @@ def yayinla_hepsi(
 
     sonuclar: Dict[str, Any] = {}
 
-    # 1. ÖNCELİK: TikTok (Direct Post / Inbox Video)
-    if format_tipi == "reels_9_16" and video_yolu and _kanal_izin_var_mi("tiktok", kanallar):
+    # Hedef kanalları belirle ve canlı ilerleme durum tablosunu hazırla
+    hedef_kanallar: List[str] = []
+    if _kanal_izin_var_mi("tiktok", kanallar) and ((format_tipi == "reels_9_16" and video_yolu) or gorsel_yollari):
+        hedef_kanallar.append("tiktok")
+    if _kanal_izin_var_mi("instagram", kanallar):
+        hedef_kanallar.append("instagram")
+    if _kanal_izin_var_mi("instagram_story", kanallar):
+        hedef_kanallar.append("instagram_story")
+    if _kanal_izin_var_mi("threads", kanallar):
+        hedef_kanallar.append("threads")
+    if _kanal_izin_var_mi("facebook", kanallar):
+        hedef_kanallar.append("facebook")
+    if format_tipi == "reels_9_16" and video_yolu and _kanal_izin_var_mi("youtube", kanallar):
+        hedef_kanallar.append("youtube")
+
+    toplam_adim = max(1, len(hedef_kanallar))
+    durum_haritasi: Dict[str, str] = {k: "⏱️ Sırada" for k in hedef_kanallar}
+    adim_sayac = 0
+    _lock = threading.Lock()
+
+    def _bildir(k: str, durum: str, increment: bool = False):
+        nonlocal adim_sayac
+        with _lock:
+            if increment:
+                adim_sayac = min(toplam_adim, adim_sayac + 1)
+            durum_haritasi[k] = durum
+            snap_harita = dict(durum_haritasi)
+            snap_adim = adim_sayac
+        if durum_cb:
+            try:
+                durum_cb(snap_adim, toplam_adim, k, snap_harita)
+            except Exception as e_cb:
+                log.debug(f"durum_cb hatası ({k}): {e_cb}")
+
+    # Cloudflare R2 Ön Yükleme (Anycast CDN ile Meta ve Threads indirme sürelerini sıfıra indirir)
+    r2_video_url = None
+    r2_gorsel_url = None
+    if r2.r2_hazir_mi():
+        try:
+            if format_tipi == "reels_9_16" and video_yolu and Path(video_yolu).exists():
+                r2_res = r2.r2ye_yukle(video_yolu, alt_klasor="video", zaman_asimi=30)
+                r2_video_url = r2_res.get("url")
+            elif gorsel_yolu and Path(gorsel_yolu).exists():
+                r2_res = r2.r2ye_yukle(gorsel_yolu, alt_klasor="sosyal", zaman_asimi=20)
+                r2_gorsel_url = r2_res.get("url")
+        except Exception as e_r2:
+            log.debug(f"Cloudflare R2 ön yükleme uyarısı: {e_r2}")
+
+    # Paralel Platform Görevleri
+    def _is_tiktok():
+        _bildir("tiktok", "⏳ Yükleniyor...")
         try:
             key = os.getenv("TIKTOK_CLIENT_KEY")
             if key and tiktok.TOKEN_DOSYASI.exists():
-                log.info(f"TikTok'a yükleniyor (1. Öncelik): {video_yolu}")
-                baslik = kayit.get("baslik") or "Ezan Plus • Günün Ayeti"
-                tt_res = tiktok.tiktok_video_yukle(
-                    video_yolu=video_yolu,
-                    baslik=baslik,
-                    aciklama=caption,
-                )
-                sonuclar["tiktok"] = tt_res.get("publish_id")
+                baslik = kayit.get("baslik") or "Ezan Plus"
+                if format_tipi == "reels_9_16" and video_yolu:
+                    log.info(f"TikTok'a yükleniyor (Paralel Dağıtım Video): {video_yolu}")
+                    tt_res = tiktok.tiktok_video_yukle(
+                        video_yolu=video_yolu,
+                        baslik=baslik,
+                        aciklama=caption,
+                    )
+                elif gorsel_yollari:
+                    log.info(f"TikTok Fotoğraf Moduna yükleniyor (Paralel Dağıtım Foto): {gorsel_yollari}")
+                    tt_res = tiktok.tiktok_foto_yukle(
+                        gorsel_yollari=gorsel_yollari,
+                        baslik=baslik,
+                        aciklama=caption,
+                    )
+                else:
+                    tt_res = {}
+                with _lock:
+                    sonuclar["tiktok"] = tt_res.get("publish_id")
+                _bildir("tiktok", "✅ Yayında", increment=True)
+            else:
+                _bildir("tiktok", "⏭️ Atlandı (API Kapalı)", increment=True)
         except Exception as e:
             log.error(f"TikTok yayınlama hatası: {e}")
-            sonuclar["tiktok_hata"] = str(e)
+            with _lock:
+                sonuclar["tiktok_hata"] = str(e)
+            _bildir("tiktok", "❌ Hata", increment=True)
 
-    # 2. Instagram Akış (Reels veya Görsel Feed)
-    if _kanal_izin_var_mi("instagram", kanallar):
+    def _is_instagram():
+        _bildir("instagram", "⏳ Yükleniyor...")
         try:
             if format_tipi == "reels_9_16" and video_yolu:
-                log.info(f"Instagram'a Reels yükleniyor: {video_yolu}")
+                log.info(f"Instagram'a Reels yükleniyor (Paralel Dağıtım): {video_yolu}")
                 ig_res = meta.instagram_reels_paylas(video_yolu, caption)
-                sonuclar["instagram"] = ig_res.get("id")
+                with _lock:
+                    sonuclar["instagram"] = ig_res.get("id")
             elif gorsel_yolu:
-                log.info(f"Instagram'a Görsel Feed (4:5) yükleniyor: {gorsel_yolu}")
+                log.info(f"Instagram'a Görsel Feed (4:5) yükleniyor (Paralel Dağıtım): {gorsel_yolu}")
                 ig_res = meta.instagram_gorsel_paylas(gorsel_yolu, caption)
-                sonuclar["instagram"] = ig_res.get("id")
+                with _lock:
+                    sonuclar["instagram"] = ig_res.get("id")
+            if sonuclar.get("instagram"):
+                _bildir("instagram", "✅ Yayında", increment=True)
+            else:
+                _bildir("instagram", "❌ Hata", increment=True)
         except Exception as e:
             log.error(f"Instagram yayınlama hatası: {e}")
-            sonuclar["instagram_hata"] = str(e)
+            with _lock:
+                sonuclar["instagram_hata"] = str(e)
+            _bildir("instagram", "❌ Hata", increment=True)
 
-    # 2b. Instagram Story (Video veya Özel 9:16 Story Görseli)
-    if _kanal_izin_var_mi("instagram_story", kanallar):
+    def _is_story():
+        _bildir("instagram_story", "⏳ Yükleniyor...")
         try:
             if format_tipi == "reels_9_16" and video_yolu:
-                log.info(f"Instagram Story (Video) yükleniyor: {video_yolu}")
+                log.info(f"Instagram Story (Video) yükleniyor (Paralel Dağıtım): {video_yolu}")
                 story_res = meta.instagram_story_paylas(video_yolu, is_video=True)
-                sonuclar["instagram_story"] = story_res.get("id")
+                with _lock:
+                    sonuclar["instagram_story"] = story_res.get("id")
             elif story_gorseli:
-                log.info(f"Instagram Story (Özel 9:16 Görsel) yükleniyor: {story_gorseli}")
+                log.info(f"Instagram Story (Özel 9:16 Görsel) yükleniyor (Paralel Dağıtım): {story_gorseli}")
                 story_res = meta.instagram_story_paylas(story_gorseli, is_video=False)
-                sonuclar["instagram_story"] = story_res.get("id")
+                with _lock:
+                    sonuclar["instagram_story"] = story_res.get("id")
+            if sonuclar.get("instagram_story"):
+                _bildir("instagram_story", "✅ Yayında", increment=True)
+            else:
+                _bildir("instagram_story", "❌ Hata", increment=True)
         except Exception as e:
             log.error(f"Instagram Story yayınlama hatası: {e}")
-            sonuclar["instagram_story_hata"] = str(e)
+            with _lock:
+                sonuclar["instagram_story_hata"] = str(e)
+            _bildir("instagram_story", "❌ Hata", increment=True)
 
-    # 3. Threads (Akıllı Parçalanmış Zincir Gönderi)
-    if _kanal_izin_var_mi("threads", kanallar):
+    def _is_threads():
+        _bildir("threads", "⏳ Yükleniyor...")
         if threads.threads_aktif_mi():
             try:
-                log.info("Threads'e zincir gönderi yükleniyor...")
+                log.info("Threads'e zincir gönderi yükleniyor (Paralel Dağıtım)...")
                 if format_tipi == "reels_9_16" and video_yolu:
-                    th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=video_yolu)
+                    th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=r2_video_url or video_yolu)
                 elif gorsel_yolu:
-                    th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=gorsel_yolu)
+                    th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=r2_gorsel_url or gorsel_yolu)
                 else:
                     th_res = threads.threads_zincir_paylas(caption)
-                sonuclar["threads"] = th_res.get("id")
-                sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
+                with _lock:
+                    sonuclar["threads"] = th_res.get("id")
+                    sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
+                _bildir("threads", "✅ Yayında", increment=True)
             except Exception as e:
                 log.error(f"Threads yayınlama hatası: {e}")
-                sonuclar["threads_hata"] = str(e)
+                with _lock:
+                    sonuclar["threads_hata"] = str(e)
+                _bildir("threads", "❌ Hata", increment=True)
         else:
-            log.info("Threads API jetonu tanımlı değil veya geçersiz; Threads yayını güvenle atlandı (OAuth 190 riski sıfır).")
+            log.info("Threads API jetonu tanımlı değil veya geçersiz; Threads yayını atlandı.")
+            _bildir("threads", "⏭️ Atlandı (API Kapalı)", increment=True)
 
-    # 4. Facebook Sayfası (Reels veya Görsel Post)
-    if _kanal_izin_var_mi("facebook", kanallar):
+    def _is_facebook():
+        _bildir("facebook", "⏳ Yükleniyor...")
         try:
             if format_tipi == "reels_9_16" and video_yolu:
-                log.info(f"Facebook Sayfasına Reels yükleniyor: {video_yolu}")
+                log.info(f"Facebook Sayfasına Reels yükleniyor (Paralel Dağıtım): {video_yolu}")
                 fb_res = meta.facebook_reels_paylas(video_yolu, caption=caption)
-                sonuclar["facebook"] = fb_res.get("id") or fb_res.get("video_id")
+                with _lock:
+                    sonuclar["facebook"] = fb_res.get("id") or fb_res.get("video_id")
             else:
-                log.info("Facebook Sayfasına görsel/metin postu yükleniyor...")
+                log.info("Facebook Sayfasına görsel/metin postu yükleniyor (Paralel Dağıtım)...")
                 fb_res = meta.facebook_post_paylas(caption, gorsel_yolu=gorsel_yolu)
-                sonuclar["facebook"] = fb_res.get("id")
+                with _lock:
+                    sonuclar["facebook"] = fb_res.get("id")
+            if sonuclar.get("facebook"):
+                _bildir("facebook", "✅ Yayında", increment=True)
+            else:
+                _bildir("facebook", "❌ Hata", increment=True)
         except Exception as e:
             log.error(f"Facebook sayfa yayınlama hatası: {e}")
-            sonuclar["facebook_hata"] = str(e)
+            with _lock:
+                sonuclar["facebook_hata"] = str(e)
+            _bildir("facebook", "❌ Hata", increment=True)
 
-    # 5. YouTube Shorts
-    if format_tipi == "reels_9_16" and video_yolu and _kanal_izin_var_mi("youtube", kanallar):
+    def _is_youtube():
+        _bildir("youtube", "⏳ Yükleniyor...")
         try:
             if youtube.CLIENT_SECRET_DOSYASI.exists() or youtube.TOKEN_DOSYASI.exists():
-                log.info(f"YouTube Shorts'a yükleniyor: {video_yolu}")
+                log.info(f"YouTube Shorts'a yükleniyor (Paralel Dağıtım): {video_yolu}")
                 baslik = kayit.get("baslik") or "Günün Ayeti • Ezan Plus"
                 yt_res = youtube.youtube_shorts_yukle(
                     video_yolu=video_yolu,
                     baslik=baslik,
                     aciklama=caption,
                 )
-                sonuclar["youtube"] = yt_res.get("video_id")
-                sonuclar["youtube_url"] = yt_res.get("url")
+                with _lock:
+                    sonuclar["youtube"] = yt_res.get("video_id")
+                    sonuclar["youtube_url"] = yt_res.get("url")
+                _bildir("youtube", "✅ Yayında", increment=True)
+            else:
+                _bildir("youtube", "⏭️ Atlandı (Yetki Yok)", increment=True)
         except Exception as e:
             log.error(f"YouTube Shorts yayınlama hatası: {e}")
-            sonuclar["youtube_hata"] = str(e)
+            with _lock:
+                sonuclar["youtube_hata"] = str(e)
+            _bildir("youtube", "❌ Hata", increment=True)
+
+    kanal_islevleri = {
+        "tiktok": _is_tiktok,
+        "instagram": _is_instagram,
+        "instagram_story": _is_story,
+        "threads": _is_threads,
+        "facebook": _is_facebook,
+        "youtube": _is_youtube,
+    }
+
+    gorevler = [kanal_islevleri[k] for k in hedef_kanallar if k in kanal_islevleri]
+    if gorevler:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(gorevler))) as executor:
+            futures = [executor.submit(fn) for fn in gorevler]
+            concurrent.futures.wait(futures)
 
 
     # Veritabanı güncelle
@@ -226,11 +347,16 @@ def yayinla_hepsi(
     return sonuclar
 
 
-def yayinla_telafi(paylasim_id: int, hedef_kanal: str = "hepsi") -> Dict[str, Any]:
+def yayinla_telafi(
+    paylasim_id: int,
+    hedef_kanal: str = "hepsi",
+    durum_cb: Optional[Callable[[int, int, str, Dict[str, str]], None]] = None,
+) -> Dict[str, Any]:
     """
     Kısmi veya başarısız yayınları telafi eder.
     Zaten yayınlanmış platformları (id'si mevcut olanları) KORUR ve atlar;
     yalnızca eksik/başarısız olan veya hedef_kanal olarak belirtilen platformları yeniden yayınlar.
+    Canlı durum callback'i (durum_cb) verilmişse adım adım ilerleme durumunu bildirir.
     """
     kayit = db.paylasim_getir(paylasim_id)
     if not kayit:
@@ -261,106 +387,213 @@ def yayinla_telafi(paylasim_id: int, hedef_kanal: str = "hepsi") -> Dict[str, An
     hedef = hedef_kanal.lower().strip()
     yeni_basarili: List[str] = []
 
-    # 1. Instagram Akış (Reels veya Görsel Feed)
+    # Telafi edilecek kanalları belirle
+    telafi_kanallar: List[str] = []
+    if (hedef in ("hepsi", "tiktok", "tt")) and ((format_tipi == "reels_9_16" and video_yolu) or gorsel_yollari) and not sonuclar.get("tiktok"):
+        telafi_kanallar.append("tiktok")
     if (hedef in ("hepsi", "instagram", "ig")) and not sonuclar.get("instagram"):
+        telafi_kanallar.append("instagram")
+    if (hedef in ("hepsi", "instagram_story", "story")) and not sonuclar.get("instagram_story"):
+        telafi_kanallar.append("instagram_story")
+    if (hedef in ("hepsi", "threads")) and not sonuclar.get("threads") and threads.threads_aktif_mi():
+        telafi_kanallar.append("threads")
+    if (hedef in ("hepsi", "facebook", "fb")) and not sonuclar.get("facebook"):
+        telafi_kanallar.append("facebook")
+    if format_tipi == "reels_9_16" and video_yolu and (hedef in ("hepsi", "youtube", "yt")) and not sonuclar.get("youtube"):
+        telafi_kanallar.append("youtube")
+
+    toplam_adim = max(1, len(telafi_kanallar))
+    durum_haritasi: Dict[str, str] = {k: "⏱️ Sırada" for k in telafi_kanallar}
+    adim_sayac = 0
+    _lock = threading.Lock()
+
+    def _bildir(k: str, durum: str, increment: bool = False):
+        nonlocal adim_sayac
+        with _lock:
+            if increment:
+                adim_sayac = min(toplam_adim, adim_sayac + 1)
+            durum_haritasi[k] = durum
+            snap_harita = dict(durum_haritasi)
+            snap_adim = adim_sayac
+        if durum_cb:
+            try:
+                durum_cb(snap_adim, toplam_adim, k, snap_harita)
+            except Exception as e_cb:
+                log.debug(f"telafi durum_cb hatası ({k}): {e_cb}")
+
+    # Cloudflare R2 Ön Yükleme (Anycast CDN ile Meta ve Threads için)
+    r2_video_url = None
+    r2_gorsel_url = None
+    if r2.r2_hazir_mi():
+        try:
+            if format_tipi == "reels_9_16" and video_yolu and Path(video_yolu).exists():
+                r2_res = r2.r2ye_yukle(video_yolu, alt_klasor="video", zaman_asimi=30)
+                r2_video_url = r2_res.get("url")
+            elif gorsel_yolu and Path(gorsel_yolu).exists():
+                r2_res = r2.r2ye_yukle(gorsel_yolu, alt_klasor="sosyal", zaman_asimi=20)
+                r2_gorsel_url = r2_res.get("url")
+        except Exception as e_r2:
+            log.debug(f"Cloudflare R2 ön yükleme uyarısı (Telafi): {e_r2}")
+
+    # Paralel Telafi Görevleri
+    def _telafi_tiktok():
+        _bildir("tiktok", "⏳ Yükleniyor...")
+        try:
+            key = os.getenv("TIKTOK_CLIENT_KEY")
+            if key and tiktok.TOKEN_DOSYASI.exists():
+                log.info(f"Telafi: TikTok yükleniyor (#{paylasim_id})...")
+                baslik = kayit.get("baslik") or "Ezan Plus"
+                if format_tipi == "reels_9_16" and video_yolu:
+                    tt_res = tiktok.tiktok_video_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption)
+                elif gorsel_yollari:
+                    tt_res = tiktok.tiktok_foto_yukle(gorsel_yollari=gorsel_yollari, baslik=baslik, aciklama=caption)
+                else:
+                    tt_res = {}
+                with _lock:
+                    sonuclar["tiktok"] = tt_res.get("publish_id")
+                    yeni_basarili.append("tiktok")
+                    sonuclar.pop("tiktok_hata", None)
+                _bildir("tiktok", "✅ Yayında", increment=True)
+            else:
+                _bildir("tiktok", "⏭️ Atlandı (API Kapalı)", increment=True)
+        except Exception as e:
+            log.error(f"Telafi TikTok hatası (#{paylasim_id}): {e}")
+            with _lock:
+                sonuclar["tiktok_hata"] = str(e)
+            _bildir("tiktok", "❌ Hata", increment=True)
+
+    def _telafi_instagram():
+        _bildir("instagram", "⏳ Yükleniyor...")
         try:
             if format_tipi == "reels_9_16" and video_yolu:
                 log.info(f"Telafi: Instagram'a Reels yükleniyor (#{paylasim_id}): {video_yolu}")
                 ig_res = meta.instagram_reels_paylas(video_yolu, caption)
-                sonuclar["instagram"] = ig_res.get("id")
+                with _lock:
+                    sonuclar["instagram"] = ig_res.get("id")
             elif gorsel_yolu:
                 log.info(f"Telafi: Instagram'a Görsel Feed (4:5) yükleniyor (#{paylasim_id}): {gorsel_yolu}")
                 ig_res = meta.instagram_gorsel_paylas(gorsel_yolu, caption)
-                sonuclar["instagram"] = ig_res.get("id")
+                with _lock:
+                    sonuclar["instagram"] = ig_res.get("id")
             if sonuclar.get("instagram"):
-                yeni_basarili.append("instagram")
-                sonuclar.pop("instagram_hata", None)
+                with _lock:
+                    yeni_basarili.append("instagram")
+                    sonuclar.pop("instagram_hata", None)
+                _bildir("instagram", "✅ Yayında", increment=True)
+            else:
+                _bildir("instagram", "❌ Hata", increment=True)
         except Exception as e:
             log.error(f"Telafi Instagram hatası (#{paylasim_id}): {e}")
-            sonuclar["instagram_hata"] = str(e)
+            with _lock:
+                sonuclar["instagram_hata"] = str(e)
+            _bildir("instagram", "❌ Hata", increment=True)
 
-    # 2. Instagram Story
-    if (hedef in ("hepsi", "instagram_story", "story")) and not sonuclar.get("instagram_story"):
+    def _telafi_story():
+        _bildir("instagram_story", "⏳ Yükleniyor...")
         try:
             if format_tipi == "reels_9_16" and video_yolu:
                 log.info(f"Telafi: Instagram Story (Video) yükleniyor (#{paylasim_id}): {video_yolu}")
                 story_res = meta.instagram_story_paylas(video_yolu, is_video=True)
-                sonuclar["instagram_story"] = story_res.get("id")
+                with _lock:
+                    sonuclar["instagram_story"] = story_res.get("id")
             elif story_gorseli:
                 log.info(f"Telafi: Instagram Story (9:16 Görsel) yükleniyor (#{paylasim_id}): {story_gorseli}")
                 story_res = meta.instagram_story_paylas(story_gorseli, is_video=False)
-                sonuclar["instagram_story"] = story_res.get("id")
+                with _lock:
+                    sonuclar["instagram_story"] = story_res.get("id")
             if sonuclar.get("instagram_story"):
-                yeni_basarili.append("instagram_story")
-                sonuclar.pop("instagram_story_hata", None)
+                with _lock:
+                    yeni_basarili.append("instagram_story")
+                    sonuclar.pop("instagram_story_hata", None)
+                _bildir("instagram_story", "✅ Yayında", increment=True)
+            else:
+                _bildir("instagram_story", "❌ Hata", increment=True)
         except Exception as e:
             log.error(f"Telafi Story hatası (#{paylasim_id}): {e}")
-            sonuclar["instagram_story_hata"] = str(e)
+            with _lock:
+                sonuclar["instagram_story_hata"] = str(e)
+            _bildir("instagram_story", "❌ Hata", increment=True)
 
-    # 3. Threads
-    if (hedef in ("hepsi", "threads")) and not sonuclar.get("threads") and threads.threads_aktif_mi():
+    def _telafi_threads():
+        _bildir("threads", "⏳ Yükleniyor...")
         try:
             log.info(f"Telafi: Threads gönderisi yükleniyor (#{paylasim_id})...")
             if format_tipi == "reels_9_16" and video_yolu:
-                th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=video_yolu)
+                th_res = threads.threads_zincir_paylas(caption, video_url_veya_yolu=r2_video_url or video_yolu)
             elif gorsel_yolu:
-                th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=gorsel_yolu)
+                th_res = threads.threads_zincir_paylas(caption, gorsel_url_veya_yolu=r2_gorsel_url or gorsel_yolu)
             else:
                 th_res = threads.threads_zincir_paylas(caption)
-            sonuclar["threads"] = th_res.get("id")
-            sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
-            yeni_basarili.append("threads")
-            sonuclar.pop("threads_hata", None)
+            with _lock:
+                sonuclar["threads"] = th_res.get("id")
+                sonuclar["threads_parca_sayisi"] = th_res.get("toplam_parca", 1)
+                yeni_basarili.append("threads")
+                sonuclar.pop("threads_hata", None)
+            _bildir("threads", "✅ Yayında", increment=True)
         except Exception as e:
             log.error(f"Telafi Threads hatası (#{paylasim_id}): {e}")
-            sonuclar["threads_hata"] = str(e)
+            with _lock:
+                sonuclar["threads_hata"] = str(e)
+            _bildir("threads", "❌ Hata", increment=True)
 
-    # 4. Facebook (Reels veya Görsel Post)
-    if (hedef in ("hepsi", "facebook", "fb")) and not sonuclar.get("facebook"):
+    def _telafi_facebook():
+        _bildir("facebook", "⏳ Yükleniyor...")
         try:
             if format_tipi == "reels_9_16" and video_yolu:
                 log.info(f"Telafi: Facebook Reels yükleniyor (#{paylasim_id})...")
                 fb_res = meta.facebook_reels_paylas(video_yolu, caption=caption)
-                sonuclar["facebook"] = fb_res.get("id") or fb_res.get("video_id")
+                with _lock:
+                    sonuclar["facebook"] = fb_res.get("id") or fb_res.get("video_id")
             else:
                 log.info(f"Telafi: Facebook postu yükleniyor (#{paylasim_id})...")
                 fb_res = meta.facebook_post_paylas(caption, gorsel_yolu=gorsel_yolu)
-                sonuclar["facebook"] = fb_res.get("id")
-            yeni_basarili.append("facebook")
-            sonuclar.pop("facebook_hata", None)
+                with _lock:
+                    sonuclar["facebook"] = fb_res.get("id")
+            with _lock:
+                yeni_basarili.append("facebook")
+                sonuclar.pop("facebook_hata", None)
+            _bildir("facebook", "✅ Yayında", increment=True)
         except Exception as e:
             log.error(f"Telafi Facebook hatası (#{paylasim_id}): {e}")
-            sonuclar["facebook_hata"] = str(e)
+            with _lock:
+                sonuclar["facebook_hata"] = str(e)
+            _bildir("facebook", "❌ Hata", increment=True)
 
-    # 5. YouTube Shorts
-    if format_tipi == "reels_9_16" and video_yolu and (hedef in ("hepsi", "youtube", "yt")) and not sonuclar.get("youtube"):
+    def _telafi_youtube():
+        _bildir("youtube", "⏳ Yükleniyor...")
         try:
             if youtube.CLIENT_SECRET_DOSYASI.exists() or youtube.TOKEN_DOSYASI.exists():
                 log.info(f"Telafi: YouTube Shorts yükleniyor (#{paylasim_id})...")
                 baslik = kayit.get("baslik") or "Günün Ayeti • Ezan Plus"
                 yt_res = youtube.youtube_shorts_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption)
-                sonuclar["youtube"] = yt_res.get("video_id")
-                sonuclar["youtube_url"] = yt_res.get("url")
-                yeni_basarili.append("youtube")
-                sonuclar.pop("youtube_hata", None)
+                with _lock:
+                    sonuclar["youtube"] = yt_res.get("video_id")
+                    sonuclar["youtube_url"] = yt_res.get("url")
+                    yeni_basarili.append("youtube")
+                    sonuclar.pop("youtube_hata", None)
+                _bildir("youtube", "✅ Yayında", increment=True)
+            else:
+                _bildir("youtube", "⏭️ Atlandı (Yetki Yok)", increment=True)
         except Exception as e:
             log.error(f"Telafi YouTube hatası (#{paylasim_id}): {e}")
-            sonuclar["youtube_hata"] = str(e)
+            with _lock:
+                sonuclar["youtube_hata"] = str(e)
+            _bildir("youtube", "❌ Hata", increment=True)
 
-    # 6. TikTok
-    if format_tipi == "reels_9_16" and video_yolu and (hedef in ("hepsi", "tiktok", "tt")) and not sonuclar.get("tiktok"):
-        try:
-            key = os.getenv("TIKTOK_CLIENT_KEY")
-            if key and tiktok.TOKEN_DOSYASI.exists():
-                log.info(f"Telafi: TikTok yükleniyor (#{paylasim_id})...")
-                baslik = kayit.get("baslik") or "Ezan Plus • Günün Ayeti"
-                tt_res = tiktok.tiktok_video_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption)
-                sonuclar["tiktok"] = tt_res.get("publish_id")
-                yeni_basarili.append("tiktok")
-                sonuclar.pop("tiktok_hata", None)
-        except Exception as e:
-            log.error(f"Telafi TikTok hatası (#{paylasim_id}): {e}")
-            sonuclar["tiktok_hata"] = str(e)
+    telafi_haritasi = {
+        "tiktok": _telafi_tiktok,
+        "instagram": _telafi_instagram,
+        "instagram_story": _telafi_story,
+        "threads": _telafi_threads,
+        "facebook": _telafi_facebook,
+        "youtube": _telafi_youtube,
+    }
+
+    t_gorevler = [telafi_haritasi[k] for k in telafi_kanallar if k in telafi_haritasi]
+    if t_gorevler:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(t_gorevler))) as executor:
+            futures = [executor.submit(fn) for fn in t_gorevler]
+            concurrent.futures.wait(futures)
 
     # Veritabanı güncelle
     kalan_hatalar = [v for k, v in sonuclar.items() if k.endswith("_hata")]
