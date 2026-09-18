@@ -243,12 +243,12 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
 
 | Slot | TSİ (UTC+3) | UTC Saat | İçerik Türü | Medya Formatı | Açıklama |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1** | **11:30** | 08:30 | **Kur'an Tilaveti** | 1080x1920 Reels | Öğle öncesi manevi tefekkür tilaveti |
-| **2** | **13:45** | 10:45 | **Sahih Hadis-i Şerif** | 4:5 Feed + 9:16 Story | Günün Nebevî Öğüdü infografik kartı |
-| **3** | **16:30** | 13:30 | **Kur'an Tilaveti** | 1080x1920 Reels | İkindi sonrası Kur'an tilaveti |
-| **4** | **18:45** | 15:45 | **Günün Duası** | 4:5 Feed + 9:16 Story | Akşam vakti manevi niyaz ve münacat |
-| **5** | **20:30** | 17:30 | **Kur'an Tilaveti** | 1080x1920 Reels | Yatsı vakti tefekkür tilaveti |
-| **6** | **22:00** | 19:00 | **İslamî Kavram / Kelime** | 4:5 Feed + 9:16 Story | Gece tefekkürü, Kur'an kavramı. Otomatik yayınlanır (onay beklemez, Telegram'a detay kartı ve 'Yayından Kaldır' iletilir). |
+| **1** | **11:30** | 08:30 | **Kur'an Tilaveti** | 1080x1920 Reels | Öğle öncesi manevi tefekkür tilaveti (Otomatik Yayın) |
+| **2** | **13:45** | 10:45 | **Sahih Hadis-i Şerif** | V20 Dinamik Video (9:16) | Günün Nebevî Öğüdü, Adam seslendirme, Segâh Ney (Otomatik Yayın) |
+| **3** | **16:30** | 13:30 | **Kur'an Tilaveti** | 1080x1920 Reels | İkindi sonrası Kur'an tilaveti (Otomatik Yayın) |
+| **4** | **18:45** | 15:45 | **Günün Duası** | V20 Dinamik Video (9:16) | Akşam vakti manevi niyaz, Adam seslendirme, Ferahfezâ Ney (Otomatik Yayın) |
+| **5** | **20:30** | 17:30 | **Kur'an Tilaveti** | 1080x1920 Reels | Yatsı vakti tefekkür tilaveti (Otomatik Yayın) |
+| **6** | **22:00** | 19:00 | **İslamî Kavram / Kelime** | 4:5 Feed + 9:16 Story | Gece tefekkürü, Kur'an kavramı, TikTok Fotoğraf Modu (Otomatik Yayın) |
 
 ```
 [Cloudflare Edge Cron] (11:30, 13:45, 16:30, 18:45, 20:30, 22:00 TSİ)
@@ -258,11 +258,11 @@ Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler dikkate alınarak 
        │
 [Ubuntu Bulut Runner]
        ├─► 1. İlgili DB'den (Kur'an, Hadis, Dua, Kelime) tescilli metni çek
-       ├─► 2. Medyayı render et (Reels için MP4 video, Kartlar için 4:5 + 9:16 PNG)
+       ├─► 2. Medyayı render et (Ayet, Hadis, Dua için 1080x1920 MP4 Video; Kelime için 4:5 + 9:16 PNG)
        ├─► 3. Kalite Kontrolü & Self-Healing Doğrulaması (src/denetleyici.py)
-       ├─► 4. Yayınlama & Onay Ayrımı:
-       │     • Kur'an Reels (1, 3, 5) & Kelime (6): Onaysız DOĞRUDAN YAYINLA! ➔ Telegram'a 'Yayından Kaldır' kartı at.
-       │     • Hadis (2) & Dua (4): Telegram'a "✅ Onayla / ❌ İptal Et" butonlarıyla ilet (45 dk bekleme).
+       ├─► 4. %100 Doğrudan Otomatik Yayınlama:
+       │     • Tüm 6 Slot Onaysız DOĞRUDAN YAYINLANIR! (Instagram, TikTok, Threads, Facebook, YouTube)
+       │     • Telegram grubuna medya (MP4 video/kart) + detaylı yayın raporu + 'Yayından Kaldır' / Telafi butonları iletilir.
        └─► 5. Yayın geçmişini ve külliyatı git push ile depoya kaydet
 ```
 
@@ -308,28 +308,32 @@ Telegram botu sadece pasif bir onay aracı değil, iki yönlü interaktif bir y�
 
 ### A. Kayıtlı Bot Menüsü Komutları (`setMyCommands`)
 Bot başlatıldığında Telegram arayüzündeki `/` menüsüne aşağıdaki komutlar otomatik olarak kaydedilir (`komutlari_kaydet`):
-* `/ayet` — Yeni Kur'an tilaveti veya ayet kartı taslağı oluşturur.
-* `/hadis` — Riyâzü's-Sâlihîn külliyatından yeni bir sahih hadis kartı üretir.
-* `/dua` — 8 farklı manevi kategoriden günün duası kartını üretir.
-* `/kelime` — Kur'an'dan önemli bir İslami kavram / kelime kartı üretir (otomatik yayınlanır).
+* `/ayet` — Yeni Kur'an tilaveti Reels videosu üretip Telegram'da onaya sunar.
+* `/hadis` — Riyâzü's-Sâlihîn külliyatından V20 Hadis Videosu üretip onaya sunar.
+* `/dua` — Tescilli dualar külliyatından V20 Dua Videosu üretip onaya sunar.
+* `/kelime` — Kur'an Sözlüğü kavram kartı üretip onaya sunar.
 * `/durum` — Veritabanı ve yayın istatistiklerini gösterir.
 * `/yardim` — Tüm komutları ve kullanım detaylarını listeler.
+
+> [!IMPORTANT]
+> **Manuel Tetikleme vs Zamanlanmış Akış Kuralı:**
+> - **Zamanlanmış Slotlar (11:30, 13:45, 16:30, 18:45, 20:30, 22:00 TSİ):** Cloudflare Cron ve GitHub Actions tarafından `--otomatik` (`auto_publish=True`) ile tetiklenir. Onay beklemeden doğrudan tüm sosyal medya kanallarına yayınlanır; Telegram'a medya videosu/kartı, yayın başarı raporu ve `[🗑️ Yayından Kaldır]` butonu iletilir.
+> - **Manuel Telegram Komutları & Menü Butonları (`/ayet`, `/hadis`, `/dua`, `/kelime`, `/yeniden_uret`):** Kullanıcı elle komut girdiğinde veya kontrol panelinden bastığında **asla otomatik yayınlanmaz** (`auto_publish=False`). Medya ve metin render edilip Telegram grubuna `onay_istegi_gonder` ile önizleme olarak sunulur; kullanıcı `[✅ Onayla ve Yayınla]` butonuna basmadan yayına girmez.
 
 ### B. İleri Seviye Yayın ve Yönetim Komutları
 * `/yayinla <PAYLASIM_ID>` — Beklemede olan bir taslağı tüm platformlara anında yayınlar.
 * `/kaldir <PAYLASIM_ID>` — Yayınlanmış olan bir içeriği Meta (Instagram/Facebook), Threads ve YouTube'dan anında siler ve veritabanı/yayın geçmişinden temizler.
 * `/iptal <PAYLASIM_ID>` — İlgili taslağı yayından kaldırır ve iptal eder.
 * `/onar <PAYLASIM_ID>` — Kusurlu veya hata almış bir paylaşımı `src/denetleyici.py` motoru ile otonom onarır.
-* `/yeniden_uret <PAYLASIM_ID>` — İlgili içeriği sıfırdan yeniden render eder ve onaya/yayına sunar.
+* `/yeniden_uret <PAYLASIM_ID>` — İlgili içeriği sıfırdan yeniden render eder ve onaya sunar.
 * `/saglik` — Tüm sosyal medya API token'larını (Instagram, Facebook, Threads, YouTube, TikTok) ve bağlantılarını test ederek sağlık durumunu raporlar.
 * `/hatalar` — Son paylaşımlarda yaşanan platform veya render hatalarını ayrıntılı listeler.
 * `/temizle` — Geçici medya ve önbellek dosyalarını temizler.
 
-### C. Kur'an Tilaveti & Kur'an Sözlüğü Otomatik Yayın & Yayından Kaldırma Güvencesi
-* **Otomatik Yayınlama:** Kur'an tilavetleri (11:30, 16:30, 20:30 TSİ) ve Kur'an Sözlüğü (22:00 TSİ) render tamamlandığı anda onay beklemeden doğrudan ilgili kanallara (Reels için Reels+Story+Threads+Facebook+Shorts; Kelime için Feed+Story+Threads+Facebook) otomatik yayınlanır.
+### C. 100% Tam Otomatik Yayın & Yayından Kaldırma Güvencesi
+* **Otomatik Yayınlama:** Tüm 6 slot (Kur'an tilavetleri 11:30, 16:30, 20:30; Hadis 13:45; Dua 18:45; Kur'an Sözlüğü 22:00 TSİ) render ve kalite denetimi tamamlandığı anda onay beklemeden doğrudan ilgili kanallara (Reels/Video için Reels+Story+Threads+Facebook+Shorts+TikTok; Kelime için Feed+Story+Threads+Facebook+TikTok) otomatik yayınlanır.
 * **Telegram Yayın Detay Kartı (`yayin_detay_karti_gonder`):** Yayınlanan medya, platform yayın başarı raporu ve izleme linkleriyle birlikte Telegram grubuna iletilir.
 * **"🗑️ Yayından Kaldır" Butonu:** Telegram'a iletilen yayın raporunun altında `[ 🗑️ Yayından Kaldır ]` butonu yer alır. Olası bir durumda tek tıkla içerik tüm platformlardan API aracılığıyla silinir.
-* **Onaylı Kartlar:** Hadis (13:45 TSİ) ve Dua (18:45 TSİ) kartları ise "✅ Onayla / ❌ İptal Et" butonlarıyla onaya sunulur; onaylandıklarında butonları otomatik olarak "🗑️ Yayından Kaldır"a dönüşür.
 
 ### D. Dinleme & Yanıt Mimarisi
 * **Tek Sefer Dinleme (`dinle_ve_bekle`):** Bulut runner'ında onay butonlarını ve yayın sonrası "Yayından Kaldır" butonlarını dinler.

@@ -62,6 +62,7 @@ export default {
           slot: slotAdi,
           saat: saatEtiket,
           cron: event.cron,
+          auto_publish: true,
         },
       }),
     });
@@ -80,7 +81,7 @@ export default {
 
       const tur = url.searchParams.get("tur") || "reels";
       const tema = url.searchParams.get("tema") || "";
-      const auto = url.searchParams.get("auto") === "true";
+      const auto = url.searchParams.get("auto") !== "false";
 
       const ghUrl = `https://api.github.com/repos/${env.GITHUB_REPO}/dispatches`;
       const res = await fetch(ghUrl, {

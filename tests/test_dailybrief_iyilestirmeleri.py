@@ -4,6 +4,7 @@ güvenilirlik, dayanıklılık ve otomasyon iyileştirmelerinin birim testleri.
 """
 
 import os
+from pathlib import Path
 import re
 import sys
 import unittest
@@ -273,6 +274,122 @@ class TestDailyBriefIyilestirmeleri(unittest.TestCase):
             self.assertEqual(mock_yayinla.call_args[0][0], 112)
             self.assertIn("durum_cb", mock_yayinla.call_args[1])
             mock_onay.assert_not_called()
+
+    def test_hadis_otomatik_yayinlanma_akisi(self):
+        """hadis_videosu_olustur_ve_gonder çağrıldığında auto_publish=True varsayılanıyla onay beklemeden doğrudan yayınlandığını doğrular."""
+        from src import otomasyon
+        from src.uretim import ai as icerik_uret
+
+        sahte_icerik = {
+            "hadis_no": 12,
+            "turkce_metin": "Müslüman, elinden ve dilinden insanların emin olduğu kimsedir.",
+            "kaynak_ravi": "Buhârî, Îmân 4",
+            "arapca_metin": "الْمُسْلِمُ مَنْ سَلِمَ الْمُسْلِمُونَ مِنْ لِسَانِهِ وَيَدِهِ",
+            "tefekkur_notu": "İman güvenilirliktir.",
+            "caption": "Günün Hadisi #ezanplus",
+            "hashtagler": ["#ezanplus", "#hadis"]
+        }
+
+        with patch.object(icerik_uret, "hadis_icerigi_uret", return_value=sahte_icerik), \
+             patch("src.uretim.ses.turkce_tts_uret", return_value=Path("/tmp/hadis.mp3")), \
+             patch("src.uretim.ses.turkce_kelime_zamanlari_getir", return_value=[]), \
+             patch("src.uretim.video.hadis_videosu_uret", return_value=Path("/tmp/hadis.mp4")), \
+             patch.object(denetleyici, "denetle_paylasim") as mock_denetle, \
+             patch.object(db, "paylasim_ekle", return_value=113), \
+             patch.object(telegram_bot, "yayinla_hepsi", return_value={"instagram": True}) as mock_yayinla, \
+             patch.object(telegram_bot, "yayin_detay_karti_gonder") as mock_detay, \
+             patch.object(telegram_bot, "onay_istegi_gonder") as mock_onay, \
+             patch.object(telegram_bot, "mesaj_gonder"), \
+             patch.object(telegram_bot, "caption_ve_buton_guncelle"):
+
+            d_sonuc = MagicMock()
+            d_sonuc.gecerli = True
+            d_sonuc.metrikler = {}
+            mock_denetle.return_value = d_sonuc
+
+            pid = otomasyon.hadis_videosu_olustur_ve_gonder(tema="emanet")
+
+            self.assertEqual(pid, 113)
+            self.assertEqual(mock_yayinla.call_args[0][0], 113)
+            mock_onay.assert_not_called()
+
+    def test_dua_otomatik_yayinlanma_akisi(self):
+        """dua_videosu_olustur_ve_gonder çağrıldığında auto_publish=True varsayılanıyla onay beklemeden doğrudan yayınlandığını doğrular."""
+        from src import otomasyon
+        from src.uretim import ai as icerik_uret
+
+        sahte_icerik = {
+            "dua_id": 5,
+            "dua_basligi": "Şükür Duası",
+            "turkce_anlam": "Rabbim, bana ve anne babama verdiğin nimete şükretmemi nasip eyle.",
+            "kaynak_ref": "Ahkâf Sûresi, 15. Âyet",
+            "arapca_metin": "رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ",
+            "fazilet": "Şükrü artıran dua.",
+            "caption": "Günün Duası #ezanplus",
+            "hashtagler": ["#ezanplus", "#dua"]
+        }
+
+        with patch.object(icerik_uret, "dua_icerigi_uret", return_value=sahte_icerik), \
+             patch("src.uretim.ses.turkce_tts_uret", return_value=Path("/tmp/dua.mp3")), \
+             patch("src.uretim.ses.turkce_kelime_zamanlari_getir", return_value=[]), \
+             patch("src.uretim.video.dua_videosu_uret", return_value=Path("/tmp/dua.mp4")), \
+             patch.object(denetleyici, "denetle_paylasim") as mock_denetle, \
+             patch.object(db, "paylasim_ekle", return_value=114), \
+             patch.object(telegram_bot, "yayinla_hepsi", return_value={"instagram": True}) as mock_yayinla, \
+             patch.object(telegram_bot, "yayin_detay_karti_gonder") as mock_detay, \
+             patch.object(telegram_bot, "onay_istegi_gonder") as mock_onay, \
+             patch.object(telegram_bot, "mesaj_gonder"), \
+             patch.object(telegram_bot, "caption_ve_buton_guncelle"):
+
+            d_sonuc = MagicMock()
+            d_sonuc.gecerli = True
+            d_sonuc.metrikler = {}
+            mock_denetle.return_value = d_sonuc
+
+            pid = otomasyon.dua_videosu_olustur_ve_gonder(ruh_hali="huzur")
+
+            self.assertEqual(pid, 114)
+            self.assertEqual(mock_yayinla.call_args[0][0], 114)
+            mock_onay.assert_not_called()
+
+    def test_manuel_tetikleme_onaya_gonderir(self):
+        """Telegram komutları veya menüden elle tetiklendiğinde (auto_publish=False) doğrudan yayınlanmayıp onaya gönderildiğini test eder."""
+        from src import otomasyon
+        from src.uretim import ai as icerik_uret
+
+        sahte_icerik = {
+            "hadis_no": 15,
+            "turkce_metin": "Hayra vesile olan, onu yapan gibidir.",
+            "kaynak_ravi": "Tirmizî, İlim 14",
+            "arapca_metin": "الدَّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ",
+            "tefekkur_notu": "İyiliği yaymak.",
+            "caption": "Günün Hadisi #ezanplus",
+            "hashtagler": ["#ezanplus", "#hadis"]
+        }
+
+        with patch.object(icerik_uret, "hadis_icerigi_uret", return_value=sahte_icerik), \
+             patch("src.uretim.ses.turkce_tts_uret", return_value=Path("/tmp/hadis.mp3")), \
+             patch("src.uretim.ses.turkce_kelime_zamanlari_getir", return_value=[]), \
+             patch("src.uretim.video.hadis_videosu_uret", return_value=Path("/tmp/hadis.mp4")), \
+             patch.object(denetleyici, "denetle_paylasim") as mock_denetle, \
+             patch.object(db, "paylasim_ekle", return_value=115), \
+             patch.object(telegram_bot, "yayinla_hepsi") as mock_yayinla, \
+             patch.object(telegram_bot, "onay_istegi_gonder") as mock_onay, \
+             patch.object(telegram_bot, "mesaj_gonder"), \
+             patch.object(telegram_bot, "caption_ve_buton_guncelle"):
+
+            d_sonuc = MagicMock()
+            d_sonuc.gecerli = True
+            d_sonuc.metrikler = {}
+            mock_denetle.return_value = d_sonuc
+
+            pid = otomasyon.hadis_videosu_olustur_ve_gonder(tema="iyilik", auto_publish=False)
+
+            self.assertEqual(pid, 115)
+            # Doğrudan yayınlanmamalı:
+            mock_yayinla.assert_not_called()
+            # Telegram grubuna onaya gönderilmeli:
+            mock_onay.assert_called_once_with(115)
 
     def test_kelimeyi_paylasildi_isaretle_kavram(self):
         """kelime_db.kelimeyi_paylasildi_isaretle_kavram fonksiyonunun doğruluğunu test eder."""

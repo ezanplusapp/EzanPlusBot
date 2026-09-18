@@ -1537,10 +1537,10 @@ def yardim_metni_olustur() -> str:
     """Kullanılabilir komutların yardım metnini döner."""
     return (
         f"🕌 <b>EZAN PLUS YÖNETİM & SORUN GİDERME REHBERİ</b>\n\n"
-        f"🎬 <b>/ayet</b> [sure:ayet veya tema] — 9:16 Kur'an Tilaveti Reels videosu üretir.\n"
-        f"📜 <b>/hadis</b> [konu veya hadis no] — V20 Dinamik Hadis Videosu (Adam Spiker + Segâh Ney).\n"
-        f"🤲 <b>/dua</b> [ruh hali veya dua adı] — V20 Dinamik Dua Videosu (Adam Spiker + Ferahfezâ Ney).\n"
-        f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (4:5 + 9:16).\n\n"
+        f"🎬 <b>/ayet</b> [sure:ayet veya tema] — 9:16 Kur'an Tilaveti Reels videosu üretir (onayınıza sunar).\n"
+        f"📜 <b>/hadis</b> [konu veya hadis no] — V20 Dinamik Hadis Videosu üretir (onayınıza sunar).\n"
+        f"🤲 <b>/dua</b> [ruh hali veya dua adı] — V20 Dinamik Dua Videosu üretir (onayınıza sunar).\n"
+        f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (onayınıza sunar).\n\n"
         f"🛠️ <b>HATA ÇÖZÜM & ONARIM KOMUTLARI:</b>\n"
         f"• <b>/sesyenile &lt;ID&gt;</b> — Hadis veya Dua videosunun sesini alternatif manevi tonla yeniden üretir.\n"
         f"• <b>/onar &lt;ID&gt;</b> — Kalite veya mizanpaj hatası alan içeriği otonom onarır.\n"
@@ -1660,22 +1660,22 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         kat = parametre.strip().lower() if parametre else "menu"
         kota_uretici.kota_gonder(chat_id=str(chat_id), kategori=kat)
 
-    elif ana_komut == "/ayet":
-        if not _coklu_komut_engeli("/ayet", chat_id):
+    elif ana_komut in ("/ayet", "/reels", "/video"):
+        if not _coklu_komut_engeli(ana_komut, chat_id):
             mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Kur'an tilaveti hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
-        durum_mid = mesaj_gonder("⏳ <b>Kur'an Tilaveti Reels Videosu Hazırlanıyor...</b>\n\nMişari Râşid el-Afâsî tilaveti render edilip otomatik yayınlanacak, lütfen bekleyin...", chat_id=str(chat_id))
+        durum_mid = mesaj_gonder("⏳ <b>Kur'an Tilaveti Reels Videosu Hazırlanıyor...</b>\n\nMişari Râşid el-Afâsî tilaveti render edilip onayınıza sunulacak, lütfen bekleyin...", chat_id=str(chat_id))
         def _gorev_ayet(d_mid=durum_mid, c_id=chat_id):
             try:
                 from .. import otomasyon
-                otomasyon.reels_icerigi_olustur_ve_gonder(tema=parametre, durum_mesaj_id=d_mid)
+                otomasyon.reels_icerigi_olustur_ve_gonder(tema=parametre, auto_publish=False, durum_mesaj_id=d_mid)
             except Exception as e:
-                log.error(f"/ayet komutu hatası: {e}")
+                log.error(f"{ana_komut} komutu hatası: {e}")
                 caption_ve_buton_guncelle(str(c_id), d_mid, f"❌ <b>Tilavet videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>")
         _arkaplanda_calistir(_gorev_ayet)
 
     elif ana_komut in ("/hadis", "/hadis_video", "/hadis_reels"):
-        if not _coklu_komut_engeli("/hadis", chat_id):
+        if not _coklu_komut_engeli(ana_komut, chat_id):
             mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Hadis videosu hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
         # Parametrede 'video' kelimesi varsa temizle
@@ -1683,18 +1683,18 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         if param_temiz.lower().startswith("video"):
             param_temiz = param_temiz[5:].strip() or None
         spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
-        durum_mid = mesaj_gonder(f"⏳ <b>V20 Dinamik Hadis Videosu Hazırlanıyor...</b>\n\nRiyâzü's-Sâlihîn külliyatından seçilerek {spiker_adi} spiker sesi (0.9x), kelime karaoke takibi ve Segâh Ney fonuyla 1080x1920 dikey video render ediliyor...", chat_id=str(chat_id))
+        durum_mid = mesaj_gonder(f"⏳ <b>V20 Dinamik Hadis Videosu Hazırlanıyor...</b>\n\nRiyâzü's-Sâlihîn külliyatından seçilerek {spiker_adi} spiker sesi (0.9x), kelime karaoke takibi ve Segâh Ney fonuyla 1080x1920 dikey video render edilip onayınıza sunulacak, lütfen bekleyin...", chat_id=str(chat_id))
         def _gorev_hadis_video(d_mid=durum_mid, c_id=chat_id):
             try:
                 from .. import otomasyon
-                otomasyon.hadis_videosu_olustur_ve_gonder(tema=param_temiz, durum_mesaj_id=d_mid)
+                otomasyon.hadis_videosu_olustur_ve_gonder(tema=param_temiz, auto_publish=False, durum_mesaj_id=d_mid)
             except Exception as e:
-                log.error(f"/hadis komutu hatası: {e}")
+                log.error(f"{ana_komut} komutu hatası: {e}")
                 caption_ve_buton_guncelle(str(c_id), d_mid, f"❌ <b>Hadis videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>")
         _arkaplanda_calistir(_gorev_hadis_video)
 
     elif ana_komut in ("/dua", "/dua_video", "/dua_reels"):
-        if not _coklu_komut_engeli("/dua", chat_id):
+        if not _coklu_komut_engeli(ana_komut, chat_id):
             mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Dua videosu hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
         # Parametrede 'video' kelimesi varsa temizle
@@ -1702,27 +1702,27 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
         if param_temiz.lower().startswith("video"):
             param_temiz = param_temiz[5:].strip() or None
         spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
-        durum_mid = mesaj_gonder(f"⏳ <b>V20 Dinamik Dua Videosu Hazırlanıyor...</b>\n\nTescilli dualar külliyatından seçilerek {spiker_adi} spiker sesi (0.9x), kelime karaoke takibi ve Ferahfezâ Ney fonuyla 1080x1920 dikey video render ediliyor...", chat_id=str(chat_id))
+        durum_mid = mesaj_gonder(f"⏳ <b>V20 Dinamik Dua Videosu Hazırlanıyor...</b>\n\nTescilli dualar külliyatından seçilerek {spiker_adi} spiker sesi (0.9x), kelime karaoke takibi ve Ferahfezâ Ney fonuyla 1080x1920 dikey video render edilip onayınıza sunulacak, lütfen bekleyin...", chat_id=str(chat_id))
         def _gorev_dua_video(d_mid=durum_mid, c_id=chat_id):
             try:
                 from .. import otomasyon
-                otomasyon.dua_videosu_olustur_ve_gonder(ruh_hali=param_temiz, durum_mesaj_id=d_mid)
+                otomasyon.dua_videosu_olustur_ve_gonder(ruh_hali=param_temiz, auto_publish=False, durum_mesaj_id=d_mid)
             except Exception as e:
-                log.error(f"/dua komutu hatası: {e}")
+                log.error(f"{ana_komut} komutu hatası: {e}")
                 caption_ve_buton_guncelle(str(c_id), d_mid, f"❌ <b>Dua videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>")
         _arkaplanda_calistir(_gorev_dua_video)
 
-    elif ana_komut == "/kelime":
-        if not _coklu_komut_engeli("/kelime", chat_id):
+    elif ana_komut in ("/kelime", "/sozluk", "/kavram", "/post", "/gorsel"):
+        if not _coklu_komut_engeli(ana_komut, chat_id):
             mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Kelime kartı hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
             return
-        durum_mid = mesaj_gonder("⏳ <b>Kur'an Sözlüğü Kartı Hazırlanıyor...</b>\n\nİslami kavramlar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çizilip otomatik yayınlanacak, lütfen bekleyin...", chat_id=str(chat_id))
+        durum_mid = mesaj_gonder("⏳ <b>Kur'an Sözlüğü Kartı Hazırlanıyor...</b>\n\nİslami kavramlar külliyatından seçilerek V16 standardında 4:5 Feed ve 9:16 Story formatlarında çizilip onayınıza sunulacak, lütfen bekleyin...", chat_id=str(chat_id))
         def _gorev_kelime(d_mid=durum_mid, c_id=chat_id):
             try:
                 from .. import otomasyon
-                otomasyon.kelime_postu_olustur_ve_gonder(kavram=parametre, durum_mesaj_id=d_mid)
+                otomasyon.kelime_postu_olustur_ve_gonder(kavram=parametre, auto_publish=False, durum_mesaj_id=d_mid)
             except Exception as e:
-                log.error(f"/kelime komutu hatası: {e}")
+                log.error(f"{ana_komut} komutu hatası: {e}")
                 caption_ve_buton_guncelle(str(c_id), d_mid, f"❌ <b>Kelime kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>")
         _arkaplanda_calistir(_gorev_kelime)
 
@@ -1954,15 +1954,15 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
                 from .. import otomasyon
                 yeni_pid = 0
                 if kat in ("ayet", "reels"):
-                    yeni_pid = otomasyon.reels_icerigi_olustur_ve_gonder(tema=baslik, durum_mesaj_id=d_mid)
+                    yeni_pid = otomasyon.reels_icerigi_olustur_ve_gonder(tema=baslik, auto_publish=False, durum_mesaj_id=d_mid)
                 elif kat == "hadis":
-                    yeni_pid = otomasyon.hadis_postu_olustur_ve_gonder(tema=baslik, durum_mesaj_id=d_mid)
+                    yeni_pid = otomasyon.hadis_postu_olustur_ve_gonder(tema=baslik, auto_publish=False, durum_mesaj_id=d_mid)
                 elif kat == "dua":
-                    yeni_pid = otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=baslik, durum_mesaj_id=d_mid)
+                    yeni_pid = otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=baslik, auto_publish=False, durum_mesaj_id=d_mid)
                 elif kat == "kelime":
-                    yeni_pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram=baslik, durum_mesaj_id=d_mid)
+                    yeni_pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram=baslik, auto_publish=False, durum_mesaj_id=d_mid)
                 else:
-                    yeni_pid = otomasyon.icerik_olustur_ve_gonder(tur=kat, tema=baslik, durum_mesaj_id=d_mid)
+                    yeni_pid = otomasyon.icerik_olustur_ve_gonder(tur=kat, tema=baslik, auto_publish=False, durum_mesaj_id=d_mid)
 
                 kayit_son = db.paylasim_getir(pid)
                 if kayit_son and kayit_son.get("durum") == "iptal_edildi":
@@ -2309,15 +2309,15 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                             from .. import otomasyon
                             yeni_pid = 0
                             if kat in ("ayet", "reels"):
-                                yeni_pid = otomasyon.reels_icerigi_olustur_ve_gonder(tema=baslik)
+                                yeni_pid = otomasyon.reels_icerigi_olustur_ve_gonder(tema=baslik, auto_publish=False)
                             elif kat == "hadis":
-                                yeni_pid = otomasyon.hadis_postu_olustur_ve_gonder(tema=baslik)
+                                yeni_pid = otomasyon.hadis_postu_olustur_ve_gonder(tema=baslik, auto_publish=False)
                             elif kat == "dua":
-                                yeni_pid = otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=baslik)
+                                yeni_pid = otomasyon.dua_postu_olustur_ve_gonder(ruh_hali=baslik, auto_publish=False)
                             elif kat == "kelime":
-                                yeni_pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram=baslik)
+                                yeni_pid = otomasyon.kelime_postu_olustur_ve_gonder(kavram=baslik, auto_publish=False)
                             else:
-                                yeni_pid = otomasyon.icerik_olustur_ve_gonder(tur=kat, tema=baslik)
+                                yeni_pid = otomasyon.icerik_olustur_ve_gonder(tur=kat, tema=baslik, auto_publish=False)
 
                             # Görev sürerken iptal edilmiş mi kontrol et
                             kayit_son = db.paylasim_getir(paylasim_id)
@@ -2756,19 +2756,19 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                     }
                     tur_kod, tur_ad = tur_harita[data]
                     callback_cevapla(cq_id, f"🚀 {tur_ad} üretimi başlatıldı...", alert=False)
-                    durum_mid = mesaj_gonder(f"⏳ <b>{tur_ad} üretimi başlatılıyor...</b>", chat_id=str(chat_id))
+                    durum_mid = mesaj_gonder(f"⏳ <b>{tur_ad} üretimi başlatılıyor...</b>\n\nİçerik render edilip onayınıza sunulacak, lütfen bekleyin...", chat_id=str(chat_id))
 
                     def _gorev_menu_uret(t_kod=tur_kod, c_id=chat_id, d_mid=durum_mid):
                         try:
                             from .. import otomasyon
                             if t_kod == "ayet":
-                                otomasyon.reels_icerigi_olustur_ve_gonder(durum_mesaj_id=d_mid)
+                                otomasyon.reels_icerigi_olustur_ve_gonder(auto_publish=False, durum_mesaj_id=d_mid)
                             elif t_kod == "hadis":
-                                otomasyon.hadis_videosu_olustur_ve_gonder(durum_mesaj_id=d_mid)
+                                otomasyon.hadis_videosu_olustur_ve_gonder(auto_publish=False, durum_mesaj_id=d_mid)
                             elif t_kod == "dua":
-                                otomasyon.dua_videosu_olustur_ve_gonder(durum_mesaj_id=d_mid)
+                                otomasyon.dua_videosu_olustur_ve_gonder(auto_publish=False, durum_mesaj_id=d_mid)
                             elif t_kod == "kelime":
-                                otomasyon.kelime_postu_olustur_ve_gonder(durum_mesaj_id=d_mid)
+                                otomasyon.kelime_postu_olustur_ve_gonder(auto_publish=False, durum_mesaj_id=d_mid)
                         except Exception as e:
                             log.error(f"Menüden üretim hatası ({t_kod}): {e}")
                             hata_metni = f"❌ <b>{tur_ad} Üretim Hatası:</b> <code>{html.escape(str(e))}</code>"

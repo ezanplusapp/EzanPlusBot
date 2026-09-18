@@ -201,7 +201,7 @@ def gorsel_icerik_olustur_ve_gonder(
     kategori: str = "kelime",
     tema: Optional[str] = None,
     format_tipi: str = "4:5",
-    auto_publish: bool = False,
+    auto_publish: bool = True,
     durum_mesaj_id: Optional[int] = None,
 ) -> int:
     """
@@ -319,7 +319,7 @@ def gorsel_icerik_olustur_ve_gonder(
 
 def hadis_videosu_olustur_ve_gonder(
     tema: Optional[str] = None,
-    auto_publish: bool = False,
+    auto_publish: bool = True,
     durum_mesaj_id: Optional[int] = None,
 ) -> int:
     """
@@ -437,7 +437,7 @@ def hadis_videosu_olustur_ve_gonder(
 
 def dua_videosu_olustur_ve_gonder(
     ruh_hali: Optional[str] = None,
-    auto_publish: bool = False,
+    auto_publish: bool = True,
     durum_mesaj_id: Optional[int] = None,
 ) -> int:
     """
@@ -651,20 +651,20 @@ def hadis_veya_dua_sesi_yenile(paylasim_id: int) -> Path:
 def hadis_postu_olustur_ve_gonder(
     tema: Optional[str] = None,
     format_tipi: str = "video",
-    auto_publish: bool = False,
+    auto_publish: bool = True,
     durum_mesaj_id: Optional[int] = None,
 ) -> int:
-    """Sahih Hadis-i Şerif V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
+    """Sahih Hadis-i Şerif V20 Dinamik Videosu üretip doğrudan otomatik yayınlar."""
     return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=auto_publish, durum_mesaj_id=durum_mesaj_id)
 
 
 def dua_postu_olustur_ve_gonder(
     ruh_hali: Optional[str] = None,
     format_tipi: str = "video",
-    auto_publish: bool = False,
+    auto_publish: bool = True,
     durum_mesaj_id: Optional[int] = None,
 ) -> int:
-    """Günün Duası / Manevi Niyaz V20 Dinamik Videosu üretip Telegram'a onaya sunar."""
+    """Günün Duası / Manevi Niyaz V20 Dinamik Videosu üretip doğrudan otomatik yayınlar."""
     return dua_videosu_olustur_ve_gonder(ruh_hali=ruh_hali, auto_publish=auto_publish, durum_mesaj_id=durum_mesaj_id)
 
 
@@ -686,19 +686,19 @@ def icerik_olustur_ve_gonder(
     durum_mesaj_id: Optional[int] = None,
 ) -> int:
     """
-    Belirtilen türe göre (reels, hadis, dua, kelime, ayet) içeriği üretip onay/yayına sunar.
-    Kur'an Tilaveti (reels) ve Kur'an Sözlüğü (kelime) varsayılan olarak doğrudan otomatik yayınlanır (onay beklemez).
-    Hadis ve Dua içerikleri standart olarak V20 Dinamik Video formatında üretilir ve Telegram onayına sunulur.
+    Belirtilen türe göre (reels, hadis, dua, kelime, ayet) içeriği üretip doğrudan otomatik yayınlar.
+    Tüm içerik türleri (Kur'an Tilaveti, Sahih Hadis, Günün Duası, Kur'an Sözlüğü) varsayılan olarak doğrudan otomatik yayınlanır (onay beklemez).
+    Telegram grubuna video/kart ile birlikte detaylı yayın raporu ve 'Yayından Kaldır' butonları iletilir.
     """
     tur_temiz = tur.lower().strip()
     if tur_temiz in ("reels", "video", "ayet_video", "ayet"):
         oto = True if auto_publish is None else auto_publish
         return reels_icerigi_olustur_ve_gonder(tema=tema, auto_publish=oto, durum_mesaj_id=durum_mesaj_id)
     elif tur_temiz in ("hadis", "hadis_video", "hadis_reels"):
-        oto = False if auto_publish is None else auto_publish
+        oto = True if auto_publish is None else auto_publish
         return hadis_videosu_olustur_ve_gonder(tema=tema, auto_publish=oto, durum_mesaj_id=durum_mesaj_id)
     elif tur_temiz in ("dua", "dua_video", "dua_reels"):
-        oto = False if auto_publish is None else auto_publish
+        oto = True if auto_publish is None else auto_publish
         return dua_videosu_olustur_ve_gonder(ruh_hali=tema, auto_publish=oto, durum_mesaj_id=durum_mesaj_id)
     elif tur_temiz in ("kelime", "gorsel", "post"):
         oto = True if auto_publish is None else auto_publish
@@ -789,7 +789,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     tur = args.komut or args.tur or "reels"
-    oto_varsayilan = True if tur in ("reels", "video", "kelime") else False
+    oto_varsayilan = True
     oto_yayin = True if args.otomatik else oto_varsayilan
     try:
         pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format, auto_publish=oto_yayin)
@@ -806,7 +806,7 @@ if __name__ == "__main__":
     kayit_son = db.paylasim_getir(pid)
     zaten_yayinlandi = kayit_son and kayit_son.get("durum") == "yayinlandi"
 
-    if zaten_yayinlandi or tur in ("reels", "video", "kelime"):
+    if zaten_yayinlandi or oto_yayin:
         # Otomatik yayınlanan içeriklerde bekleme süresi boyunca 'Yayından Kaldır' butonu dinlenir
         log.info(f"{tur.upper()} #{pid} yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor (Maks: {args.bekleme//60} dk)...")
         dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
