@@ -178,6 +178,7 @@ def yayinla_hepsi(
                         video_yolu=video_yolu,
                         baslik=baslik,
                         aciklama=caption,
+                        taslak_modu=True,
                     )
                 elif gorsel_yollari:
                     log.info(f"TikTok Fotoğraf Moduna yükleniyor (Paralel Dağıtım Foto): {gorsel_yollari}")
@@ -185,12 +186,14 @@ def yayinla_hepsi(
                         gorsel_yollari=gorsel_yollari,
                         baslik=baslik,
                         aciklama=caption,
+                        taslak_modu=True,
                     )
                 else:
                     tt_res = {}
                 with _lock:
                     sonuclar["tiktok"] = tt_res.get("publish_id")
-                _bildir("tiktok", "✅ Yayında", increment=True)
+                durum_etiketi = "📥 Taslakta" if tt_res.get("mod") == "inbox" else "✅ Yayında"
+                _bildir("tiktok", durum_etiketi, increment=True)
             else:
                 _bildir("tiktok", "⏭️ Atlandı (API Kapalı)", increment=True)
         except Exception as e:
@@ -444,16 +447,17 @@ def yayinla_telafi(
                 log.info(f"Telafi: TikTok yükleniyor (#{paylasim_id})...")
                 baslik = kayit.get("baslik") or "Ezan Plus"
                 if format_tipi == "reels_9_16" and video_yolu:
-                    tt_res = tiktok.tiktok_video_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption)
+                    tt_res = tiktok.tiktok_video_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption, taslak_modu=True)
                 elif gorsel_yollari:
-                    tt_res = tiktok.tiktok_foto_yukle(gorsel_yollari=gorsel_yollari, baslik=baslik, aciklama=caption)
+                    tt_res = tiktok.tiktok_foto_yukle(gorsel_yollari=gorsel_yollari, baslik=baslik, aciklama=caption, taslak_modu=True)
                 else:
                     tt_res = {}
                 with _lock:
                     sonuclar["tiktok"] = tt_res.get("publish_id")
                     yeni_basarili.append("tiktok")
                     sonuclar.pop("tiktok_hata", None)
-                _bildir("tiktok", "✅ Yayında", increment=True)
+                durum_etiketi = "📥 Taslakta" if tt_res.get("mod") == "inbox" else "✅ Yayında"
+                _bildir("tiktok", durum_etiketi, increment=True)
             else:
                 _bildir("tiktok", "⏭️ Atlandı (API Kapalı)", increment=True)
         except Exception as e:

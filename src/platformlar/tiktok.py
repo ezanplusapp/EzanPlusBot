@@ -388,12 +388,13 @@ def tiktok_foto_yukle(
 
         kullanilan_mod = "inbox" if taslak_modu else "direct"
         post_mode = "MEDIA_UPLOAD" if taslak_modu else "DIRECT_POST"
+        privacy_val = "SELF_ONLY" if taslak_modu else "PUBLIC_TO_EVERYONE"
 
         payload = {
             "post_info": {
                 "title": temiz_baslik,
                 "description": caption_fmt,
-                "privacy_level": "PUBLIC_TO_EVERYONE",
+                "privacy_level": privacy_val,
                 "disable_comment": False,
                 "auto_add_music": True,
             },
