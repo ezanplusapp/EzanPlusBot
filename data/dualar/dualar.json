@@ -211,7 +211,10 @@
     "arapca_okunus": "Allâhümme lâ sehle illâ mâ ce'altehû sehlen, ve ente tec'alü'l-hazne izâ şi'te sehlâ",
     "turkce_anlam": "Allah'ım! Senin kolay kıldığından başka kolay yoktur. **Eğer Sen dilersen en zor olanı bile kolaylaştırırsın.**",
     "kaynak_ref": "İbn Hibbân, Sahîh, 974",
-    "fazilet_notu": "Mülakata, sınava veya çetin bir işe başlamadan önce okunur."
+    "fazilet_notu": "Mülakata, sınava veya çetin bir işe başlamadan önce okunur.",
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-09-24 15:47:50"
   },
   {
     "id": 17,
