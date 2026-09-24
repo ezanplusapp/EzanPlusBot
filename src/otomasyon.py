@@ -85,6 +85,36 @@ def otomatik_yayinla_ve_raporla(paylasim_id: int, durum_mesaj_id: Optional[int] 
     return sonuclar
 
 
+def mukerrer_slot_kontrolu(kategori: str, esik_dakika: int = 40) -> bool:
+    """
+    Belirtilen kategoride son esik_dakika içinde zaten yayınlanmış içerik var mı kontrol eder.
+    Cloudflare Worker retry veya çift webhook tetiklemelerinde mükerrer yayını önler.
+    """
+    gecmis = db.yayin_gecmisi_yukle()
+    if not gecmis:
+        return False
+    from datetime import datetime, timedelta
+    simdi = datetime.now()
+    kat_eslesme = "ayet" if kategori in ("reels", "ayet") else kategori
+    for item in reversed(gecmis[-10:]):
+        item_kat = item.get("kategori")
+        if item_kat == kat_eslesme:
+            yz = item.get("yayin_zamani")
+            if yz:
+                try:
+                    t_yayin = datetime.strptime(yz, "%Y-%m-%d %H:%M:%S")
+                    fark_dakika = (simdi - t_yayin).total_seconds() / 60.0
+                    if 0 <= fark_dakika < esik_dakika:
+                        log.warning(
+                            f"🛡️ Mükerrer Slot Koruması: '{kategori}' için son {fark_dakika:.1f} dakika önce "
+                            f"zaten yayın yapılmış ({item.get('kaynak')}). Çift tetikleme engellendi!"
+                        )
+                        return True
+                except Exception:
+                    pass
+    return False
+
+
 def reels_icerigi_olustur_ve_gonder(
     tema: Optional[str] = None,
     auto_publish: bool = True,
@@ -791,6 +821,12 @@ if __name__ == "__main__":
     tur = args.komut or args.tur or "reels"
     oto_varsayilan = True
     oto_yayin = True if args.otomatik else oto_varsayilan
+
+    # Mükerrer slot tetiklemesi kontrolü (Cloudflare / Webhook çift tetikleme koruması)
+    if oto_yayin and mukerrer_slot_kontrolu(tur, esik_dakika=40):
+        log.info(f"⏭️ '{tur.upper()}' slotu yakın zamanda zaten yayınlandığı için bu mükerrer çalıştırma atlandı.")
+        sys.exit(0)
+
     try:
         pid = icerik_olustur_ve_gonder(tur=tur, tema=args.tema, format_tipi=args.format, auto_publish=oto_yayin)
     except Exception as e:

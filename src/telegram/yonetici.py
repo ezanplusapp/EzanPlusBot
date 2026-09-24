@@ -620,11 +620,31 @@ def yayindan_kaldir(paylasim_id: int) -> Dict[str, Any]:
     """
     Daha önce yayınlanmış bir içeriği tüm platformlardan (Meta, YouTube, Threads)
     ve sistem veritabanından / yayın geçmişinden siler.
+    Bulut runner ve yerel ortam senkronizasyonu için yayin_gecmisi.json fallback'i içerir.
     """
     kayit = db.paylasim_getir(paylasim_id)
-    if not kayit:
+    gecmis = db.yayin_gecmisi_yukle()
+
+    # Eğer SQLite'da bulunamazsa veya platform ID'leri eksikse yayin_gecmisi.json'dan tamamla
+    gecmis_kayit = None
+    for item in reversed(gecmis):
+        if item.get("id") == paylasim_id:
+            gecmis_kayit = item
+            break
+    if not gecmis_kayit and (not kayit or paylasim_id == 1) and gecmis:
+        # Generic ID=1 veya yerel DB senkron değilse en son yayınlanan kaydı al
+        gecmis_kayit = gecmis[-1]
+
+    if not kayit and not gecmis_kayit:
         raise ValueError(f"Silinecek paylaşım bulunamadı: ID {paylasim_id}")
 
+    kayit_birlestirilmis = dict(kayit or {})
+    if gecmis_kayit:
+        for k_id in ["instagram_post_id", "instagram_story_post_id", "facebook_post_id", "youtube_post_id", "threads_post_id", "tiktok_post_id"]:
+            if not kayit_birlestirilmis.get(k_id) and gecmis_kayit.get(k_id):
+                kayit_birlestirilmis[k_id] = gecmis_kayit[k_id]
+
+    kayit = kayit_birlestirilmis
     sonuclar: Dict[str, bool] = {}
 
     # 1. Instagram / Facebook (Meta Graph API)

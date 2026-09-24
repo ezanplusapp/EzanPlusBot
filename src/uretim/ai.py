@@ -442,7 +442,7 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
     hadis_metni = hadis_metni.strip("“”\"' —-")
     kaynak_ref = secilen_hadis["kaynak_ref"]
     ravi = turkce_kisaltmalari_genislet(secilen_hadis.get("ravi", ""))
-    arapca_metin = secilen_hadis.get("arapca_veciz", "") or secilen_hadis.get("arapca_metin", "")
+    arapca_metin = (secilen_hadis.get("arapca_metin") or secilen_hadis.get("arapca_veciz") or "").strip()
     from .kart import arapca_glif_temizle
     arapca_metin = arapca_glif_temizle(arapca_metin)
     hadis_id = secilen_hadis.get("id")

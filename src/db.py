@@ -133,25 +133,41 @@ def yayin_gecmisi_yukle() -> List[Dict[str, Any]]:
 
 
 def yayin_gecmisi_kaydet(kayit: Dict[str, Any]):
-    """Yeni yayınlanan içeriği Git dostu JSON geçmişine ekler."""
+    """Yeni yayınlanan içeriği Git dostu JSON geçmişine ekler veya günceller."""
     gecmis = yayin_gecmisi_yukle()
     kaynak = (kayit.get("kaynak") or kayit.get("baslik") or "").strip()
     if not kaynak:
         return
 
-    # Mükerrer eklemeyi engelle
-    if not any(item.get("kaynak") == kaynak for item in gecmis):
-        gecmis.append({
-            "id": kayit.get("id"),
-            "kategori": kayit.get("kategori", "ayet"),
-            "kaynak": kaynak,
-            "baslik": kayit.get("baslik"),
-            "yayin_zamani": kayit.get("yayin_zamani") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        })
-        YAYIN_GECMISI_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
-        with open(YAYIN_GECMISI_DOSYASI, "w", encoding="utf-8") as f:
-            json.dump(gecmis, f, ensure_ascii=False, indent=2)
-        log.info(f"Yayın geçmişi JSON güncellendi: {kaynak}")
+    veri = {
+        "id": kayit.get("id"),
+        "kategori": kayit.get("kategori", "ayet"),
+        "kaynak": kaynak,
+        "baslik": kayit.get("baslik"),
+        "yayin_zamani": kayit.get("yayin_zamani") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "instagram_post_id": kayit.get("instagram_post_id"),
+        "instagram_story_post_id": kayit.get("instagram_story_post_id"),
+        "threads_post_id": kayit.get("threads_post_id"),
+        "youtube_post_id": kayit.get("youtube_post_id"),
+        "facebook_post_id": kayit.get("facebook_post_id"),
+        "tiktok_post_id": kayit.get("tiktok_post_id"),
+    }
+
+    # Eğer kaynak zaten varsa güncelle, yoksa sona ekle
+    bulundu = False
+    for idx, item in enumerate(gecmis):
+        if item.get("kaynak") == kaynak or (kayit.get("id") and item.get("id") == kayit.get("id")):
+            gecmis[idx].update({k: v for k, v in veri.items() if v is not None})
+            bulundu = True
+            break
+
+    if not bulundu:
+        gecmis.append(veri)
+
+    YAYIN_GECMISI_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
+    with open(YAYIN_GECMISI_DOSYASI, "w", encoding="utf-8") as f:
+        json.dump(gecmis, f, ensure_ascii=False, indent=2)
+    log.info(f"Yayın geçmişi JSON güncellendi: {kaynak}")
 
 
 def yayin_gecmisinden_sil(paylasim_id: int) -> bool:
