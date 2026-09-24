@@ -644,6 +644,61 @@ def yayin_durum_metni_olustur(
     return "\n".join(satirlar)
 
 
+def kaldirma_durum_metni_olustur(
+    paylasim_id: int,
+    adim: int,
+    toplam_adim: int,
+    durum_haritasi: Dict[str, str],
+    baslik: str = "",
+    baslangic_ts: float = 0.0,
+) -> str:
+    """
+    Yayından kaldırma işlemi sürerken canlı ilerleme çubuğu ve platform platform silinme durumunu oluşturur.
+    """
+    toplam = max(1, toplam_adim)
+    ad = max(0, min(adim, toplam))
+    dolu = "▰" * ad
+    bos = "▱" * (toplam - ad)
+    yuzde = int((ad / toplam) * 100)
+    bar = f"<code>[{dolu}{bos}] %{yuzde} ({ad}/{toplam})</code>"
+
+    etiketler = {
+        "instagram": "📸 Instagram Feed / Reels",
+        "instagram_story": "⭕ Instagram Story",
+        "facebook": "👥 Facebook Sayfası",
+        "threads": "🧵 Threads (@ezanplusapp)",
+        "youtube": "▶️ YouTube Shorts",
+        "tiktok": "🎵 TikTok (@ezanplusapp)",
+    }
+
+    tamamlandi = (ad == toplam and all(v not in ("⏱️ Sırada", "⏳ Siliniyor...") for v in durum_haritasi.values()))
+
+    if tamamlandi:
+        baslik_satiri = f"🗑️ <b>YAYINDAN KALDIRMA TAMAMLANDI! (#{paylasim_id})</b>"
+    else:
+        baslik_satiri = f"⏳ <b>YAYINDAN KALDIRILIYOR... (#{paylasim_id})</b>"
+
+    satirlar = [baslik_satiri]
+    if baslik:
+        satirlar.append(f"📌 <b>{html.escape(baslik)}</b>")
+    satirlar.append("")
+    satirlar.append(bar)
+    satirlar.append("")
+    satirlar.append("🗑️ <b>Platform Silme Durumları:</b>")
+
+    for k, durum in durum_haritasi.items():
+        isim = etiketler.get(k, k.capitalize())
+        satirlar.append(f"• <b>{isim}:</b> {durum}")
+
+    if baslangic_ts > 0:
+        gecen = time.time() - baslangic_ts
+        if tamamlandi:
+            satirlar.append(f"\n⏱️ <i>Toplam Kaldırma Süresi: {gecen:.1f} sn</i>")
+        else:
+            satirlar.append(f"\n⏱️ <i>Geçen Süre: {gecen:.1f} sn</i>")
+
+    return "\n".join(satirlar)
+
 
 def onay_istegi_gonder(paylasim_id: int) -> int:
     """
@@ -1785,17 +1840,38 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
             mesaj_gonder("⚠️ <b>Geçersiz Kullanım:</b> Lütfen yayından kaldırmak istediğiniz paylaşım ID'sini girin.\n<i>Örnek: <code>/kaldir 14</code></i>", chat_id=str(chat_id))
             return
         pid = int(parametre)
-        durum_msg_id = mesaj_gonder(f"⏳ <b>Paylaşım #{pid} tüm platformlardan yayından kaldırılıyor...</b>", chat_id=str(chat_id))
+        t_start = time.time()
+        durum_msg_id = mesaj_gonder(f"⏳ <b>YAYINDAN KALDIRILIYOR (#{pid})...</b>\nLütfen bekleyin...", chat_id=str(chat_id))
+
         def _gorev_kaldir(d_mid=durum_msg_id, c_id=chat_id):
+            _son_edit = [0.0]
+            def _kaldir_cb(adim: int, toplam_adim: int, aktif_kanal: str, durumlar: Dict[str, str]):
+                now = time.time()
+                if (adim < toplam_adim) and (now - _son_edit[0] < 0.8):
+                    time.sleep(max(0.0, 0.8 - (now - _son_edit[0])))
+                _son_edit[0] = time.time()
+
+                txt = kaldirma_durum_metni_olustur(
+                    paylasim_id=pid,
+                    adim=adim,
+                    toplam_adim=toplam_adim,
+                    durum_haritasi=durumlar,
+                    baslangic_ts=t_start,
+                )
+                caption_ve_buton_guncelle(str(c_id), d_mid, txt, butonlar=[])
+
             try:
-                silme_sonuclar = yayindan_kaldir(pid)
+                silme_sonuclar = yayindan_kaldir(pid, durum_cb=_kaldir_cb)
+                gecen_sure = time.time() - t_start
                 rapor_txt = (
                     f"🗑️ <b>PAYLAŞIM #{pid} YAYINDAN KALDIRILDI!</b>\n\n"
-                    f"• Instagram: {'✅ Silindi' if silme_sonuclar.get('instagram') else '—'}\n"
-                    f"• Facebook: {'✅ Silindi' if silme_sonuclar.get('facebook') else '—'}\n"
-                    f"• YouTube: {'✅ Silindi' if silme_sonuclar.get('youtube') else '—'}\n"
-                    f"• Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else '—'}\n\n"
-                    f"Sistem yayın geçmişinden ve veritabanından temizlendi."
+                    f"• 📸 Instagram Feed / Reels: {'✅ Silindi' if silme_sonuclar.get('instagram') else ('❌ Hata' if silme_sonuclar.get('instagram') is False else '—')}\n"
+                    f"• ⭕ Instagram Story: {'✅ Silindi' if silme_sonuclar.get('instagram_story') else ('❌ Hata' if silme_sonuclar.get('instagram_story') is False else '—')}\n"
+                    f"• 👥 Facebook Reels: {'✅ Silindi' if silme_sonuclar.get('facebook') else ('❌ Hata' if silme_sonuclar.get('facebook') is False else '—')}\n"
+                    f"• 🧵 Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else ('❌ Hata' if silme_sonuclar.get('threads') is False else '—')}\n"
+                    f"• ▶️ YouTube Shorts: {'✅ Silindi' if silme_sonuclar.get('youtube') else ('❌ Hata' if silme_sonuclar.get('youtube') is False else '—')}\n\n"
+                    f"⏱️ <i>Toplam Süre: {gecen_sure:.1f} sn</i>\n"
+                    f"Sistem yayın geçmişinden ve veritabanından başarıyla temizlendi."
                 )
                 caption_ve_buton_guncelle(str(c_id), d_mid, rapor_txt, butonlar=[])
             except Exception as e:
@@ -2426,7 +2502,9 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                 elif data.startswith("kaldir_"):
                     paylasim_id = int(data.split("_")[1])
                     kayit = db.paylasim_getir(paylasim_id)
-                    if not kayit:
+                    gecmis = db.yayin_gecmisi_yukle()
+                    gecmis_kayit = next((x for x in gecmis if x.get("id") == paylasim_id or x.get("paylasim_id") == paylasim_id), None)
+                    if not kayit and not gecmis_kayit:
                         callback_cevapla(cq_id, f"ℹ️ Paylaşım #{paylasim_id} zaten yayından kaldırılmış veya silinmiş.", alert=True)
                         caption_ve_buton_guncelle(
                             chat_id,
@@ -2436,35 +2514,58 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                         )
                         continue
 
-                    callback_cevapla(cq_id, "⏳ İçerik platformlardan kaldırılıyor...", alert=True)
+                    callback_cevapla(cq_id, "⏳ İçerik platformlardan kaldırılıyor...", alert=False)
+                    t_start = time.time()
+                    baslik_bilgisi = (kayit.get("baslik") if kayit else None) or (gecmis_kayit.get("baslik") if gecmis_kayit else "") or ""
+
                     caption_ve_buton_guncelle(
                         chat_id,
                         msg_id,
-                        "⏳ <b>YAYINDAN KALDIRILIYOR...</b>\n\nİçerik Meta, YouTube ve Threads ağlarından siliniyor...",
+                        f"⏳ <b>YAYINDAN KALDIRILIYOR... (#{paylasim_id})</b>\n\nLütfen bekleyin...",
                         butonlar=[]
                     )
 
-                    def _gorev_kaldir_btn(p_id=paylasim_id, c_id=chat_id, m_id=msg_id):
+                    def _gorev_kaldir_btn(p_id=paylasim_id, c_id=chat_id, m_id=msg_id, b_baslik=baslik_bilgisi):
+                        _son_edit = [0.0]
+                        def _kaldir_cb(adim: int, toplam_adim: int, aktif_kanal: str, durumlar: Dict[str, str]):
+                            now = time.time()
+                            if (adim < toplam_adim) and (now - _son_edit[0] < 0.8):
+                                time.sleep(max(0.0, 0.8 - (now - _son_edit[0])))
+                            _son_edit[0] = time.time()
+
+                            txt = kaldirma_durum_metni_olustur(
+                                paylasim_id=p_id,
+                                adim=adim,
+                                toplam_adim=toplam_adim,
+                                durum_haritasi=durumlar,
+                                baslik=b_baslik,
+                                baslangic_ts=t_start,
+                            )
+                            caption_ve_buton_guncelle(str(c_id), m_id, txt, butonlar=[])
+
                         try:
-                            silme_sonuclar = yayindan_kaldir(p_id)
+                            silme_sonuclar = yayindan_kaldir(p_id, durum_cb=_kaldir_cb)
+                            gecen_sure = time.time() - t_start
                             kaldirildi_metni = (
                                 f"🗑️ <b>BU İÇERİK YAYINDAN KALDIRILDI</b>\n\n"
                                 f"📌 <b>Paylaşım #{p_id}</b> Doğukan tarafından tüm platformlardan başarıyla silindi ve arşivlendi.\n\n"
-                                f"• Instagram: {'✅ Silindi' if silme_sonuclar.get('instagram') else '—'}\n"
-                                f"• Facebook: {'✅ Silindi' if silme_sonuclar.get('facebook') else '—'}\n"
-                                f"• YouTube: {'✅ Silindi' if silme_sonuclar.get('youtube') else '—'}\n"
-                                f"• Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else '—'}\n\n"
+                                f"• 📸 Instagram Feed / Reels: {'✅ Silindi' if silme_sonuclar.get('instagram') else ('❌ Hata' if silme_sonuclar.get('instagram') is False else '—')}\n"
+                                f"• ⭕ Instagram Story: {'✅ Silindi' if silme_sonuclar.get('instagram_story') else ('❌ Hata' if silme_sonuclar.get('instagram_story') is False else '—')}\n"
+                                f"• 👥 Facebook Reels: {'✅ Silindi' if silme_sonuclar.get('facebook') else ('❌ Hata' if silme_sonuclar.get('facebook') is False else '—')}\n"
+                                f"• 🧵 Threads: {'✅ Silindi' if silme_sonuclar.get('threads') else ('❌ Hata' if silme_sonuclar.get('threads') is False else '—')}\n"
+                                f"• ▶️ YouTube Shorts: {'✅ Silindi' if silme_sonuclar.get('youtube') else ('❌ Hata' if silme_sonuclar.get('youtube') is False else '—')}\n\n"
+                                f"⏱️ <i>Toplam Süre: {gecen_sure:.1f} sn</i>\n"
                                 f"⏰ <i>Kaldırılma Saati: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"
                             )
                             caption_ve_buton_guncelle(
-                                c_id,
+                                str(c_id),
                                 m_id,
                                 kaldirildi_metni,
                                 butonlar=[]
                             )
                         except Exception as e:
                             log.error(f"Yayından kaldırma hatası (#{p_id}): {e}")
-                            caption_ve_buton_guncelle(c_id, m_id, f"⚠️ <b>Yayından kaldırma hatası:</b>\n<code>{html.escape(str(e))}</code>")
+                            caption_ve_buton_guncelle(str(c_id), m_id, f"⚠️ <b>Yayından kaldırma hatası:</b>\n<code>{html.escape(str(e))}</code>")
 
                     _arkaplanda_calistir(_gorev_kaldir_btn)
 

@@ -616,11 +616,15 @@ def yayinla_telafi(
     return sonuclar
 
 
-def yayindan_kaldir(paylasim_id: int) -> Dict[str, Any]:
+def yayindan_kaldir(
+    paylasim_id: int,
+    durum_cb: Optional[Callable[[int, int, str, Dict[str, str]], None]] = None,
+) -> Dict[str, Any]:
     """
     Daha önce yayınlanmış bir içeriği tüm platformlardan (Meta, YouTube, Threads)
     ve sistem veritabanından / yayın geçmişinden siler.
     Bulut runner ve yerel ortam senkronizasyonu için yayin_gecmisi.json fallback'i içerir.
+    Canlı durum callback'i (durum_cb) verilmişse adım adım ilerleme durumunu bildirir.
     """
     kayit = db.paylasim_getir(paylasim_id)
     gecmis = db.yayin_gecmisi_yukle()
@@ -647,56 +651,133 @@ def yayindan_kaldir(paylasim_id: int) -> Dict[str, Any]:
     kayit = kayit_birlestirilmis
     sonuclar: Dict[str, bool] = {}
 
-    # 1. Instagram / Facebook (Meta Graph API)
-    ig_id = kayit.get("instagram_post_id")
-    if ig_id:
-        try:
-            log.info(f"Instagram Feed'den içerik siliniyor: {ig_id}")
-            sonuclar["instagram"] = meta.medyayi_sil(ig_id)
-        except Exception as e:
-            log.error(f"Instagram silme hatası ({ig_id}): {e}")
-            sonuclar["instagram"] = False
+    # Hedef silme platformlarını belirle
+    hedef_kanallar: List[str] = []
+    if kayit.get("instagram_post_id"):
+        hedef_kanallar.append("instagram")
+    if kayit.get("instagram_story_post_id"):
+        hedef_kanallar.append("instagram_story")
+    if kayit.get("facebook_post_id"):
+        hedef_kanallar.append("facebook")
+    if kayit.get("threads_post_id"):
+        hedef_kanallar.append("threads")
+    if kayit.get("youtube_post_id"):
+        hedef_kanallar.append("youtube")
 
-    ig_story_id = kayit.get("instagram_story_post_id")
-    if ig_story_id:
-        try:
-            log.info(f"Instagram Story'den içerik siliniyor: {ig_story_id}")
-            sonuclar["instagram_story"] = meta.medyayi_sil(ig_story_id)
-        except Exception as e:
-            log.error(f"Instagram Story silme hatası ({ig_story_id}): {e}")
-            sonuclar["instagram_story"] = False
+    if not hedef_kanallar:
+        hedef_kanallar = ["instagram", "facebook", "threads"]
 
-    fb_id = kayit.get("facebook_post_id")
-    if fb_id:
-        try:
-            log.info(f"Facebook'tan içerik siliniyor: {fb_id}")
-            sonuclar["facebook"] = meta.medyayi_sil(fb_id)
-        except Exception as e:
-            log.error(f"Facebook silme hatası ({fb_id}): {e}")
-            sonuclar["facebook"] = False
+    toplam_adim = max(1, len(hedef_kanallar))
+    durum_haritasi: Dict[str, str] = {k: "⏱️ Sırada" for k in hedef_kanallar}
+    adim_sayac = 0
+    _lock = threading.Lock()
 
-    # 2. YouTube Shorts
-    yt_id = kayit.get("youtube_post_id")
-    if yt_id:
-        try:
-            log.info(f"YouTube'dan video siliniyor: {yt_id}")
-            sonuclar["youtube"] = youtube.videoyu_sil(yt_id)
-        except Exception as e:
-            log.error(f"YouTube silme hatası ({yt_id}): {e}")
-            sonuclar["youtube"] = False
+    def _bildir(k: str, durum: str, increment: bool = False):
+        nonlocal adim_sayac
+        with _lock:
+            if increment:
+                adim_sayac = min(toplam_adim, adim_sayac + 1)
+            durum_haritasi[k] = durum
+            snap_harita = dict(durum_haritasi)
+            snap_adim = adim_sayac
+        if durum_cb:
+            try:
+                durum_cb(snap_adim, toplam_adim, k, snap_harita)
+            except Exception as e_cb:
+                log.debug(f"kaldir durum_cb hatası ({k}): {e_cb}")
 
-    # 3. Threads
-    th_id = kayit.get("threads_post_id")
-    if th_id:
+    # İlk sıradaki durumları bildir
+    if durum_cb:
         try:
-            log.info(f"Threads'ten gönderi siliniyor: {th_id}")
-            sonuclar["threads"] = threads.gonderiyi_sil(th_id)
-        except Exception as e:
-            log.error(f"Threads silme hatası ({th_id}): {e}")
-            sonuclar["threads"] = False
+            durum_cb(0, toplam_adim, hedef_kanallar[0], dict(durum_haritasi))
+        except Exception:
+            pass
 
-    # 4. Veritabanını ve JSON yayın geçmişini güncelle
+    # 1. Instagram Feed / Reels
+    if "instagram" in hedef_kanallar:
+        _bildir("instagram", "⏳ Siliniyor...")
+        ig_id = kayit.get("instagram_post_id")
+        if ig_id:
+            try:
+                log.info(f"Instagram Feed'den içerik siliniyor: {ig_id}")
+                sonuclar["instagram"] = meta.medyayi_sil(ig_id)
+                _bildir("instagram", "🗑️ Silindi" if sonuclar["instagram"] else "❌ Başarısız", increment=True)
+            except Exception as e:
+                log.error(f"Instagram silme hatası ({ig_id}): {e}")
+                sonuclar["instagram"] = False
+                _bildir("instagram", "❌ Hata", increment=True)
+        else:
+            _bildir("instagram", "⏭️ Bulunamadı", increment=True)
+
+    # 2. Instagram Story
+    if "instagram_story" in hedef_kanallar:
+        _bildir("instagram_story", "⏳ Siliniyor...")
+        ig_story_id = kayit.get("instagram_story_post_id")
+        if ig_story_id:
+            try:
+                log.info(f"Instagram Story'den içerik siliniyor: {ig_story_id}")
+                sonuclar["instagram_story"] = meta.medyayi_sil(ig_story_id)
+                _bildir("instagram_story", "🗑️ Silindi" if sonuclar["instagram_story"] else "❌ Başarısız", increment=True)
+            except Exception as e:
+                log.error(f"Instagram Story silme hatası ({ig_story_id}): {e}")
+                sonuclar["instagram_story"] = False
+                _bildir("instagram_story", "❌ Hata", increment=True)
+        else:
+            _bildir("instagram_story", "⏭️ Bulunamadı", increment=True)
+
+    # 3. Facebook
+    if "facebook" in hedef_kanallar:
+        _bildir("facebook", "⏳ Siliniyor...")
+        fb_id = kayit.get("facebook_post_id")
+        if fb_id:
+            try:
+                log.info(f"Facebook'tan içerik siliniyor: {fb_id}")
+                sonuclar["facebook"] = meta.medyayi_sil(fb_id)
+                _bildir("facebook", "🗑️ Silindi" if sonuclar["facebook"] else "❌ Başarısız", increment=True)
+            except Exception as e:
+                log.error(f"Facebook silme hatası ({fb_id}): {e}")
+                sonuclar["facebook"] = False
+                _bildir("facebook", "❌ Hata", increment=True)
+        else:
+            _bildir("facebook", "⏭️ Bulunamadı", increment=True)
+
+    # 4. YouTube
+    if "youtube" in hedef_kanallar:
+        _bildir("youtube", "⏳ Siliniyor...")
+        yt_id = kayit.get("youtube_post_id")
+        if yt_id:
+            try:
+                log.info(f"YouTube'dan video siliniyor: {yt_id}")
+                sonuclar["youtube"] = youtube.videoyu_sil(yt_id)
+                _bildir("youtube", "🗑️ Silindi" if sonuclar["youtube"] else "❌ Başarısız", increment=True)
+            except Exception as e:
+                log.error(f"YouTube silme hatası ({yt_id}): {e}")
+                sonuclar["youtube"] = False
+                _bildir("youtube", "❌ Hata", increment=True)
+        else:
+            _bildir("youtube", "⏭️ Bulunamadı", increment=True)
+
+    # 5. Threads
+    if "threads" in hedef_kanallar:
+        _bildir("threads", "⏳ Siliniyor...")
+        th_id = kayit.get("threads_post_id")
+        if th_id:
+            try:
+                log.info(f"Threads'ten gönderi siliniyor: {th_id}")
+                sonuclar["threads"] = threads.gonderiyi_sil(th_id)
+                _bildir("threads", "🗑️ Silindi" if sonuclar["threads"] else "❌ Başarısız", increment=True)
+            except Exception as e:
+                log.error(f"Threads silme hatası ({th_id}): {e}")
+                sonuclar["threads"] = False
+                _bildir("threads", "❌ Hata", increment=True)
+        else:
+            _bildir("threads", "⏭️ Bulunamadı", increment=True)
+
+    # 6. Veritabanını ve JSON yayın geçmişini güncelle
     db.durum_guncelle(paylasim_id, yeni_durum="yayindan_kaldirildi")
+    if gecmis_kayit and gecmis_kayit.get("id"):
+        db.yayin_gecmisinden_sil(gecmis_kayit["id"])
+
     log.info(f"Paylaşım #{paylasim_id} başarıyla yayından kaldırıldı: {sonuclar}")
     return sonuclar
 
