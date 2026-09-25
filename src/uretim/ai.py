@@ -156,7 +156,7 @@ def _json_onar(metin: str) -> str:
 def _json_ayikla(metin: str) -> Dict[str, Any]:
     """Markdown kod blokları arasındaki veya çıplak JSON verisini toleranslı ayrıştırır."""
     metin = metin.strip()
-    # İlk deneme: doğrudan veya temizlenmiş
+    # 1. İlk deneme: doğrudan veya markdown blok temizlenmiş
     try:
         if "```" in metin:
             m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", metin, re.DOTALL)
@@ -166,13 +166,51 @@ def _json_ayikla(metin: str) -> Dict[str, Any]:
     except Exception:
         pass
 
-    # İkinci deneme: onarılmış metin
+    # 2. İkinci deneme: virgül temizliği yapılmış onarılmış metin
     onarilmis = _json_onar(metin)
     try:
         return json.loads(onarilmis, strict=False)
-    except Exception as e:
-        log.warning(f"JSON onarma başarısız oldu ({e}): {metin[:300]}")
-        raise e
+    except Exception:
+        pass
+
+    # 3. Üçüncü deneme: Yüksek toleranslı Regex anahtar-değer çıkarıcı
+    # (LLM'in tırnak içinde tırnak kaçırma, unescaped quote veya newline hatalarını kurtarır)
+    sonuc: Dict[str, Any] = {}
+    # Liste alanları (örn: latin_kelimeler, etiketler)
+    for m in re.finditer(r"\"([a-zA-Z0-9_]+)\"\s*:\s*\[(.*?)\]", onarilmis, re.DOTALL):
+        k, raw_list = m.group(1), m.group(2)
+        items = [re.sub(r"^\"|\"$", "", x.strip()) for x in re.findall(r"\"(.*?)\"", raw_list, re.DOTALL)]
+        sonuc[k] = items
+
+    # Sayısal ve boolean alanlar
+    for m in re.finditer(r"\"([a-zA-Z0-9_]+)\"\s*:\s*(true|false|null|-?\d+(?:\.\d+)?)\b", onarilmis, re.IGNORECASE):
+        k, v = m.group(1), m.group(2).lower()
+        if k not in sonuc:
+            if v == "true":
+                sonuc[k] = True
+            elif v == "false":
+                sonuc[k] = False
+            elif v == "null":
+                sonuc[k] = None
+            elif "." in v:
+                sonuc[k] = float(v)
+            else:
+                sonuc[k] = int(v)
+
+    # String alanlar: tırnak içindeki metin bir sonraki anahtar tanımlamasına veya süslü paranteze kadar
+    pattern = r"\"([a-zA-Z0-9_]+)\"\s*:\s*\"(.*?)\"(?=\s*,\s*\"[a-zA-Z0-9_]+\"\s*:|\s*\}\s*$)"
+    for m in re.finditer(pattern, onarilmis, re.DOTALL):
+        k, v = m.group(1), m.group(2)
+        if k not in sonuc:
+            v_temiz = v.replace('\\"', '"').replace("\\n", "\n").strip()
+            sonuc[k] = v_temiz
+
+    if sonuc and len(sonuc) >= 2:
+        log.info(f"JSON sözdizimi hatası regex tolerans motoru ile başarıyla kurtarıldı ({len(sonuc)} anahtar çıkarıldı).")
+        return sonuc
+
+    log.warning(f"JSON onarma ve kurtarma başarısız oldu: {metin[:300]}")
+    raise ValueError(f"JSON verisi hiçbir yöntemle ayrıştırılamadı: {metin[:200]}")
 
 
 def _gemini_cagir_json(prompt: str, sistem_talimati: str = "", maks_deneme: int = 2) -> Dict[str, Any]:
@@ -367,7 +405,7 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
     "tam {toplam_ar_kelime} adet eleman içeren dizi"
   ],
   "arapca_okunus": "Latin kelimelerin aralarında tek boşluk olan tam metni",
-  "meal_vurgulu": "Yukarıdaki Türkçe mealin hiçbir kelimesini değiştirmeden veya eksiltmeden, âyetin en can alıcı ve vurucu 2-5 kelimelik kısmını markdown **bold** içine alarak aynen yaz. Asla bold işaretini (**...**) cümle veya dua ortasında yarım bırakma (Örn: 'Elbette güçlükle beraber şüphesiz **bir kolaylık vardır.**')",
+  "meal_vurgulu": "Yukarıdaki Türkçe mealin hiçbir kelimesini değiştirmeden veya eksiltmeden, âyetin en can alıcı ve vurucu 2-5 kelimelik kısmını markdown **bold** içine alarak aynen yaz. Asla bold işaretini (**...**) cümle veya dua ortasında yarım bırakma. Tırnak işaretlerini mutlaka kaçışlı (\\\") veya tek tırnak ('...') kullan (Örn: 'Elbette güçlükle beraber şüphesiz **bir kolaylık vardır.**')",
   "video_baslik_satir1": "Çağrı/anons cümlesi (sonunda : olsun, maks 30 karakter)",
   "video_baslik_satir2": "Vurucu hakikat cümlesi (maks 32 karakter)",
   "tefekkur_notu": "2-3 cümlelik samimi hayat dersi ve tefekkür",
