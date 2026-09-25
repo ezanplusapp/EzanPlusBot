@@ -72,5 +72,5 @@ kategoriler:
     hafiz: "Mishary Rashid Alafasy"
 
 yapay_zeka:
-  model: "gemini-2.5-flash"
+  model: "gemini-3.6-flash"
   sicaklik: 0.7
