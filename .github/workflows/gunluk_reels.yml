@@ -160,7 +160,7 @@ jobs:
               except Exception:
                   pass
           PY
-          git add data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json data/kuran/kuran.db data/hadisler/hadisler.db data/bot.db || true
+          git add -f data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json data/kuran/kuran.db data/hadisler/hadisler.db data/bot.db 2>/dev/null || git add data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json data/kuran/kuran.db data/hadisler/hadisler.db || true
           if ! git diff --staged --quiet; then
             git commit -m "chore: Günlük yayın geçmişi ve külliyat güncellendi [skip ci]"
             git fetch origin main || true
