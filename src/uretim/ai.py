@@ -153,7 +153,7 @@ def _json_onar(metin: str) -> str:
     return s
 
 
-def _json_ayikla(metin: str) -> Dict[str, Any]:
+def _json_ayikla(metin: str, toleransli: bool = True) -> Dict[str, Any]:
     """Markdown kod blokları arasındaki veya çıplak JSON verisini toleranslı ayrıştırır."""
     metin = metin.strip()
     # 1. İlk deneme: doğrudan veya markdown blok temizlenmiş
@@ -170,8 +170,9 @@ def _json_ayikla(metin: str) -> Dict[str, Any]:
     onarilmis = _json_onar(metin)
     try:
         return json.loads(onarilmis, strict=False)
-    except Exception:
-        pass
+    except Exception as e:
+        if not toleransli:
+            raise e
 
     # 3. Üçüncü deneme: Yüksek toleranslı Regex anahtar-değer çıkarıcı
     # (LLM'in tırnak içinde tırnak kaçırma, unescaped quote veya newline hatalarını kurtarır)
@@ -221,7 +222,8 @@ def _gemini_cagir_json(prompt: str, sistem_talimati: str = "", maks_deneme: int 
     for deneme in range(1, maks_deneme + 1):
         try:
             cevap = _gemini_cagir(guncel_prompt, sistem_talimati)
-            return _json_ayikla(cevap)
+            son_deneme_mi = (deneme == maks_deneme)
+            return _json_ayikla(cevap, toleransli=son_deneme_mi)
         except Exception as e:
             son_hata = e
             log.warning(f"Gemini yanıtı JSON ayrıştırma hatası (deneme {deneme}/{maks_deneme}): {e}")
