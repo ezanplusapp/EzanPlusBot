@@ -141,6 +141,17 @@ def gunun_duasini_sec(
     if henuz_paylasilmamis:
         return random.choice(henuz_paylasilmamis)
 
+    # Eğer seçilen ruh halinde paylaşılmamış dua kalmadıysa ama genel havuzda varsa, ruh hali kısıtını kaldır
+    genel_paylasilmamis = [
+        d for d in dualar
+        if not d.get("paylasildi_mi", False)
+        and d.get("dua_basligi", "").strip().lower() not in haric_set
+        and d.get("kaynak_ref", "").strip().lower() not in haric_set
+    ]
+    if genel_paylasilmamis:
+        log.info(f"'{ruh_hali}' kategorisinde paylaşılmamış dua kalmadı. Genel sıfır paylaşımlı dua havuzundan seçiliyor.")
+        return random.choice(genel_paylasilmamis)
+
     # 4. Hepsi paylaşılmışsa en az paylaşılanlardan seç
     min_paylasim = min(d.get("paylasim_sayisi", 1) for d in adaylar)
     en_az_paylasilanlar = [d for d in adaylar if d.get("paylasim_sayisi", 1) == min_paylasim]

@@ -96,6 +96,27 @@ class TestKuranDB(unittest.TestCase):
             self.assertGreater(z[0][2], 0.2)
 
 
+    def test_mukerrer_ayet_secimi_engelleme(self):
+        """
+        Veritabanında henüz paylaşılmamış (paylasim_sayisi == 0) âyetler varken,
+        daha önce paylaşılmış hiçbir âyetin seçilmeyeceğini doğrular.
+        """
+        temalar = [
+            "Zorluk ve Kolaylık (İnşirah, Sabır)",
+            "Huzur, Tevekkül ve İç Ferahlığı",
+            "Namazın Önemi ve Kalbe Etkisi",
+            "İnfak, Sadaka ve Cömertlik",
+        ]
+        for tema in temalar:
+            ayet = kuran_db.gunun_ayetini_sec(tema=tema, sadece_video_uygun=True)
+            self.assertIsNotNone(ayet)
+            self.assertEqual(
+                ayet.get("paylasim_sayisi", 0),
+                0,
+                f"Sıfır paylaşımlı havuz varken daha önce paylaşılan âyet seçildi: {ayet['sure_ayet_etiket']}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
 

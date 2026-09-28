@@ -229,10 +229,19 @@ def gunun_hadisini_sec(
         filtreler = []
         parametreler: List[Any] = []
 
+        # Veritabanındaki global minimum paylaşım sayısını tespit et (henüz 0 olanlar var mı?)
+        min_kontrol = "SELECT MIN(paylasim_sayisi) FROM hadisler WHERE " + ("kart_icin_uygun = 1" if sadece_kart_uygun else "1=1")
+        global_min_row = con.execute(min_kontrol).fetchone()
+        global_min = global_min_row[0] if global_min_row and global_min_row[0] is not None else 0
+
         if sadece_kart_uygun:
             filtreler.append("kart_icin_uygun = 1")
             filtreler.append("arapca_veciz != ''")
             filtreler.append("kaynak_ref != ''")
+
+        # KATI KURAL: Global minimum paylaşımlı (henüz paylaşılmamış) hadisler önceliklidir
+        filtreler.append("paylasim_sayisi <= ?")
+        parametreler.append(global_min)
 
         if tema:
             filtreler.append("(turkce_tam LIKE ? OR hadis_metni LIKE ?)")
@@ -250,14 +259,29 @@ def gunun_hadisini_sec(
         sorgu = f"""
             SELECT * FROM hadisler
             WHERE {where_clause}
-            ORDER BY paylasim_sayisi ASC, RANDOM()
+            ORDER BY RANDOM()
             LIMIT 1
         """
         cur = con.execute(sorgu, parametreler)
         row = cur.fetchone()
 
         if not row and tema:
+            log.info(f"'{tema}' temasında henüz paylaşılmamış hadis kalmadı. Genel sıfır paylaşımlı havuza geçiliyor.")
             return gunun_hadisini_sec(tema=None, sadece_kart_uygun=sadece_kart_uygun, haric_tutulanlar=haric_tutulanlar)
+
+        if not row and global_min == 0:
+            # Hariç tutulanlar nedeniyle 0 paylaşımlı kalmadıysa genel minimum kısıtını esnet
+            filtreler_gevsek = [f for f in filtreler if "paylasim_sayisi" not in f]
+            params_gevsek = [p for p in parametreler if not (isinstance(p, int) and p == global_min)]
+            where_gevsek = " AND ".join(filtreler_gevsek) if filtreler_gevsek else "1=1"
+            sorgu_gevsek = f"""
+                SELECT * FROM hadisler
+                WHERE {where_gevsek}
+                ORDER BY paylasim_sayisi ASC, son_paylasim ASC, RANDOM()
+                LIMIT 1
+            """
+            cur = con.execute(sorgu_gevsek, params_gevsek)
+            row = cur.fetchone()
 
         if row:
             return dict(row)

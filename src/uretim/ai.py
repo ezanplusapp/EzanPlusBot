@@ -81,52 +81,52 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
     if not api_key:
         raise ValueError("GEMINI_API_KEY tanımlanmamış! Lütfen .env dosyasına ekleyin.")
 
+    # Çalışan güncel modeller öncelik sırasına göre dizilir
     modeller: List[str] = [MODEL_ADI]
-    for yedek in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.7-flash"]:
+    for yedek in ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest"]:
         if yedek not in modeller:
             modeller.append(yedek)
 
     son_hata = None
     for model in modeller:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        payload: Dict[str, Any] = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.5,
-                "maxOutputTokens": 4096,
-                "responseMimeType": "application/json",
-            },
-        }
-
-        if sistem_talimati:
-            payload["systemInstruction"] = {
-                "role": "system",
-                "parts": [{"text": sistem_talimati}],
+        for deneme in range(1, 3):  # Her model için 2 defa retry/backoff
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload: Dict[str, Any] = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.5,
+                    "maxOutputTokens": 4096,
+                    "responseMimeType": "application/json",
+                },
             }
 
-        try:
-            res = requests.post(url, json=payload, timeout=45)
-            if res.status_code in (503, 429, 500, 502, 504) and model != modeller[-1]:
-                log.warning(f"Gemini {model} geçici yoğunluk ({res.status_code}), sonraki modele geçiliyor...")
-                time.sleep(0.5)
-                continue
-            res.raise_for_status()
+            if sistem_talimati:
+                payload["systemInstruction"] = {
+                    "role": "system",
+                    "parts": [{"text": sistem_talimati}],
+                }
 
-            data = res.json()
-            candidates = data.get("candidates", [])
-            if not candidates:
-                raise ValueError(f"Gemini yanıt vermedi: {data}")
+            try:
+                res = requests.post(url, json=payload, timeout=45)
+                if res.status_code in (503, 429, 500, 502, 504):
+                    bekleme = 1.5 * deneme
+                    log.warning(f"Gemini {model} geçici yoğunluk ({res.status_code}), {bekleme}s bekleniyor (deneme {deneme}/2)...")
+                    time.sleep(bekleme)
+                    continue
+                res.raise_for_status()
 
-            parcalar = candidates[0].get("content", {}).get("parts", [])
-            cevap = "".join(p.get("text", "") for p in parcalar)
-            return cevap.strip()
-        except Exception as e:
-            son_hata = e
-            if model != modeller[-1]:
-                log.warning(f"Gemini {model} çağrısı başarısız ({e}), yedek modele geçiliyor...")
-                time.sleep(0.5)
-                continue
-            raise son_hata
+                data = res.json()
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    raise ValueError(f"Gemini yanıt vermedi: {data}")
+
+                parcalar = candidates[0].get("content", {}).get("parts", [])
+                cevap = "".join(p.get("text", "") for p in parcalar)
+                return cevap.strip()
+            except Exception as e:
+                son_hata = e
+                log.warning(f"Gemini {model} çağrısı hata verdi ({e}), deneme {deneme}/2...")
+                time.sleep(1.0)
 
     raise son_hata or RuntimeError("Tüm Gemini modelleri denendi fakat yanıt alınamadı.")
 
@@ -502,8 +502,9 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
     hadis_metni = turkce_metin_harf_duzelt(hadis_metni)
     hadis_metni = hadis_metni.strip("“”\"' —-")
     kaynak_ref = secilen_hadis["kaynak_ref"]
-    ravi = turkce_kisaltmalari_genislet(secilen_hadis.get("ravi", ""))
-    arapca_metin = (secilen_hadis.get("arapca_metin") or secilen_hadis.get("arapca_veciz") or "").strip()
+    # Hadis metni (meal) Resûlullah'ın asıl veciz sözünü içerdiğinden,
+    # Arapça metin olarak da sened/kıssa değil, 1:1 nebevi lafzı içeren arapca_veciz önceliklidir.
+    arapca_metin = (secilen_hadis.get("arapca_veciz") or secilen_hadis.get("arapca_metin") or "").strip()
     from .kart import arapca_glif_temizle
     arapca_metin = arapca_glif_temizle(arapca_metin)
     hadis_id = secilen_hadis.get("id")

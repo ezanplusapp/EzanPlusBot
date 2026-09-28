@@ -40,7 +40,13 @@ YUKSEKLIK = AYARLAR.get("boyutlar", {}).get("feed_yukseklik", 1350)
 def font_al(yol: Path, boyut: int, agirlik: Optional[int] = None) -> ImageFont.FreeTypeFont:
     """Belirtilen boyutta ve kalınlıkta (weight) font yükler, bulunamazsa varsayılana döner."""
     try:
-        f = ImageFont.truetype(str(yol), boyut)
+        # Linux (Ubuntu GitHub Actions) ortamında Raqm (HarfBuzz+FriBidi) kütüphanesinin
+        # önceden bidi+reshaped edilmiş Arapça glifleri çift-bidi ile ters çevirip
+        # harfleri birbirinden koparmasını kesinlikle önlemek için BASIC layout engine kilitlenir.
+        try:
+            f = ImageFont.truetype(str(yol), boyut, layout_engine=ImageFont.Layout.BASIC)
+        except (TypeError, AttributeError):
+            f = ImageFont.truetype(str(yol), boyut)
         if agirlik is not None:
             try:
                 f.set_variation_by_axes([agirlik])
@@ -1120,7 +1126,7 @@ def hadis_karti_ciz(
     # Dikey Emniyet Tavanı (Okunuş erimeye asla değemez)
     hard_max_ok_bottom = 815 if is_916 else 595
 
-    while pt_ar >= 64:
+    while pt_ar >= 52:
         f_ar = font_al(FONT_ARAPCA, pt_ar)
         ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_w, draw) if ar_temiz else []
         f_ok = font_al(FONT_GOVDE, pt_ok, agirlik=400)
@@ -1140,7 +1146,7 @@ def hadis_karti_ciz(
         if cur_calc_y <= hard_max_ok_bottom:
             break
         pt_ar -= 3
-        pt_ok = max(28 if is_916 else 22, int(pt_ar * 0.38))
+        pt_ok = max(22 if is_916 else 18, int(pt_ar * 0.38))
 
     f_ar = font_al(FONT_ARAPCA, pt_ar)
     ar_satirlar = arapca_satirla(ar_temiz, f_ar, max_w, draw) if ar_temiz else []
@@ -1158,17 +1164,17 @@ def hadis_karti_ciz(
         top_text_bottom += (bb[3] - bb[1]) + ar_line_gap
     top_text_bottom += gap_ar_ok + len(ok_lines) * ok_line_step
 
-    # 5. Dinamik Flex Keten Bandı (Anlam Odaklı Genişleme)
+    # 5. Dinamik Flex Keten Bandı (Anlam Odaklı Genişleme ve Sıfır Çakışma)
     if is_916:
         fade_len = 70
-        fade_1_start = max(740, min(835, int(top_text_bottom + 38)))
+        fade_1_start = max(740, min(860, int(top_text_bottom + 28)))
         fade_1_end = fade_1_start + fade_len
         fade_2_start = 1430
         fade_2_end = fade_2_start + fade_len
         tefekkur_start_y = fade_2_end + 25
     else:
         fade_len = 55
-        fade_1_start = max(490, min(610, int(top_text_bottom + 28)))
+        fade_1_start = max(490, min(630, int(top_text_bottom + 20)))
         fade_1_end = fade_1_start + fade_len
         fade_2_start = 1040
         fade_2_end = fade_2_start + fade_len

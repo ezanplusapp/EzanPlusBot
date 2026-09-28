@@ -236,11 +236,17 @@ def gunun_ayetini_sec(
                 haric_keys.add(f"{s_no}:{a_no}")
                 haric_keys.add(f"{s_no:03d}{a_no:03d}")
 
+        # Veritabanındaki global minimum paylaşım sayısını tespit et (henüz 0 olanlar var mı?)
+        min_kontrol_sorgu = "SELECT MIN(paylasim_sayisi) FROM ayetler WHERE " + ("video_icin_uygun = 1" if sadece_video_uygun else "1=1")
+        global_min_row = con.execute(min_kontrol_sorgu).fetchone()
+        global_min = global_min_row[0] if global_min_row and global_min_row[0] is not None else 0
+
         # 1. Tema araması
         if tema:
             tema_kelimeleri = [k.strip() for k in tema.replace("(", " ").replace(")", " ").replace(",", " ").split() if len(k.strip()) >= 3]
+            uygun_adaylar = []
             for kelime in tema_kelimeleri:
-                adaylar = ayet_ara(kelime, limit=40)
+                adaylar = ayet_ara(kelime, limit=50)
                 if sadece_video_uygun:
                     adaylar = [a for a in adaylar if a.get("video_icin_uygun") == 1]
                 if haric_keys or haric_etiketler or haric_ciftler:
@@ -251,18 +257,31 @@ def gunun_ayetini_sec(
                         and (a.get("sure_no"), a.get("ayet_no")) not in haric_ciftler
                     ]
 
-                if adaylar:
-                    min_paylasim = min(a.get("paylasim_sayisi", 0) for a in adaylar)
-                    en_iyi_adaylar = [a for a in adaylar if a.get("paylasim_sayisi", 0) == min_paylasim]
-                    import random
-                    return random.choice(en_iyi_adaylar)
+                # KATI KURAL: Yalnızca global minimum (sıfır) paylaşımlı adaylar kabul edilir
+                sifir_paylasimlilar = [a for a in adaylar if a.get("paylasim_sayisi", 0) <= global_min]
+                uygun_adaylar.extend(sifir_paylasimlilar)
 
-        # 2. Genel Havuzdan Seçim (Tema bulunamadıysa veya verilmediyse)
+            if uygun_adaylar:
+                # Tekilleştir ve rastgele seç
+                tekil_adaylar = list({a["sure_ayet_key"]: a for a in uygun_adaylar}.values())
+                import random
+                return random.choice(tekil_adaylar)
+            else:
+                log.info(
+                    f"'{tema}' temasında henüz paylaşılmamış (paylaşım <= {global_min}) âyet bulunamadı. "
+                    f"Mükerrer paylaşımı önlemek için genel sıfır paylaşımlı havuza geçiliyor."
+                )
+
+        # 2. Genel Havuzdan Seçim (Tema bulunamadıysa, tema verilmediyse veya temadaki âyetler önceden paylaşılmışsa)
         filtreler = []
         params: List[Any] = []
 
         if sadece_video_uygun:
             filtreler.append("a.video_icin_uygun = 1")
+
+        # KATI KURAL: Global minimum paylaşım sayısına sahip âyetlere öncelik ver
+        filtreler.append("a.paylasim_sayisi <= ?")
+        params.append(global_min)
 
         if haric_keys:
             placeholders = ",".join("?" for _ in haric_keys)
@@ -285,11 +304,25 @@ def gunun_ayetini_sec(
             FROM ayetler a
             JOIN sureler s ON a.sure_no = s.sure_no
             WHERE {where_str}
-            ORDER BY a.paylasim_sayisi ASC, RANDOM()
+            ORDER BY RANDOM()
             LIMIT 1
         """
         cur = con.execute(sorgu, params)
         row = cur.fetchone()
+
+        if not row and global_min == 0:
+            # Eğer hariç tutulanlar nedeniyle 0 paylaşımlı kalmadıysa genel minimum kuralını gevşet
+            sorgu_gevsek = f"""
+                SELECT a.*, s.sure_adi_tr, s.sure_adi_ar, s.inis_yeri
+                FROM ayetler a
+                JOIN sureler s ON a.sure_no = s.sure_no
+                WHERE {' AND '.join([f for f in filtreler if 'paylasim_sayisi' not in f]) or '1=1'}
+                ORDER BY a.paylasim_sayisi ASC, a.son_paylasim ASC, RANDOM()
+                LIMIT 1
+            """
+            gevsek_params = [p for i, p in enumerate(params) if not (isinstance(p, int) and p == global_min)]
+            cur = con.execute(sorgu_gevsek, gevsek_params)
+            row = cur.fetchone()
 
         if not row and sadece_video_uygun:
             # Video filtresini gevşetip tekrar dene
