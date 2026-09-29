@@ -83,7 +83,7 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
 
     # Çalışan güncel modeller öncelik sırasına göre dizilir
     modeller: List[str] = [MODEL_ADI]
-    for yedek in ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest"]:
+    for yedek in ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]:
         if yedek not in modeller:
             modeller.append(yedek)
 
@@ -111,6 +111,7 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 if res.status_code in (503, 429, 500, 502, 504):
                     bekleme = 1.5 * deneme
                     log.warning(f"Gemini {model} geçici yoğunluk ({res.status_code}), {bekleme}s bekleniyor (deneme {deneme}/2)...")
+                    son_hata = requests.exceptions.HTTPError(f"HTTP {res.status_code}: {res.text[:150]}")
                     time.sleep(bekleme)
                     continue
                 res.raise_for_status()
@@ -502,6 +503,7 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
     hadis_metni = turkce_metin_harf_duzelt(hadis_metni)
     hadis_metni = hadis_metni.strip("“”\"' —-")
     kaynak_ref = secilen_hadis["kaynak_ref"]
+    ravi = turkce_kisaltmalari_genislet(secilen_hadis.get("ravi") or "")
     # Hadis metni (meal) Resûlullah'ın asıl veciz sözünü içerdiğinden,
     # Arapça metin olarak da sened/kıssa değil, 1:1 nebevi lafzı içeren arapca_veciz önceliklidir.
     arapca_metin = (secilen_hadis.get("arapca_veciz") or secilen_hadis.get("arapca_metin") or "").strip()
