@@ -25,6 +25,10 @@ data/sesler/*
 !data/sesler/hadis/.gitkeep
 !data/sesler/dua/.gitkeep
 
+# Kalıcı Repo Arşivi (Üretilmiş Tescilli İçerikler Deposu)
+!data/arsiv/
+!data/arsiv/**
+
 # Sistem & Editör
 .DS_Store
 .idea/

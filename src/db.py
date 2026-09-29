@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from .ayar import KOK_DIZIN, AYARLAR
+from .ayar import KOK_DIZIN, AYARLAR, AKTIF_TASARIM_VERSIYONU
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +79,14 @@ def tabloları_hazirla():
             con.execute("ALTER TABLE paylasimlar ADD COLUMN instagram_story_post_id TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            con.execute("ALTER TABLE paylasimlar ADD COLUMN tasarim_versiyonu TEXT DEFAULT 'v1'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            con.execute("ALTER TABLE paylasimlar ADD COLUMN unique_id TEXT")
+        except sqlite3.OperationalError:
+            pass
         # Ayarlar tablosu (R2, entegrasyonlar vb. için esnek yapılandırma)
         con.execute("""
             CREATE TABLE IF NOT EXISTS ayarlar (
@@ -89,6 +97,8 @@ def tabloları_hazirla():
         # Hızlı mükerrer arama için index
         con.execute("CREATE INDEX IF NOT EXISTS idx_kaynak ON paylasimlar(kaynak)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_durum ON paylasimlar(durum)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_unique_id ON paylasimlar(unique_id)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_tasarim_ver ON paylasimlar(tasarim_versiyonu)")
         con.commit()
 
 
@@ -141,6 +151,8 @@ def yayin_gecmisi_kaydet(kayit: Dict[str, Any]):
 
     veri = {
         "id": kayit.get("id"),
+        "unique_id": kayit.get("unique_id"),
+        "tasarim_versiyonu": kayit.get("tasarim_versiyonu") or AKTIF_TASARIM_VERSIYONU,
         "kategori": kayit.get("kategori", "ayet"),
         "kaynak": kaynak,
         "baslik": kayit.get("baslik"),
@@ -258,6 +270,8 @@ def paylasim_ekle(
     video_yolu: Optional[str] = None,
     ses_yolu: Optional[str] = None,
     durum: str = "taslak",
+    unique_id: Optional[str] = None,
+    tasarim_versiyonu: str = AKTIF_TASARIM_VERSIYONU,
 ) -> int:
     """Yeni bir içerik kaydı oluşturur ve id'sini döner."""
     gorsel_json = json.dumps(gorsel_yollari or [], ensure_ascii=False)
@@ -267,8 +281,8 @@ def paylasim_ekle(
             INSERT INTO paylasimlar (
                 kategori, format, baslik, arapca_metin, turkce_metin,
                 kaynak, tefekkur, caption, etiketler, gorsel_yollari,
-                video_yolu, ses_yolu, durum
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                video_yolu, ses_yolu, durum, unique_id, tasarim_versiyonu
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 kategori,
@@ -284,6 +298,8 @@ def paylasim_ekle(
                 video_yolu,
                 ses_yolu,
                 durum,
+                unique_id,
+                tasarim_versiyonu,
             ),
         )
         con.commit()
@@ -429,6 +445,36 @@ def paylasim_guncelle(paylasim_id: int, **kwargs) -> bool:
         con.execute(f"UPDATE paylasimlar SET {', '.join(sutunlar)} WHERE id = ?", params)
         con.commit()
     return True
+
+
+def paylasim_getir_unique_id(
+    unique_id: str,
+    tasarim_versiyonu: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """unique_id ve opsiyonel tasarim_versiyonu ile son paylaşım kaydını döner."""
+    if not unique_id:
+        return None
+    with baglanti_al() as con:
+        if tasarim_versiyonu:
+            cur = con.execute(
+                "SELECT * FROM paylasimlar WHERE unique_id = ? AND tasarim_versiyonu = ? ORDER BY id DESC LIMIT 1",
+                (unique_id, tasarim_versiyonu),
+            )
+        else:
+            cur = con.execute(
+                "SELECT * FROM paylasimlar WHERE unique_id = ? ORDER BY id DESC LIMIT 1",
+                (unique_id,),
+            )
+        row = cur.fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        if d.get("gorsel_yollari"):
+            try:
+                d["gorsel_yollari"] = json.loads(d["gorsel_yollari"])
+            except Exception:
+                pass
+        return d
 
 
 # Modül yüklendiğinde tablolar hazır olsun

@@ -30,6 +30,24 @@ def dualari_yukle() -> List[Dict[str, Any]]:
         return json.load(f)
 
 
+def dualari_denetle() -> List[str]:
+    """Tüm dua koleksiyonunu eksik alan ve imla hatalarına karşı tarar."""
+    hatalar: List[str] = []
+    dualar = dualari_yukle()
+    zorunlu_alanlar = [
+        "id", "dua_basligi", "kategori", "ruh_hali", "kimin_duasi",
+        "arapca_metin", "arapca_okunus", "turkce_anlam", "kaynak_ref", "fazilet_notu"
+    ]
+
+    for d in dualar:
+        d_id = d.get("id", "?")
+        for z in zorunlu_alanlar:
+            if not d.get(z):
+                hatalar.append(f"Dua ID {d_id}: '{z}' alanı boş veya eksik!")
+
+    return hatalar
+
+
 def dua_getir_id(dua_id: int) -> Optional[Dict[str, Any]]:
     """ID ile belirli bir duayı getirir."""
     dualar = dualari_yukle()

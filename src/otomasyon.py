@@ -13,12 +13,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from . import db
+from . import db, arsiv
 from .uretim import ai as icerik_uret
 from .uretim import kart as sablon_ciz
 from .uretim import ses as ses_getir
 from .uretim import video as video_motoru
-from .ayar import KOK_DIZIN, get_env
+from .ayar import KOK_DIZIN, get_env, AKTIF_TASARIM_VERSIYONU
 from .telegram import bot as telegram_bot
 
 log = logging.getLogger(__name__)
@@ -142,41 +142,75 @@ def reels_icerigi_olustur_ve_gonder(
     arapca_metin = icerik.get("arapca_metin", "")
     caption = icerik.get("instagram_caption", "")
 
-    if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kur'an Tilaveti Reels", 2, 4, f"Mişari Alafasy tilaveti indiriliyor ({sure_no}:{ayet_no})...")
+    # Kalıcı Repo Arşivi Denetimi (Önceden üretilmişse yeniden render etme)
+    unique_id = f"ayet_{sure_no}_{ayet_no}"
+    arsiv_kayit = arsiv.arsivde_var_mi(unique_id, kategori="ayet", versiyon=AKTIF_TASARIM_VERSIYONU)
 
-    log.info(f"2/5: Ayet sesi indiriliyor (Sure: {sure_no}, Ayet: {ayet_no})...")
-    try:
-        ses_yolu = ses_getir.ayet_sesi_indir(sure_no, ayet_no)
-    except Exception as e:
-        log.warning(f"Ayet sesi indirilemedi ({e}), yedek ses deneniyor...")
-        # Eğer belirtilen ayet sesinde sorun çıkarsa İnşirah 5-6 yedek kullanılır
-        ses_yolu = ses_getir.sure_aralik_indir(94, 5, 6, "insirah_5_6.mp3")
+    if arsiv_kayit:
+        log.info(f"🎯 [REPO ARŞİVİNDE MEVCUT] {unique_id} ({AKTIF_TASARIM_VERSIYONU}) depodan getirildi, render atlanıyor.")
+        video_yolu = Path(arsiv_kayit["video_yolu"])
+        ses_yolu = video_yolu
+        turkce_meal = arsiv_kayit.get("turkce_metin") or turkce_meal
+        sure_ayet_etiket = arsiv_kayit.get("baslik") or sure_ayet_etiket
+        caption = arsiv_kayit.get("caption") or caption
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kur'an Tilaveti Reels", 3, 4, f"Hazır video arşivden yüklendi ({AKTIF_TASARIM_VERSIYONU})...")
+    else:
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kur'an Tilaveti Reels", 2, 4, f"Mişari Alafasy tilaveti indiriliyor ({sure_no}:{ayet_no})...")
 
-    if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kur'an Tilaveti Reels", 3, 4, "1080x1920 dikey video ve karaoke render ediliyor...")
+        log.info(f"2/5: Ayet sesi indiriliyor (Sure: {sure_no}, Ayet: {ayet_no})...")
+        try:
+            ses_yolu = ses_getir.ayet_sesi_indir(sure_no, ayet_no)
+        except Exception as e:
+            log.warning(f"Ayet sesi indirilemedi ({e}), yedek ses deneniyor...")
+            ses_yolu = ses_getir.sure_aralik_indir(94, 5, 6, "insirah_5_6.mp3")
 
-    log.info(f"3/5: 9:16 Dikey Reels videosu render ediliyor ({sure_ayet_etiket})...")
-    dosya_adi = f"reels_{sure_no}_{ayet_no}_{int(time.time())}.mp4"
-    # Resmi QuranCDN kelime zaman damgalarını al (Mişari Alafasy stüdyo senkronizasyonu)
-    kelime_zamanlari = ses_getir.ayet_kelime_zamanlari_getir(sure_no, ayet_no)
-    if kelime_zamanlari:
-        log.info(f"Mişari Râşid Alafasy kelime zaman damgaları başarıyla yüklendi: {len(kelime_zamanlari)} kelime")
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kur'an Tilaveti Reels", 3, 4, "1080x1920 dikey video ve karaoke render ediliyor...")
 
-    video_yolu = video_motoru.reels_videosu_uret(
-        sure_ayet=sure_ayet_etiket,
-        turkce_meal=turkce_meal,
-        ses_yolu=ses_yolu,
-        arapca_metin=arapca_metin,
-        arapca_okunus=icerik.get("arapca_okunus"),
-        video_baslik_satir1=icerik.get("video_baslik_satir1"),
-        video_baslik_satir2=icerik.get("video_baslik_satir2"),
-        tefekkur_notu=icerik.get("tefekkur_notu"),
-        hafiz_adi=icerik.get("hafiz_adi", "Mişari Râşid el-Afâsî"),
-        cikti_adi=dosya_adi,
-        kelime_zamanlari=kelime_zamanlari,
-        latin_kelimeler=icerik.get("latin_kelimeler"),
-    )
+        log.info(f"3/5: 9:16 Dikey Reels videosu render ediliyor ({sure_ayet_etiket})...")
+        dosya_adi = f"reels_{sure_no}_{ayet_no}_{int(time.time())}.mp4"
+        kelime_zamanlari = ses_getir.ayet_kelime_zamanlari_getir(sure_no, ayet_no)
+        if kelime_zamanlari:
+            log.info(f"Mişari Râşid Alafasy kelime zaman damgaları başarıyla yüklendi: {len(kelime_zamanlari)} kelime")
+
+        video_yolu = video_motoru.reels_videosu_uret(
+            sure_ayet=sure_ayet_etiket,
+            turkce_meal=turkce_meal,
+            ses_yolu=ses_yolu,
+            arapca_metin=arapca_metin,
+            arapca_okunus=icerik.get("arapca_okunus"),
+            video_baslik_satir1=icerik.get("video_baslik_satir1"),
+            video_baslik_satir2=icerik.get("video_baslik_satir2"),
+            tefekkur_notu=icerik.get("tefekkur_notu"),
+            hafiz_adi=icerik.get("hafiz_adi", "Mişari Râşid el-Afâsî"),
+            cikti_adi=dosya_adi,
+            kelime_zamanlari=kelime_zamanlari,
+            latin_kelimeler=icerik.get("latin_kelimeler"),
+        )
+
+        # Üretilen videoyu kalıcı GitHub repo arşivine kaydet
+        arsiv.arsive_kaydet(
+            unique_id=unique_id,
+            kategori="ayet",
+            medya_kaynaklari={"video": str(video_yolu)},
+            meta={
+                "baslik": sure_ayet_etiket,
+                "kaynak": sure_ayet_etiket,
+                "turkce_metin": turkce_meal,
+                "arapca_metin": arapca_metin,
+                "arapca_okunus": icerik.get("arapca_okunus"),
+                "tefekkur": icerik.get("tefekkur_notu"),
+                "caption": caption,
+                "ekstra": {
+                    "sure_no": sure_no,
+                    "ayet_no": ayet_no,
+                    "hafiz_adi": icerik.get("hafiz_adi", "Mişari Râşid el-Afâsî"),
+                },
+            },
+            versiyon=AKTIF_TASARIM_VERSIYONU,
+        )
 
     if durum_mesaj_id and chat_id:
         telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kur'an Tilaveti Reels", 4, 4, "Kalite kontrolü yapılıyor ve yayınlanıyor...")
@@ -195,6 +229,8 @@ def reels_icerigi_olustur_ve_gonder(
         gorsel_yollari=[str(video_yolu.with_suffix(".png"))],
         ses_yolu=str(ses_yolu),
         durum="taslak",
+        unique_id=unique_id,
+        tasarim_versiyonu=AKTIF_TASARIM_VERSIYONU,
     )
 
     # 4.5/5: Yayın Öncesi Kalite, Taşma & Boyut Denetimi
@@ -262,45 +298,80 @@ def gorsel_icerik_olustur_ve_gonder(
     if kategori == "kelime":
         icerik = icerik_uret.kelime_icerigi_uret(kelime_tr=tema)
         kavram_adi = icerik.get("kelime_tr", "Kur'an Sözlüğü")
-        arapca_kelime = icerik.get("kelime_ar", "")
-        kok = icerik.get("kok", "")
-        lugat_anlami = icerik.get("lugat_anlami", "")
-        ayet_ornek = icerik.get("kuran_boyutu", "")
-        ayet_referans = icerik.get("ayet_ref", "")
-        hikmet_notu = icerik.get("hayat_dersi", "")
-        caption = icerik.get("instagram_caption", "")
-        kaynak = f"Kur'an Sözlüğü • {kavram_adi}"
-        turkce = lugat_anlami
-        arapca = arapca_kelime
-        tefekkur = hikmet_notu
+        kelime_id = icerik.get("id") or icerik.get("kelime_id")
+        unique_id = f"kelime_{kelime_id}" if kelime_id is not None else f"kelime_{dosya_eki}"
 
-        gorsel_4_5 = sablon_ciz.kelime_karti_ciz(
-            kelime_tr=kavram_adi,
-            kelime_ar=arapca_kelime,
-            okunus=icerik.get("okunus", ""),
-            kok=kok,
-            lugat_anlami=lugat_anlami,
-            kuran_boyutu=ayet_ornek,
-            hayat_dersi=hikmet_notu,
-            ayet_ref=ayet_referans,
-            cikti_dosya_adi=f"kelime_4_5_{dosya_eki}.png",
-            format_tipi="4:5",
-            palet="yakut_kirmizi",
-        )
-        gorsel_9_16 = sablon_ciz.kelime_karti_ciz(
-            kelime_tr=kavram_adi,
-            kelime_ar=arapca_kelime,
-            okunus=icerik.get("okunus", ""),
-            kok=kok,
-            lugat_anlami=lugat_anlami,
-            kuran_boyutu=ayet_ornek,
-            hayat_dersi=hikmet_notu,
-            ayet_ref=ayet_referans,
-            cikti_dosya_adi=f"kelime_9_16_{dosya_eki}.png",
-            format_tipi="9:16",
-            palet="yakut_kirmizi",
-        )
-        gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
+        arsiv_kayit = arsiv.arsivde_var_mi(unique_id, kategori="kelime", versiyon=AKTIF_TASARIM_VERSIYONU)
+        if arsiv_kayit:
+            log.info(f"🎯 [REPO ARŞİVİNDE MEVCUT] {unique_id} ({AKTIF_TASARIM_VERSIYONU}) depodan getirildi, render atlanıyor.")
+            gorsel_yollari = arsiv_kayit["gorsel_yollari"]
+            turkce = arsiv_kayit.get("turkce_metin") or ""
+            kaynak = arsiv_kayit.get("kaynak") or f"Kur'an Sözlüğü • {kavram_adi}"
+            caption = arsiv_kayit.get("caption") or ""
+            arapca = arsiv_kayit.get("arapca_metin") or ""
+            tefekkur = arsiv_kayit.get("tefekkur") or ""
+            if durum_mesaj_id and chat_id:
+                telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "Kelime Kartı", 2, 3, f"Hazır kartlar arşivden yüklendi ({AKTIF_TASARIM_VERSIYONU})...")
+        else:
+            arapca_kelime = icerik.get("kelime_ar", "")
+            kok = icerik.get("kok", "")
+            lugat_anlami = icerik.get("lugat_anlami", "")
+            ayet_ornek = icerik.get("kuran_boyutu", "")
+            ayet_referans = icerik.get("ayet_ref", "")
+            hikmet_notu = icerik.get("hayat_dersi", "")
+            caption = icerik.get("instagram_caption", "")
+            kaynak = f"Kur'an Sözlüğü • {kavram_adi}"
+            turkce = lugat_anlami
+            arapca = arapca_kelime
+            tefekkur = hikmet_notu
+
+            gorsel_4_5 = sablon_ciz.kelime_karti_ciz(
+                kelime_tr=kavram_adi,
+                kelime_ar=arapca_kelime,
+                okunus=icerik.get("okunus", ""),
+                kok=kok,
+                lugat_anlami=lugat_anlami,
+                kuran_boyutu=ayet_ornek,
+                hayat_dersi=hikmet_notu,
+                ayet_ref=ayet_referans,
+                cikti_dosya_adi=f"kelime_4_5_{dosya_eki}.png",
+                format_tipi="4:5",
+                palet="yakut_kirmizi",
+            )
+            gorsel_9_16 = sablon_ciz.kelime_karti_ciz(
+                kelime_tr=kavram_adi,
+                kelime_ar=arapca_kelime,
+                okunus=icerik.get("okunus", ""),
+                kok=kok,
+                lugat_anlami=lugat_anlami,
+                kuran_boyutu=ayet_ornek,
+                hayat_dersi=hikmet_notu,
+                ayet_ref=ayet_referans,
+                cikti_dosya_adi=f"kelime_9_16_{dosya_eki}.png",
+                format_tipi="9:16",
+                palet="yakut_kirmizi",
+            )
+            gorsel_yollari = [str(gorsel_4_5), str(gorsel_9_16)]
+
+            arsiv.arsive_kaydet(
+                unique_id=unique_id,
+                kategori="kelime",
+                medya_kaynaklari={
+                    "gorsel_4_5": str(gorsel_4_5),
+                    "gorsel_9_16": str(gorsel_9_16),
+                },
+                meta={
+                    "baslik": kaynak,
+                    "kaynak": kaynak,
+                    "turkce_metin": turkce,
+                    "arapca_metin": arapca,
+                    "arapca_okunus": icerik.get("okunus"),
+                    "tefekkur": tefekkur,
+                    "caption": caption,
+                    "ekstra": {"kelime_id": kelime_id, "kok": kok},
+                },
+                versiyon=AKTIF_TASARIM_VERSIYONU,
+            )
 
     else:
         raise ValueError(f"Bilinmeyen içerik kategorisi: {kategori}")
@@ -316,6 +387,8 @@ def gorsel_icerik_olustur_ve_gonder(
         caption=caption,
         gorsel_yollari=gorsel_yollari,
         durum="taslak",
+        unique_id=unique_id,
+        tasarim_versiyonu=AKTIF_TASARIM_VERSIYONU,
     )
 
     # Yayın Öncesi Kalite & Güvenlik Denetimi
@@ -379,39 +452,72 @@ def hadis_videosu_olustur_ve_gonder(
     arapca_okunus = icerik.get("arapca_okunus")
     ravi = icerik.get("ravi")
 
-    spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
-    if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 2, 4, f"{spiker_adi} sesi ve kelime zamanları üretiliyor...")
+    # Kalıcı Repo Arşivi Denetimi
+    unique_id = f"hadis_{hadis_id}" if hadis_id is not None else f"hadis_{dosya_eki}"
+    arsiv_kayit = arsiv.arsivde_var_mi(unique_id, kategori="hadis", versiyon=AKTIF_TASARIM_VERSIYONU)
 
-    log.info(f"2/5: {spiker_adi} spiker sesi ve kelime zaman damgaları üretiliyor ({kaynak_ravi})...")
-    ses_id_etiketi = f"hadis_{hadis_id}" if hadis_id else f"hadis_{dosya_eki}"
-    ses_yolu = ses_getir.turkce_tts_uret(
-        metin=turkce_metin,
-        kategori="hadis",
-        icerik_id=ses_id_etiketi,
-        ton_promptu="[vakur, manevi ve sakin bir tefekkür tonuyla]",
-        zaman_damgasi_al=True
-    )
+    if arsiv_kayit:
+        log.info(f"🎯 [REPO ARŞİVİNDE MEVCUT] {unique_id} ({AKTIF_TASARIM_VERSIYONU}) depodan getirildi, render atlanıyor.")
+        video_yolu = Path(arsiv_kayit["video_yolu"])
+        ses_yolu = video_yolu
+        turkce_metin = arsiv_kayit.get("turkce_metin") or turkce_metin
+        kaynak_ravi = arsiv_kayit.get("kaynak") or kaynak_ravi
+        caption = arsiv_kayit.get("caption") or caption
+        tefekkur_notu = arsiv_kayit.get("tefekkur") or tefekkur_notu
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 3, 4, f"Hazır video arşivden yüklendi ({AKTIF_TASARIM_VERSIYONU})...")
+    else:
+        spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 2, 4, f"{spiker_adi} sesi ve kelime zamanları üretiliyor...")
 
-    words_data = ses_getir.turkce_kelime_zamanlari_getir(ses_yolu)
-    log.info(f"Kelime zaman damgaları yüklendi: {len(words_data)} kelime")
+        log.info(f"2/5: {spiker_adi} spiker sesi ve kelime zaman damgaları üretiliyor ({kaynak_ravi})...")
+        ses_id_etiketi = f"hadis_{hadis_id}" if hadis_id else f"hadis_{dosya_eki}"
+        ses_yolu = ses_getir.turkce_tts_uret(
+            metin=turkce_metin,
+            kategori="hadis",
+            icerik_id=ses_id_etiketi,
+            ton_promptu="[vakur, manevi ve sakin bir tefekkür tonuyla]",
+            zaman_damgasi_al=True
+        )
 
-    if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 3, 4, "1080x1920 video, Segâh Ney ve karaoke render ediliyor...")
+        words_data = ses_getir.turkce_kelime_zamanlari_getir(ses_yolu)
+        log.info(f"Kelime zaman damgaları yüklendi: {len(words_data)} kelime")
 
-    log.info("3/5: V20 Çok Sayfalı Dinamik Hadis Videosu render ediliyor...")
-    video_yolu = video_motoru.hadis_videosu_uret(
-        hadis_metni=turkce_metin,
-        kaynak_ref=kaynak_ravi,
-        ses_yolu=ses_yolu,
-        words_data=words_data,
-        arapca_metin=arapca_metin,
-        arapca_okunus=arapca_okunus,
-        ravi=ravi,
-        tefekkur_notu=tefekkur_notu,
-        cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"hadis_video_{dosya_eki}.mp4",
-        ney_volume=0.48
-    )
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 3, 4, "1080x1920 video, Segâh Ney ve karaoke render ediliyor...")
+
+        log.info("3/5: V20 Çok Sayfalı Dinamik Hadis Videosu render ediliyor...")
+        video_yolu = video_motoru.hadis_videosu_uret(
+            hadis_metni=turkce_metin,
+            kaynak_ref=kaynak_ravi,
+            ses_yolu=ses_yolu,
+            words_data=words_data,
+            arapca_metin=arapca_metin,
+            arapca_okunus=arapca_okunus,
+            ravi=ravi,
+            tefekkur_notu=tefekkur_notu,
+            cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"hadis_video_{dosya_eki}.mp4",
+            ney_volume=0.48
+        )
+
+        # Üretilen videoyu kalıcı GitHub repo arşivine kaydet
+        arsiv.arsive_kaydet(
+            unique_id=unique_id,
+            kategori="hadis",
+            medya_kaynaklari={"video": str(video_yolu)},
+            meta={
+                "baslik": kaynak_ravi,
+                "kaynak": kaynak_ravi,
+                "turkce_metin": turkce_metin,
+                "arapca_metin": arapca_metin,
+                "arapca_okunus": arapca_okunus,
+                "tefekkur": tefekkur_notu,
+                "caption": caption,
+                "ekstra": {"hadis_id": hadis_id, "ravi": ravi},
+            },
+            versiyon=AKTIF_TASARIM_VERSIYONU,
+        )
 
     if durum_mesaj_id and chat_id:
         telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Hadis Videosu", 4, 4, "Kalite kontrolü yapılıyor ve onaya sunuluyor...")
@@ -430,6 +536,8 @@ def hadis_videosu_olustur_ve_gonder(
         gorsel_yollari=[str(video_yolu.with_suffix(".png"))],
         ses_yolu=str(ses_yolu),
         durum="taslak",
+        unique_id=unique_id,
+        tasarim_versiyonu=AKTIF_TASARIM_VERSIYONU,
     )
 
     if hadis_id:
@@ -499,38 +607,72 @@ def dua_videosu_olustur_ve_gonder(
     kaynak_ref = icerik.get("kaynak_ref") or baslik
     caption = icerik.get("instagram_caption", "")
 
-    spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
-    if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 2, 4, f"{spiker_adi} sesi ve kelime zamanları üretiliyor...")
+    dua_id = icerik.get("id") or icerik.get("dua_id")
+    unique_id = f"dua_{dua_id}" if dua_id is not None else f"dua_{dosya_eki}"
+    arsiv_kayit = arsiv.arsivde_var_mi(unique_id, kategori="dua", versiyon=AKTIF_TASARIM_VERSIYONU)
 
-    log.info(f"2/5: {spiker_adi} spiker sesi ve kelime zaman damgaları üretiliyor ({baslik})...")
-    ses_yolu = ses_getir.turkce_tts_uret(
-        metin=turkce_anlam,
-        kategori="dua",
-        icerik_id=f"dua_{dosya_eki}",
-        ton_promptu="[huzurlu, samimi ve ulvi bir dua tonuyla]",
-        zaman_damgasi_al=True
-    )
+    if arsiv_kayit:
+        log.info(f"🎯 [REPO ARŞİVİNDE MEVCUT] {unique_id} ({AKTIF_TASARIM_VERSIYONU}) depodan getirildi, render atlanıyor.")
+        video_yolu = Path(arsiv_kayit["video_yolu"])
+        ses_yolu = video_yolu
+        turkce_anlam = arsiv_kayit.get("turkce_metin") or turkce_anlam
+        baslik = arsiv_kayit.get("baslik") or baslik
+        caption = arsiv_kayit.get("caption") or caption
+        fazilet = arsiv_kayit.get("tefekkur") or fazilet
+        kaynak_ref = arsiv_kayit.get("kaynak") or kaynak_ref
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 3, 4, f"Hazır video arşivden yüklendi ({AKTIF_TASARIM_VERSIYONU})...")
+    else:
+        spiker_adi = "Adam" if get_env("ELEVENLABS_API_KEY") else "Mazlum Kiper"
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 2, 4, f"{spiker_adi} sesi ve kelime zamanları üretiliyor...")
 
-    words_data = ses_getir.turkce_kelime_zamanlari_getir(ses_yolu)
-    log.info(f"Kelime zaman damgaları yüklendi: {len(words_data)} kelime")
+        log.info(f"2/5: {spiker_adi} spiker sesi ve kelime zaman damgaları üretiliyor ({baslik})...")
+        ses_yolu = ses_getir.turkce_tts_uret(
+            metin=turkce_anlam,
+            kategori="dua",
+            icerik_id=f"dua_{dosya_eki}",
+            ton_promptu="[huzurlu, samimi ve ulvi bir dua tonuyla]",
+            zaman_damgasi_al=True
+        )
 
-    if durum_mesaj_id and chat_id:
-        telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 3, 4, "1080x1920 video, Ferahfezâ Ney ve karaoke render ediliyor...")
+        words_data = ses_getir.turkce_kelime_zamanlari_getir(ses_yolu)
+        log.info(f"Kelime zaman damgaları yüklendi: {len(words_data)} kelime")
 
-    log.info("3/5: V20 Çok Sayfalı Dinamik Dua Videosu render ediliyor...")
-    video_yolu = video_motoru.dua_videosu_uret(
-        turkce_anlam=turkce_anlam,
-        dua_basligi=baslik,
-        ses_yolu=ses_yolu,
-        words_data=words_data,
-        arapca_metin=arapca_metin,
-        arapca_okunus=arapca_okunus,
-        tefekkur_notu=fazilet,
-        kaynak_ref=kaynak_ref,
-        cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"dua_video_{dosya_eki}.mp4",
-        ney_volume=0.48
-    )
+        if durum_mesaj_id and chat_id:
+            telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 3, 4, "1080x1920 video, Ferahfezâ Ney ve karaoke render ediliyor...")
+
+        log.info("3/5: V20 Çok Sayfalı Dinamik Dua Videosu render ediliyor...")
+        video_yolu = video_motoru.dua_videosu_uret(
+            turkce_anlam=turkce_anlam,
+            dua_basligi=baslik,
+            ses_yolu=ses_yolu,
+            words_data=words_data,
+            arapca_metin=arapca_metin,
+            arapca_okunus=arapca_okunus,
+            tefekkur_notu=fazilet,
+            kaynak_ref=kaynak_ref,
+            cikti_yolu=KOK_DIZIN / "data" / "cikti" / f"dua_video_{dosya_eki}.mp4",
+            ney_volume=0.48
+        )
+
+        # Üretilen videoyu kalıcı GitHub repo arşivine kaydet
+        arsiv.arsive_kaydet(
+            unique_id=unique_id,
+            kategori="dua",
+            medya_kaynaklari={"video": str(video_yolu)},
+            meta={
+                "baslik": baslik,
+                "kaynak": kaynak_ref,
+                "turkce_metin": turkce_anlam,
+                "arapca_metin": arapca_metin,
+                "arapca_okunus": arapca_okunus,
+                "tefekkur": fazilet,
+                "caption": caption,
+                "ekstra": {"dua_id": dua_id},
+            },
+            versiyon=AKTIF_TASARIM_VERSIYONU,
+        )
 
     if durum_mesaj_id and chat_id:
         telegram_bot.durum_guncelle(chat_id, durum_mesaj_id, "V20 Dua Videosu", 4, 4, "Kalite kontrolü yapılıyor ve onaya sunuluyor...")
@@ -549,6 +691,8 @@ def dua_videosu_olustur_ve_gonder(
         gorsel_yollari=[str(video_yolu.with_suffix(".png"))],
         ses_yolu=str(ses_yolu),
         durum="taslak",
+        unique_id=unique_id,
+        tasarim_versiyonu=AKTIF_TASARIM_VERSIYONU,
     )
 
     # Kalite Denetimi

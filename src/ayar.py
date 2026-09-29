@@ -18,6 +18,9 @@ CONFIG_YOLU = KOK_DIZIN / "config.yaml"
 # .env yükle
 load_dotenv(dotenv_path=ENV_YOLU)
 
+# Aktif Şablon ve Tasarım Motoru Versiyonu
+AKTIF_TASARIM_VERSIYONU: str = "v1"
+
 
 def ayar_yukle() -> Dict[str, Any]:
     """config.yaml dosyasını okur ve sözlük olarak döner."""
