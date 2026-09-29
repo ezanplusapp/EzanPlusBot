@@ -13,7 +13,7 @@ Bu belge, **Ezan Plus Sosyal Medya Motoru** projesinin mimari anayasasıdır. Pr
   * Paylaşılan her içerik Ezan Plus editoryal ekibinin elinden çıkmış gibi zarif, edebi, saygılı ve samimi bir Türkçe ile sunulmalıdır.
 - **KATI KURAL — SIFIR HALÜSİNASYON & TESCİLLİ KAYNAK ZORUNLULUĞU:**
   * Hadis ve Ayet mealleri, Arapça orijinal metinler ve kaynak referansları **asla yapay zekaya (Gemini'ye) sıfırdan yazdırılamaz**.
-  * **Sahih Hadisler:** Doğrudan yerel tescilli külliyat veritabanından (`data/hadisler/hadisler.db` - Riyâzü's-Sâlihîn 1.900 hadis) çekilir (`src/hadis_db.py`).
+  * **Sahih Hadisler:** Doğrudan yerel tescilli külliyat veritabanından (`data/hadisler/hadisler.db` - Sahîh-i Buhârî, Müslim, Kırk Hadis ve Riyâzü's-Sâlihîn 2.000 hadis) çekilir (`src/hadis_db.py`). Omurgası tam 1.000 Buhârî ve 1.295 Müslim hadisinden müteşekkildir.
   * **Kur'an Âyetleri ve Mealleri:** Doğrudan yerel tescilli Kur'an veritabanından (`data/kuran/kuran.db` - 6.236 âyet, 114 sûre) çekilir (`src/kuran_db.py`). Orijinal Arapça hat Medine Kral Fehd Uthmani metnidir; mealler resmi Elmalılı Hamdi Yazır ve Diyanet İşleri Başkanlığı külliyatıdır.
   * **Gemini AI'nin Sınırı:** Gemini AI yalnızca bu tescilli metinler üzerine edebi transkripsiyon (Latin okunuş), 2 satırlık video başlıkları, "Günün Nebevî Öğüdü / Hikmet Notu" (tefekkür) ve 5 odaklı hashtag'e sahip sosyal medya metni (caption) üretir.
 - **Alan Adı ve Web:**
@@ -296,9 +296,9 @@ Ezan Plus sosyal medya yayınlarında içeriklerin (Âyet, Hadis, Dua, Kelime) k
    GitHub Actions bulut ortamında çalışan sanal makineler geçicidir (ephemeral). Veritabanı sayaçlarının sıfırlanmasını önlemek için iş akışı sonunda `data/kuran/kuran.db` ve `data/hadisler/hadisler.db` dosyaları `git add` ile commit edilip depoya geri push edilir.
 4. **Külliyat ve Arşiv Kapasitesi:**
    - **Kur'an Âyetleri (`data/kuran/kuran.db`):** 6.236 âyet (Reels formatına uygun 4-25 kelimelik 4.476 âyet; günde 3 tilavet slotuyla ~4 yıl sıfır tekrar).
-   - **Sahih Hadisler (`data/hadisler/hadisler.db`):** 1.900 hadis (Riyâzü's-Sâlihîn; günde 1 hadis slotuyla ~5.2 yıl sıfır tekrar).
-   - **Günün Duası (`data/dualar/dualar.json`):** 20 özel dua (8 manevi ruh haline göre; paylaşılmamışlar önceliklidir).
-   - **Kur'an Sözlüğü / Kelime (`data/kelimeler/kelimeler.json`):** 15 temel kavram (el-Müfredât külliyatı; paylaşılmamışlar önceliklidir).
+   - **Sahih Hadisler (`data/hadisler/hadisler.db`):** 2.000 hadis (Sahîh-i Buhârî, Müslim, el-Erba'ûn Kırk Hadis ve Riyâzü's-Sâlihîn; 1.000 Buhârî, 1.295 Müslim referansı; günde 1 hadis slotuyla ~5.5 yıl sıfır tekrar).
+   - **Günün Duası (`data/dualar/dualar.json`):** 150 özel dua (Kur'an ve Sünnet'ten tescilli sahih niyazlar; günde 1 dua ile 5 ay sıfır tekrar).
+   - **Kur'an Sözlüğü / Kelime (`data/kelimeler/kelimeler.json`):** 250 temel kavram (el-Müfredât külliyatı & tescilli Medine Mushaf âyetleri; 8 aydan fazla sıfır tekrar).
 
 ---
 

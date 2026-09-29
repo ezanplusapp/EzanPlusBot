@@ -218,11 +218,13 @@ def gunun_hadisini_sec(
     tema: Optional[str] = None,
     sadece_kart_uygun: bool = True,
     haric_tutulanlar: Optional[List[str]] = None,
+    kulliyat: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Paylaşılmamış veya en az paylaşılmış sahih bir hadis seçer.
     Kart mizanpajına tam oturan uzunluktaki hadislere öncelik verir.
     Geçmişte paylaşılanları (haric_tutulanlar) kesinlikle eler.
+    İsteğe bağlı olarak belirli bir külliyatı (örn: 'Sahîh-i Buhârî') filtreleyebilir.
     """
     veritabanini_hazirla()
     with baglanti_al() as con:
@@ -231,13 +233,21 @@ def gunun_hadisini_sec(
 
         # Veritabanındaki global minimum paylaşım sayısını tespit et (henüz 0 olanlar var mı?)
         min_kontrol = "SELECT MIN(paylasim_sayisi) FROM hadisler WHERE " + ("kart_icin_uygun = 1" if sadece_kart_uygun else "1=1")
-        global_min_row = con.execute(min_kontrol).fetchone()
+        if kulliyat:
+            min_kontrol += " AND kulliyat LIKE ?"
+            global_min_row = con.execute(min_kontrol, (f"%{kulliyat}%",)).fetchone()
+        else:
+            global_min_row = con.execute(min_kontrol).fetchone()
         global_min = global_min_row[0] if global_min_row and global_min_row[0] is not None else 0
 
         if sadece_kart_uygun:
             filtreler.append("kart_icin_uygun = 1")
             filtreler.append("arapca_veciz != ''")
             filtreler.append("kaynak_ref != ''")
+
+        if kulliyat:
+            filtreler.append("kulliyat LIKE ?")
+            parametreler.append(f"%{kulliyat}%")
 
         # KATI KURAL: Global minimum paylaşımlı (henüz paylaşılmamış) hadisler önceliklidir
         filtreler.append("paylasim_sayisi <= ?")
