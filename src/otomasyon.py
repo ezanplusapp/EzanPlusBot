@@ -843,9 +843,11 @@ if __name__ == "__main__":
     zaten_yayinlandi = kayit_son and kayit_son.get("durum") == "yayinlandi"
 
     if zaten_yayinlandi or oto_yayin:
-        # Otomatik yayınlanan içeriklerde bekleme süresi boyunca 'Yayından Kaldır' butonu dinlenir
-        log.info(f"{tur.upper()} #{pid} yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor (Maks: {args.bekleme//60} dk)...")
-        dinle_ve_bekle(sure_saniye=args.bekleme, paylasim_id=pid, yayin_sonrasi=True)
+        # CI/GitHub Actions ortamında sonraki yayınları kilitlememek ve gereksiz runner süresi harcamamak için
+        # otomatik yayınlanan içeriklerde yayın sonrası Telegram dinleme süresi 60 saniye ile sınırlandırılır.
+        bekleme_suresi = min(args.bekleme, 60) if (os.environ.get("GITHUB_ACTIONS") and oto_yayin) else args.bekleme
+        log.info(f"{tur.upper()} #{pid} yayınlandı. Telegram'dan 'Yayından Kaldır' komutları dinleniyor (Maks: {bekleme_suresi} sn)...")
+        dinle_ve_bekle(sure_saniye=bekleme_suresi, paylasim_id=pid, yayin_sonrasi=True)
     elif args.otomatik:
         log.info(f"Otomatik yayınlama aktif. Paylaşım #{pid} doğrudan yayınlanıyor...")
         try:

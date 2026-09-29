@@ -39,7 +39,7 @@ on:
     types: [gunluk_yayin, gunluk_reels, gunluk_hadis, gunluk_dua, gunluk_kelime]
 
 concurrency:
-  group: reels-otomasyon
+  group: reels-otomasyon-${{ github.event.inputs.tur || github.event.client_payload.tur || 'genel' }}
   cancel-in-progress: false
 
 jobs:
@@ -135,7 +135,7 @@ jobs:
             fi
           fi
 
-          ARGS="--tur $TUR --bekleme 2700 --otomatik"
+          ARGS="--tur $TUR --bekleme 60 --otomatik"
           if [ "$AUTO" = "false" ]; then
             ARGS="--tur $TUR --bekleme 2700"
           fi
