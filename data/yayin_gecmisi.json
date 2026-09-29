@@ -701,5 +701,20 @@
     "youtube_post_id": null,
     "facebook_post_id": null,
     "tiktok_post_id": null
+  },
+  {
+    "id": 28,
+    "unique_id": "ayet_24_10",
+    "tasarim_versiyonu": "v1",
+    "kategori": "ayet",
+    "kaynak": "Nûr Sûresi • 10. Âyet",
+    "baslik": "Nûr Sûresi • 10. Âyet",
+    "yayin_zamani": "2026-09-29 13:33:07",
+    "instagram_post_id": "17984492742119964",
+    "instagram_story_post_id": "18126191857848866",
+    "threads_post_id": "18013282340962396",
+    "youtube_post_id": "V792WLHjtuU",
+    "facebook_post_id": "2176267953310186",
+    "tiktok_post_id": "v_inbox_file~v2.7690949364923795457"
   }
 ]
