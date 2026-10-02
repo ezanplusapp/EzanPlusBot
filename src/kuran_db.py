@@ -127,6 +127,22 @@ def sure_ayetleri_getir(
         return [dict(r) for r in cur.fetchall()]
 
 
+def cuz_ayetleri_getir(cuz_no: int) -> List[Dict[str, Any]]:
+    """Belirli bir cüze ait tüm âyetleri sırasıyla getirir (1..30)."""
+    with baglanti_al() as con:
+        cur = con.execute(
+            """
+            SELECT a.*, s.sure_adi_tr, s.sure_adi_ar, s.inis_yeri
+            FROM ayetler a
+            JOIN sureler s ON a.sure_no = s.sure_no
+            WHERE a.cuz_no = ?
+            ORDER BY a.sure_no ASC, a.ayet_no ASC
+            """,
+            (cuz_no,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
 def ayet_ara(arama_terimi: str, limit: int = 20) -> List[Dict[str, Any]]:
     """FTS5 tam metin araması ile meallerde veya sûre adlarında arama yapar."""
     arama_temiz = arama_terimi.strip().replace('"', '').replace("'", "")
