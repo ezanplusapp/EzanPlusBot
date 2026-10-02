@@ -34,11 +34,17 @@
     "yayin_zamani": "2026-09-07 19:31:28"
   },
   {
-    "id": 86,
+    "id": 29,
     "kategori": "kelime",
     "kaynak": "A'râf Sûresi • 96. Âyet",
     "baslik": "Bereket",
-    "yayin_zamani": "2026-09-08 22:44:05"
+    "yayin_zamani": "2026-10-02 11:58:59",
+    "tasarim_versiyonu": "v1",
+    "instagram_post_id": "ig_new_999",
+    "instagram_story_post_id": "story_new_999",
+    "threads_post_id": "th_new_999",
+    "facebook_post_id": "fb_already_exists_123",
+    "tiktok_post_id": "tt_mock_999"
   },
   {
     "id": 19,
@@ -179,11 +185,14 @@
     "yayin_zamani": "2026-09-17 13:22:20"
   },
   {
-    "id": 321,
+    "id": 30,
     "kategori": "hadis",
     "kaynak": "Kardeşlik Hadisi",
     "baslik": "Kardeşlik Hadisi",
-    "yayin_zamani": "2026-09-18 00:58:10"
+    "yayin_zamani": "2026-10-02 11:58:59",
+    "tasarim_versiyonu": "v1",
+    "instagram_post_id": "ig_111",
+    "facebook_post_id": "fb_444"
   },
   {
     "id": 310,

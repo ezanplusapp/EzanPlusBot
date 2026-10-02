@@ -184,6 +184,9 @@ def ayet_kelime_zamanlari_getir(sure_no: int, ayet_no: int) -> List[Tuple[int, f
                     e_sec = max(s_sec + 0.05, (ayah_end - ayah_start) / 1000.0)
                 else:
                     continue
+                # Anormal büyük QuranCDN zaman damgası indekslerini temizle
+                if w_idx > 1000:
+                    w_idx = len(zamanlar)
                 zamanlar.append((w_idx, round(s_sec, 3), round(e_sec, 3)))
             return zamanlar
 

@@ -303,6 +303,8 @@ def turkce_okunus_hizala(tr_list: List[str], ar_list: List[str]) -> List[str]:
         return []
     if not tr_list:
         return [""] * len(ar_list)
+    if isinstance(tr_list, str):
+        tr_list = tr_list.split()
 
     # Glif eksikliği (tofu kutusu) engeli için kelimeleri temizle
     tr_list = [latin_okunus_temizle(w.strip()) for w in tr_list if w.strip()]
@@ -421,6 +423,10 @@ def kelime_zamanlarini_hizala(
         w_idx = max(0, min(w_idx, toplam_kelime - 1))
         e_sec = max(s_sec + 0.05, e_sec)
         normalize_segs.append((w_idx, round(s_sec, 3), round(e_sec, 3)))
+
+    if len(normalize_segs) == toplam_kelime:
+        # 1:1 kelime-segment eşleşmesinde harici veri hatasını (QuranCDN typo) otomatik iyileştir
+        normalize_segs = [(i, s, e) for i, (_, s, e) in enumerate(normalize_segs)]
 
     if normalize_segs:
         return normalize_segs

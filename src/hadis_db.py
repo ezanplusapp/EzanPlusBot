@@ -55,6 +55,77 @@ def _html_temizle_ve_ayristir(raw_tr: str) -> List[str]:
     return [s.strip() for s in m.split('\n') if s.strip()]
 
 
+def make_arabic_pattern(phrase: str) -> str:
+    T = r'[\u064B-\u065F\u0670]*'
+    clean = re.sub(r'[\u064B-\u065F\u0670]', '', phrase)
+    parts = []
+    for ch in clean:
+        if ch.isspace():
+            parts.append(r'\s+')
+        elif ch in ('ا', 'أ', 'إ', 'آ'):
+            parts.append(r'[اأإآ]' + T)
+        elif ch in ('ه', 'ة'):
+            parts.append(r'[هة]' + T)
+        elif ch in ('ي', 'ى'):
+            parts.append(r'[يى]' + T)
+        else:
+            parts.append(re.escape(ch) + T)
+    return ''.join(parts)
+
+
+_TAK_TERMS = ['رواه', 'متفق عليه', 'اخرجه', 'أخرجه', 'وفي رواية', 'حديث حسن']
+_TAK_REGEX = re.compile(r'(?:[\s\.\،»\"\(\[\{]|^)(?:' + '|'.join(make_arabic_pattern(t) for t in _TAK_TERMS) + r')')
+
+
+def arapca_veciz_ayikla(ar_clean: str) -> str:
+    """
+    Arapça hadis metninden senedi (isnadı), takhrij ibarelerini (râvî, tahric, sıhhat derecesi)
+    ve fıkhî açıklamaları ayıklayarak Resûlullah'ın (s.a.v.) asıl veciz lafzını döner.
+    """
+    if not ar_clean:
+        return ""
+    text = ar_clean.strip()
+
+    # 1. Takhrij'in başladığı ilk noktayı bul (en az 20 karakter sonra olmalı)
+    m = _TAK_REGEX.search(text)
+    if m and m.start() >= 20:
+        ana_govde = text[:m.start()].strip()
+    else:
+        ana_govde = text
+
+    ana_govde = re.sub(r'[\s\.\،»\"“”\'\(\)\[\]]+$', '', ana_govde).strip()
+
+    # 2. Tam tırnak (« ... » veya “ ... ” veya " ... ") kontrolü
+    tirnak = re.search(r'[\"“«]([^\"”»]{8,})[\"”»]', ana_govde)
+    if tirnak and not tirnak.group(1).strip().startswith('بفتح'):
+        candidate = tirnak.group(1).strip()
+        if len(candidate.split()) >= 3:
+            return re.sub(r'\s+', ' ', candidate).strip('«»\"“”\' \t\r\n:،.()')
+
+    # Yetim kapanış tırnağı varsa temizle
+    if ana_govde.endswith('»'):
+        ana_govde = ana_govde[:-1].strip()
+
+    # 3. İsnad / Sened temizliği: Salavat veya 'قال :' sonrasını bul
+    salawat_match = re.search(r'(?:صَلّى|صلى)[^:]*?(?:قالَ?|قَالَ|يقول|يقُولُ?)?\s*[:\.]\s*', ana_govde)
+    if salawat_match:
+        sonraki = ana_govde[salawat_match.end():].strip()
+    else:
+        matches = list(re.finditer(r'(?:قالَ?|قَالَ|يقُولُ?)\s*[:\.]\s*', ana_govde))
+        if matches:
+            sonraki = ana_govde[matches[-1].end():].strip()
+        else:
+            sonraki = ana_govde
+
+    sonraki = re.sub(r'^سمعت\s*رسول\s*الله\s*(?:صلى|صَلّى)\s*اللهُ?\s*عَلَيْهِ\s*وسَلَّم\s*(?:يقول|يقُولُ)\s*[:\.]\s*', '', sonraki)
+    sonraki = sonraki.strip('«»\"“”\' \t\r\n:،.()')
+    sonraki = re.sub(r'\s+', ' ', sonraki)
+
+    if len(sonraki.split()) < 3:
+        return ana_govde.strip('«»\"“”\' \t\r\n:،.()')
+    return sonraki
+
+
 def _hadis_kaydi_parse(h: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Ham JSON kaydını ayrıştırarak temiz alanlara dönüştürür."""
     raw_tr = h.get("turkish", "")
@@ -109,23 +180,7 @@ def _hadis_kaydi_parse(h: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     ar_temiz = html.unescape(raw_ar) if raw_ar else ""
     ar_temiz = re.sub(r'<[^>]+>', '', ar_temiz).strip()
     ar_clean = re.sub(r'[\u200e\u200f\u200b\u202a-\u202e\ufeff]', '', ar_temiz).replace('\r', ' ').strip()
-
-    tirnak = re.search(r'[\"“«]([^\"”»]{15,})[\"”»]', ar_clean)
-    if tirnak and len(tirnak.group(1).strip().split()) >= 3 and not tirnak.group(1).strip().startswith('بفتح'):
-        ar_veciz = re.sub(r'\s+', ' ', tirnak.group(1).strip())
-    else:
-        matches = list(re.finditer(r'(?:قالَ?|يقُولُ?|صَلّى\s*اللهُ?\s*عَلَيْهِ\s*وسَلَّم|صلى\s*الله\s*عليه\s*وسلم)\s*[:\.]\s*', ar_clean))
-        if matches:
-            last_match = matches[-1]
-            sonraki = ar_clean[last_match.end():].strip()
-        else:
-            sonraki = ar_clean
-
-        sonraki = re.sub(r'^سمعت\s*رسول\s*الله\s*(?:صلى|صَلّى)\s*اللهُ?\s*عَلَيْهِ\s*وسَلَّم\s*(?:يقول|يقُولُ)\s*[:\.]\s*', '', sonraki)
-        sonraki = re.split(r'متفقٌ?\s*عليه|رَوَاهُ|رواه|وفي رواية|و\s*«', sonraki)[0].strip()
-        sonraki = sonraki.strip('«»\"“”\' \t\r\n:،.()')
-        sonraki = re.sub(r'\s+', ' ', sonraki)
-        ar_veciz = sonraki if len(sonraki.split()) >= 3 else ar_clean
+    ar_veciz = arapca_veciz_ayikla(ar_clean)
 
     # Kelime sayısı ve kart uygunluğu
     kelime_sayisi = len(ana_metin.split())
