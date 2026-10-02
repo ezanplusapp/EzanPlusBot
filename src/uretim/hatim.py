@@ -19,7 +19,7 @@ import imageio_ffmpeg
 from PIL import Image, ImageDraw, ImageFont
 
 from ..ayar import KOK_DIZIN
-from ..kuran_db import ayet_getir, cuz_ayetleri_getir, sure_bilgisi_getir
+from ..kuran_db import ayet_getir, cuz_ayetleri_getir, sure_bilgisi_getir, latin_okunus_getir
 from .kart import arapca_hazirla
 from .ses import (
     ayet_kelime_zamanlari_getir,
@@ -154,6 +154,8 @@ class Hatim16x9Sayfa:
         tefekkur_notu: str,
         cuz_ilerleme_yuzdesi: float = 0.0,
         juz_toplam_sure_str: str = "52:14",
+        sayfa_indeks: int = 1,
+        sayfa_toplam: int = 1,
     ):
         self.sure_no = sure_no
         self.ayet_no = ayet_no
@@ -168,6 +170,8 @@ class Hatim16x9Sayfa:
         self.tefekkur_notu = tefekkur_notu
         self.cuz_ilerleme_yuzdesi = cuz_ilerleme_yuzdesi
         self.juz_toplam_sure_str = juz_toplam_sure_str
+        self.sayfa_indeks = sayfa_indeks
+        self.sayfa_toplam = sayfa_toplam
 
         # Fontlar
         self.f_logo = font_al("Lora.ttf", 32)
@@ -222,7 +226,10 @@ class Hatim16x9Sayfa:
         draw.text((157, 92), "HATİM-İ ŞERİF • 4K ULTRA HD", font=self.f_sub, fill=ALTIN)
 
         # Orta: Cüz & Sûre Rozeti
-        badge_text = f"{self.cuz_no}. CÜZ  •  {self.sure_adi_tr.upper()} SÛRESİ  ({self.ayet_no}. ÂYET)"
+        if self.sayfa_toplam > 1:
+            badge_text = f"{self.cuz_no}. CÜZ  •  {self.sure_adi_tr.upper()} SÛRESİ  ({self.ayet_no}. ÂYET  {self.sayfa_indeks}/{self.sayfa_toplam})"
+        else:
+            badge_text = f"{self.cuz_no}. CÜZ  •  {self.sure_adi_tr.upper()} SÛRESİ  ({self.ayet_no}. ÂYET)"
         bbox_b = draw.textbbox((0, 0), badge_text, font=self.f_badge)
         bw = bbox_b[2] - bbox_b[0]
         bx = (W_16_9 - bw) // 2
@@ -441,9 +448,12 @@ def hatim_ayet_klibi_uret(
     hizali_zamanlar = kelime_zamanlarini_hizala(kelime_zamanlari, len(ar_kelimeler), toplam_sure)
 
     # Latin okunuş transkripsiyonu
-    latin_raw = latin_okunus_temizle(meal_str)  # fallback
-    # Kelime sayısı kadar latin okunuş dengesi
-    tr_kelimeler = ar_kelimeler[:]
+    latin_str = latin_okunus_getir(sure_no, ayet_no)
+    if latin_str:
+        tr_ham = [latin_okunus_temizle(w.strip()) for w in latin_str.split() if w.strip()]
+        tr_kelimeler = turkce_okunus_hizala(tr_ham, ar_kelimeler)
+    else:
+        tr_kelimeler = ar_kelimeler[:]
 
     # Tefekkür Notu
     tefekkur_notu = (
@@ -451,21 +461,72 @@ def hatim_ayet_klibi_uret(
         "Her âyet-i kerîme, müminin kalbine şifa, zihnine tefekkür ve istikamet aşılayan ilahî bir rehberdir."
     )
 
-    # Sayfalandırma denetimi: 16:9 ekranda 14 kelimeye kadar tek sayfa idealdir
-    sayfa = Hatim16x9Sayfa(
-        sure_no=sure_no,
-        ayet_no=ayet_no,
-        cuz_no=cuz_no,
-        sayfa_no=sayfa_no,
-        sure_adi_tr=sure_adi_tr,
-        toplam_sure_ayet=toplam_sure_ayet,
-        ar_kelimeler=ar_kelimeler,
-        tr_kelimeler=tr_kelimeler,
-        kelime_offset=0,
-        meal_metni=meal_str,
-        tefekkur_notu=tefekkur_notu,
-        cuz_ilerleme_yuzdesi=cuz_ilerleme_yuzdesi,
-    )
+    # Sayfalandırma denetimi: 16:9 ekranda 15 kelimeye kadar tek sayfa ferahça sunulur;
+    # 16 kelime ve üzerinde tescilli secavend duraklarına göre sayfalara bölünür.
+    toplam_kelime = len(ar_kelimeler)
+    if toplam_kelime <= 15:
+        sayfa_sayisi = 1
+        sayfa_araliklari = [(0, toplam_kelime)]
+        meal_parcalari = [meal_str]
+    else:
+        sayfa_sayisi = max(2, math.ceil(toplam_kelime / 13))
+        sayfa_araliklari = akilli_sayfa_araliklari(ar_kelimeler, ar_str, hizali_zamanlar, sayfa_sayisi)
+        split_ratios = [w_e / max(1, toplam_kelime) for _, w_e in sayfa_araliklari[:-1]]
+        meal_parcalari = _meal_parcala(meal_str, sayfa_sayisi, split_ratios=split_ratios)
+
+    sayfalar: List[Hatim16x9Sayfa] = []
+    for p_idx, (w_s, w_e) in enumerate(sayfa_araliklari):
+        s_obj = Hatim16x9Sayfa(
+            sure_no=sure_no,
+            ayet_no=ayet_no,
+            cuz_no=cuz_no,
+            sayfa_no=sayfa_no,
+            sure_adi_tr=sure_adi_tr,
+            toplam_sure_ayet=toplam_sure_ayet,
+            ar_kelimeler=ar_kelimeler[w_s:w_e],
+            tr_kelimeler=tr_kelimeler[w_s:w_e],
+            kelime_offset=w_s,
+            meal_metni=meal_parcalari[p_idx],
+            tefekkur_notu=tefekkur_notu,
+            cuz_ilerleme_yuzdesi=cuz_ilerleme_yuzdesi,
+            sayfa_indeks=p_idx + 1,
+            sayfa_toplam=sayfa_sayisi,
+        )
+        sayfalar.append(s_obj)
+
+    # Çok sayfalı geçiş pencereleri (0.45s crossfade)
+    gecisler: List[Tuple[float, float, int, int]] = []
+    TRANS_DURATION = 0.45
+    if sayfa_sayisi > 1:
+        for p in range(sayfa_sayisi - 1):
+            w_last = sayfa_araliklari[p][1] - 1
+            w_first = sayfa_araliklari[p + 1][0]
+            t_p_end = None
+            t_next_start = None
+            if hizali_zamanlar:
+                for seg in hizali_zamanlar:
+                    w_k = seg[0]
+                    s_t = seg[1]
+                    e_t = seg[2]
+                    if w_k <= w_last:
+                        t_p_end = e_t
+                    if w_k >= w_first and t_next_start is None:
+                        t_next_start = s_t
+            if t_p_end is None:
+                t_p_end = (p + 1) * (toplam_sure / sayfa_sayisi)
+            if t_next_start is None:
+                t_next_start = t_p_end
+
+            pause = t_next_start - t_p_end
+            if pause >= TRANS_DURATION:
+                t_trans_s = t_p_end + (pause - TRANS_DURATION) / 2.0
+                t_trans_e = t_trans_s + TRANS_DURATION
+            else:
+                t_switch = (t_p_end + t_next_start) / 2.0
+                t_trans_s = max(0.0, t_switch - TRANS_DURATION / 2.0)
+                t_trans_e = min(toplam_sure, t_switch + TRANS_DURATION / 2.0)
+
+            gecisler.append((t_trans_s, t_trans_e, p, p + 1))
 
     if cikti_mp4 is None:
         cikti_mp4 = HATIM_CIKTI_DIR / f"ayet_{sure_no:03d}_{ayet_no:03d}.mp4"
@@ -508,7 +569,29 @@ def hatim_ayet_klibi_uret(
                     aktif_idx = w_i
                     break
 
-            kare = sayfa.kare_ciz(aktif_idx=aktif_idx, ayah_progress=f_idx / max(1, total_frames))
+            if sayfa_sayisi == 1:
+                kare = sayfalar[0].kare_ciz(aktif_idx=aktif_idx, ayah_progress=f_idx / max(1, total_frames))
+            else:
+                in_transition = False
+                for t_s, t_e, p_from, p_to in gecisler:
+                    if t_s <= t_sec <= t_e:
+                        alpha = (t_sec - t_s) / max(0.001, (t_e - t_s))
+                        kare_from = sayfalar[p_from].kare_ciz(aktif_idx=sayfa_araliklari[p_from][1], ayah_progress=f_idx / max(1, total_frames))
+                        kare_to = sayfalar[p_to].kare_ciz(aktif_idx=sayfa_araliklari[p_to][0] - 1, ayah_progress=f_idx / max(1, total_frames))
+                        kare = Image.blend(kare_from, kare_to, alpha)
+                        in_transition = True
+                        break
+
+                if not in_transition:
+                    active_p = 0
+                    for t_s, t_e, p_from, p_to in gecisler:
+                        if t_sec < t_s:
+                            active_p = p_from
+                            break
+                        else:
+                            active_p = p_to
+                    kare = sayfalar[active_p].kare_ciz(aktif_idx=aktif_idx, ayah_progress=f_idx / max(1, total_frames))
+
             proc.stdin.write(kare.tobytes())
 
         _, stderr = proc.communicate(timeout=60)

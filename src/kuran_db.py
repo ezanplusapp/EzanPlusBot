@@ -143,6 +143,30 @@ def cuz_ayetleri_getir(cuz_no: int) -> List[Dict[str, Any]]:
         return [dict(r) for r in cur.fetchall()]
 
 
+_TRANSLITERATION_CACHE: Optional[Dict[Tuple[int, int], str]] = None
+
+
+def latin_okunus_getir(sure_no: int, ayet_no: int) -> str:
+    """Tescilli tr.transliteration dosyasından âyetin Latin okunuşunu getirir."""
+    global _TRANSLITERATION_CACHE
+    if _TRANSLITERATION_CACHE is None:
+        cache: Dict[Tuple[int, int], str] = {}
+        trans_dosyasi = KURAN_DIZINI / "tr.transliteration"
+        if trans_dosyasi.exists():
+            try:
+                for line in trans_dosyasi.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line:
+                        parts = line.split("|", 2)
+                        if len(parts) == 3:
+                            cache[(int(parts[0]), int(parts[1]))] = parts[2].strip()
+            except Exception as e:
+                log.warning(f"tr.transliteration okuma hatası: {e}")
+        _TRANSLITERATION_CACHE = cache
+
+    return _TRANSLITERATION_CACHE.get((sure_no, ayet_no), "")
+
+
 def ayet_ara(arama_terimi: str, limit: int = 20) -> List[Dict[str, Any]]:
     """FTS5 tam metin araması ile meallerde veya sûre adlarında arama yapar."""
     arama_temiz = arama_terimi.strip().replace('"', '').replace("'", "")
