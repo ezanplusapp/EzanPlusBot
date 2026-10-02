@@ -427,6 +427,23 @@ def kelime_zamanlarini_hizala(
     if len(normalize_segs) == toplam_kelime:
         # 1:1 kelime-segment eşleşmesinde harici veri hatasını (QuranCDN typo) otomatik iyileştir
         normalize_segs = [(i, s, e) for i, (_, s, e) in enumerate(normalize_segs)]
+    else:
+        # Segment sayısı farklı olan ayetlerde geleceğe sıçrayan hatalı indeksleri (future spikes) düzelt
+        clean_segs = []
+        frontier = 0
+        for i, (w_i, s, e) in enumerate(normalize_segs):
+            fixed_w = w_i
+            if fixed_w > frontier + 1 and i + 1 < len(normalize_segs):
+                drops_later = any(normalize_segs[k][0] < fixed_w for k in range(i + 1, min(len(normalize_segs), i + 8)))
+                if drops_later:
+                    next_val = normalize_segs[i + 1][0]
+                    if next_val <= frontier + 1:
+                        fixed_w = max(0, frontier)
+                    else:
+                        fixed_w = min(toplam_kelime - 1, frontier + 1)
+            frontier = max(frontier, fixed_w)
+            clean_segs.append((min(toplam_kelime - 1, fixed_w), s, e))
+        normalize_segs = clean_segs
 
     if normalize_segs:
         return normalize_segs

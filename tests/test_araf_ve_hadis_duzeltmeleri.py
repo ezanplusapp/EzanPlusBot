@@ -33,6 +33,52 @@ class TestArafVeHadisDuzeltmeleri(unittest.TestCase):
         self.assertEqual(hizali[3][0], 3)
         self.assertEqual(hizali[4][0], 4)
 
+    def test_ayetel_kursi_ve_oob_zaman_damgalari(self):
+        """Bakara 255 (Ayet-el Kürsî), Bakara 114 ve Tin 8 gibi âyetlerde sınır dışı (OOB) indeks oluşmadığını doğrular."""
+        test_ayetleri = [(2, 255), (2, 114), (3, 8), (3, 200), (95, 8)]
+        with sqlite3.connect(str(KURAN_DB_YOLU)) as con:
+            for s_no, a_no in test_ayetleri:
+                cur = con.execute("SELECT arapca_metin FROM ayetler WHERE sure_no = ? AND ayet_no = ?", (s_no, a_no))
+                ar_text = cur.fetchone()[0]
+                words = arapca_kelimeleri_ayristir(ar_text)
+                nw = len(words)
+
+                zamanlar = ayet_kelime_zamanlari_getir(s_no, a_no)
+                self.assertTrue(len(zamanlar) > 0, f"Sûre {s_no}:{a_no} için zaman damgaları boş olamaz.")
+
+                for seg_idx, (w_i, s_t, e_t) in enumerate(zamanlar):
+                    self.assertGreaterEqual(w_i, 0, f"{s_no}:{a_no} seg {seg_idx} indeksi negatif olamaz.")
+                    self.assertLess(w_i, nw, f"{s_no}:{a_no} seg {seg_idx} indeksi kelime sayısını ({nw}) aşamaz!")
+
+                hizali = kelime_zamanlarini_hizala(zamanlar, nw, 60.0)
+                for w_i, _, _ in hizali:
+                    self.assertLess(w_i, nw)
+
+    def test_gelecege_sicrayan_anomaliler_korumasi(self):
+        """2:153, 2:196, 2:201, 2:217 ve 7:157 gibi âyetlerde geleceğe sıçrama hatalarının çözüldüğünü doğrular."""
+        test_ayetleri = [(2, 153), (2, 196), (2, 201), (2, 217), (7, 157)]
+        with sqlite3.connect(str(KURAN_DB_YOLU)) as con:
+            for s_no, a_no in test_ayetleri:
+                cur = con.execute("SELECT arapca_metin FROM ayetler WHERE sure_no = ? AND ayet_no = ?", (s_no, a_no))
+                ar_text = cur.fetchone()[0]
+                words = arapca_kelimeleri_ayristir(ar_text)
+                nw = len(words)
+
+                zamanlar = ayet_kelime_zamanlari_getir(s_no, a_no)
+                hizali = kelime_zamanlarini_hizala(zamanlar, nw, 60.0)
+
+                # Monoton frontier denetimi: Hiçbir kelime geleceğe sıçrayıp ardından geri düşmemelidir
+                frontier = 0
+                for i, (w_i, s_t, e_t) in enumerate(hizali):
+                    if w_i > frontier + 1:
+                        # Geleceğe zıplamışsa, sonradan geri düşme ASLA olmamalıdır
+                        later_indices = [item[0] for item in hizali[i + 1:]]
+                        self.assertFalse(
+                            any(l_i < w_i for l_i in later_indices),
+                            f"{s_no}:{a_no} segment {i} indeksi ({w_i}) geleceğe sıçrayıp sonra geri düşüyor!"
+                        )
+                    frontier = max(frontier, w_i)
+
     def test_tirmizi_birr_71_veciz_ve_metin_butunlugu(self):
         """Tirmizî Birr 71 (ID 1741) hadisinde Arapça metnin kırpılmadığını ve takhric notunun veciz yerine geçmediğini doğrular."""
         with sqlite3.connect(str(HADIS_DB_YOLU)) as con:
