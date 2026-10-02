@@ -2352,9 +2352,9 @@
     "kuran_boyutu": "Peygamber'e ve muhacirlere yurtlarını açan, mallarını kardeşleriyle bölüşen ve Kur'an'da övülen Medineli müminlerdir.",
     "hayat_dersi": "Varlığını paylaşmaktan korkmayıp zorda kalan kardeşine sığınak ve dayanak olabilmektir.",
     "ayet_ref": "Tevbe Sûresi, 100. Âyet",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-02 19:03:11"
   },
   {
     "id": 162,
