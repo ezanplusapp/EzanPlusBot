@@ -3287,10 +3287,10 @@
     "kuran_boyutu": "“Şüphesiz Biz ona yolu gösterdik; ister şükredici olsun, isterse nankör.” (İnsân, 3)",
     "hayat_dersi": "Hayat bir seçimdir; nankörlüğün darlığını değil, şükrün bereketli ve huzurlu genişliğini seç.",
     "ayet_ref": "İnsân Sûresi, 3. Âyet",
-    "paylasildi_mi": false,
+    "paylasildi_mi": true,
     "ayet_arapca": "إِنَّا هَدَيْنَـٰهُ ٱلسَّبِيلَ إِمَّا شَاكِرًا وَإِمَّا كَفُورًا",
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-04 19:02:19"
   },
   {
     "id": 227,
