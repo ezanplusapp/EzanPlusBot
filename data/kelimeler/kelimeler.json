@@ -1029,10 +1029,10 @@
     "kuran_boyutu": "“Hanginizin daha iyi iş işlediğini belirtmek için, ölümü ve dirimi yaratan O'dur. O, güçlüdür, bağışlayandır.” (Mülk, 2)",
     "hayat_dersi": "Başına gelen dertler seni yok etmek için değil, manevi cevherini parlatıp olgunlaştırmak içindir.",
     "ayet_ref": "Mülk Sûresi, 2. Âyet",
-    "paylasildi_mi": false,
+    "paylasildi_mi": true,
     "ayet_arapca": "ٱلَّذِى خَلَقَ ٱلْمَوْتَ وَٱلْحَيَوٰةَ لِيَبْلُوَكُمْ أَيُّكُمْ أَحْسَنُ عَمَلًا ۚ وَهُوَ ٱلْعَزِيزُ ٱلْغَفُورُ",
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-05 19:02:29"
   },
   {
     "id": 70,
