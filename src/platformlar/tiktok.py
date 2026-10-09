@@ -201,15 +201,16 @@ def tiktok_video_yukle(
     video_yolu: str | Path,
     baslik: str,
     aciklama: Optional[str] = None,
-    taslak_modu: bool = True,
+    taslak_modu: bool = False,
 ) -> Dict[str, Any]:
     """
     9:16 dikey videoyu TikTok'a yükler.
-    taslak_modu=True: TikTok Inbox (Draft) modunda yükler (/v2/post/publish/inbox/video/init/).
-                      Video kullanıcının TikTok mobil uygulamasındaki 'Gelen Kutusu / Taslaklar' klasörüne düşer,
-                      kullanıcı telefonundan kontrol edip yayınlar. App Review gerektirmez (video.upload yeterlidir).
     taslak_modu=False: TikTok Direct Post modunda doğrudan yayınlar (/v2/post/publish/video/init/).
-                       TikTok App Review onayı (video.publish) gerektirir. Hata alırsa otomatik olarak taslak moduna düşer.
+                       TikTok API v2 'post_info.title' alanına tam açıklamayı (caption + etiketler) ekler.
+                       App Review onayı (video.publish) gerektirir. Hata alırsa otomatik olarak taslak moduna düşer.
+    taslak_modu=True:  TikTok Inbox (Draft) modunda yükler (/v2/post/publish/inbox/video/init/).
+                       Video kullanıcının TikTok bildirimlerine düşer. DİKKAT: TikTok API v2 Inbox endpoint'i
+                       teknik olarak 'post_info' desteklemez; videoyu saf dosya olarak gönderir (açıklama parametresi kabul edilmez).
     """
     v_path = Path(video_yolu)
     if not v_path.exists():
@@ -376,10 +377,18 @@ def tiktok_foto_yukle(
         # TikTok Photo Mode Kuralı (API v2):
         # title: Maksimum 90 karakter (kısa manşet başlığı)
         # description: Maksimum 4000 karakter (tam metin, tefekkür ve etiketler)
-        caption_fmt = baslik_ve_etiketleri_birlestir(baslik, aciklama, maks_karakter=4000)
         temiz_baslik = (baslik or "Ezan Plus").strip()
         if len(temiz_baslik) > 85:
             temiz_baslik = temiz_baslik[:82] + "..."
+
+        # Açıklama (description) alanına başlığı mükerrer ekleme!
+        # TikTok Photo Mode'da 'title' (manşet) ve 'description' (açıklama) ayrı alanlardır.
+        # aciklama parametresi zaten kanca, künye, tefekkür ve etiketleri içerir.
+        temiz_aciklama = (aciklama or "").strip()
+        if temiz_baslik and temiz_aciklama.startswith(temiz_baslik):
+            temiz_aciklama = temiz_aciklama[len(temiz_baslik):].strip()
+
+        desc_fmt = temiz_aciklama[:4000].strip() if temiz_aciklama else temiz_baslik
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -393,7 +402,7 @@ def tiktok_foto_yukle(
         payload = {
             "post_info": {
                 "title": temiz_baslik,
-                "description": caption_fmt,
+                "description": desc_fmt,
                 "privacy_level": privacy_val,
                 "disable_comment": False,
                 "auto_add_music": True,

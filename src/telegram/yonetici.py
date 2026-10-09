@@ -172,13 +172,14 @@ def yayinla_hepsi(
             key = os.getenv("TIKTOK_CLIENT_KEY")
             if key and tiktok.TOKEN_DOSYASI.exists():
                 baslik = kayit.get("baslik") or "Ezan Plus"
+                tt_inbox_ayar = db.ayar_getir("ayar_tiktok_inbox", "KAPALI") == "AÇIK"
                 if format_tipi == "reels_9_16" and video_yolu:
                     log.info(f"TikTok'a yükleniyor (Paralel Dağıtım Video): {video_yolu}")
                     tt_res = tiktok.tiktok_video_yukle(
                         video_yolu=video_yolu,
                         baslik=baslik,
                         aciklama=caption,
-                        taslak_modu=True,
+                        taslak_modu=tt_inbox_ayar,
                     )
                 elif gorsel_yollari:
                     log.info(f"TikTok Fotoğraf Moduna yükleniyor (Paralel Dağıtım Foto): {gorsel_yollari}")
@@ -186,7 +187,7 @@ def yayinla_hepsi(
                         gorsel_yollari=gorsel_yollari,
                         baslik=baslik,
                         aciklama=caption,
-                        taslak_modu=True,
+                        taslak_modu=tt_inbox_ayar,
                     )
                 else:
                     tt_res = {}
@@ -446,10 +447,11 @@ def yayinla_telafi(
             if key and tiktok.TOKEN_DOSYASI.exists():
                 log.info(f"Telafi: TikTok yükleniyor (#{paylasim_id})...")
                 baslik = kayit.get("baslik") or "Ezan Plus"
+                tt_inbox_ayar = db.ayar_getir("ayar_tiktok_inbox", "KAPALI") == "AÇIK"
                 if format_tipi == "reels_9_16" and video_yolu:
-                    tt_res = tiktok.tiktok_video_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption, taslak_modu=True)
+                    tt_res = tiktok.tiktok_video_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption, taslak_modu=tt_inbox_ayar)
                 elif gorsel_yollari:
-                    tt_res = tiktok.tiktok_foto_yukle(gorsel_yollari=gorsel_yollari, baslik=baslik, aciklama=caption, taslak_modu=True)
+                    tt_res = tiktok.tiktok_foto_yukle(gorsel_yollari=gorsel_yollari, baslik=baslik, aciklama=caption, taslak_modu=tt_inbox_ayar)
                 else:
                     tt_res = {}
                 with _lock:

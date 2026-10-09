@@ -506,7 +506,7 @@ AYAR_TANIMLARI = {
     "ayar_facebook": ("📘 Facebook Paylaşımı", ["AÇIK", "KAPALI"], "AÇIK"),
     "ayar_threads": ("🧵 Threads Paylaşımı", ["AÇIK", "KAPALI"], "AÇIK"),
     "ayar_youtube": ("▶️ YouTube Shorts", ["AÇIK", "KAPALI"], "AÇIK"),
-    "ayar_tiktok_inbox": ("🎵 TikTok Inbox Modu", ["AÇIK", "KAPALI"], "AÇIK"),
+    "ayar_tiktok_inbox": ("🎵 TikTok Inbox Modu", ["KAPALI", "AÇIK"], "KAPALI"),
     "ayar_oto_yayin": ("🌙 Otomatik Yayın", ["KAPALI", "AÇIK"], "KAPALI"),
     "ayar_spiker_hiz": ("🎙️ Spiker Hızı", ["0.85x", "0.9x", "0.95x"], "0.9x"),
 }
