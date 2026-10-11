@@ -966,9 +966,9 @@
     "turkce_anlam": "Allah'ım! **Senin kolay kıldığından başka hiçbir kolay yoktur.** Sen dilediğin zaman zor olanı bile kolaylaştırırsın.",
     "kaynak_ref": "İbn Hibbân, Sahîh, 974; İbnü's-Sünnî, 351",
     "fazilet_notu": "İmtihanlara, zor sınavlara, ağır ameliyatlara ve karmaşık işlere başlarken okunan büyük hacet duasıdır.",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-11 15:47:21"
   },
   {
     "id": 67,
