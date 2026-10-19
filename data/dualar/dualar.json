@@ -921,9 +921,9 @@
     "turkce_anlam": "Allah'ım! **Senin lütfundan ve bereketinden diliyorum.**",
     "kaynak_ref": "Müslim, Müsâfirîn, 68; Nesâî, Mesâcid, 36",
     "fazilet_notu": "İbadeti tamamlayıp dünya maişetine yönelirken sol ayakla dışarı çıkışta okunur.",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-19 15:47:16"
   },
   {
     "id": 64,
