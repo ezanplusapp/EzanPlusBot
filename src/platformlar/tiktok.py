@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -369,6 +370,9 @@ def tiktok_foto_yukle(
             r2_res = r2ye_yukle(yuklenecek, alt_klasor="sosyal", zaman_asimi=30)
             url = r2_res.get("url")
             if url:
+                # TikTok domain doğrulaması: pub-*.r2.dev yerine media.ezanplus.ozbornstudio.com kullan
+                if ".r2.dev" in url:
+                    url = re.sub(r"https://[^/]+\.r2\.dev", "https://media.ezanplus.ozbornstudio.com", url)
                 r2_foto_urlleri.append(url)
 
         if not r2_foto_urlleri:
@@ -419,6 +423,16 @@ def tiktok_foto_yukle(
         log.info(f"TikTok Fotoğraf Modu başlatılıyor [{kullanilan_mod.upper()}] ({len(r2_foto_urlleri)} görsel)...")
         res = requests.post(PHOTO_INIT_URL, headers=headers, json=payload, timeout=30)
         res_data = res.json()
+
+        # Doğrudan yayın reddedilirse (örn: unaudited client / denetim bekleyen uygulama),
+        # tıpkı videolarda olduğu gibi otomatik olarak MEDIA_UPLOAD (Inbox / Taslak) moduna geç
+        if res_data.get("error", {}).get("code") != "ok" and not taslak_modu:
+            log.warning(f"TikTok direct foto post reddedildi ({res_data}), otomatik olarak taslak (MEDIA_UPLOAD / Inbox) moduna geçiliyor...")
+            payload["post_mode"] = "MEDIA_UPLOAD"
+            payload["post_info"]["privacy_level"] = "SELF_ONLY"
+            kullanilan_mod = "inbox"
+            res = requests.post(PHOTO_INIT_URL, headers=headers, json=payload, timeout=30)
+            res_data = res.json()
 
         if res_data.get("error", {}).get("code") != "ok":
             raise RuntimeError(f"TikTok foto init hatası: {res_data}")
