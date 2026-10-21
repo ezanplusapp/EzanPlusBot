@@ -1689,8 +1689,14 @@ def reels_videosu_uret(
                 proc.stdin.close()
             except Exception:
                 pass
+            proc.stdin = None
 
-        _, stderr = proc.communicate(timeout=180)
+        try:
+            _, stderr = proc.communicate(timeout=180)
+        except ValueError:
+            stderr = proc.stderr.read() if proc.stderr else b""
+            proc.wait(timeout=180)
+
         if proc.returncode != 0:
             hata_detayi = stderr.decode("utf-8", errors="replace") if stderr else f"kod {proc.returncode}"
             log.error(f"FFmpeg render hatası: {hata_detayi[:400]}")

@@ -594,9 +594,21 @@ def hatim_ayet_klibi_uret(
 
             proc.stdin.write(kare.tobytes())
 
-        _, stderr = proc.communicate(timeout=60)
+        if proc.stdin:
+            try:
+                proc.stdin.close()
+            except Exception:
+                pass
+            proc.stdin = None
+
+        try:
+            _, stderr = proc.communicate(timeout=60)
+        except ValueError:
+            stderr = proc.stderr.read() if proc.stderr else b""
+            proc.wait(timeout=60)
+
         if proc.returncode != 0:
-            raise RuntimeError(f"FFmpeg render hatası (kod {proc.returncode}): {stderr.decode('utf-8', errors='ignore')}")
+            raise RuntimeError(f"FFmpeg render hatası (kod {proc.returncode}): {stderr.decode('utf-8', errors='ignore') if stderr else ''}")
     except Exception as e:
         proc.kill()
         raise RuntimeError(f"FFmpeg render hatası: {e}")
