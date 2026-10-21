@@ -943,10 +943,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Ezan Plus Sosyal Medya Otomasyon Motoru")
-    parser.add_argument("komut", nargs="?", default=None, choices=["reels", "hadis", "dua", "kelime", "ayet"], help="Üretilecek içerik türü: reels (ayet), hadis, dua, kelime")
-    parser.add_argument("--tur", choices=["reels", "hadis", "dua", "kelime", "ayet"], default=None, help="İçerik türü")
+    parser.add_argument("komut", nargs="?", default=None, choices=["reels", "hadis", "dua", "kelime", "ayet", "hatim"], help="Üretilecek içerik türü: reels (ayet), hadis, dua, kelime, hatim")
+    parser.add_argument("--tur", choices=["reels", "hadis", "dua", "kelime", "ayet", "hatim"], default=None, help="İçerik türü")
     parser.add_argument("--format", choices=["4:5", "9:16"], default="4:5", help="Görsel formatı (4:5 feed veya 9:16 story)")
     parser.add_argument("--tema", type=str, default=None, help="Özel tema, sure:ayet veya arama terimi")
+    parser.add_argument("--cuz", type=int, default=1, help="Hatim/Mukabele için cüz numarası (1-30)")
+    parser.add_argument("--limit", type=int, default=None, help="Hatim/Mukabele için işlenecek azami âyet sayısı")
     parser.add_argument("--otomatik", action="store_true", help="Onay beklemeden doğrudan yayınla")
     parser.add_argument("--bekleme", type=int, default=1800, help="Onay bekleme süresi (saniye)")
     parser.add_argument("--dinle", action="store_true", help="Sürekli dinleme modunda Telegram botunu çalıştır")
@@ -964,6 +966,14 @@ if __name__ == "__main__":
         sys.exit(0)
 
     tur = args.komut or args.tur or "reels"
+
+    if tur == "hatim":
+        log.info(f"YouTube 16:9 Hatim / Mukabele videosu üretiliyor (Cüz: {args.cuz}, Limit: {args.limit})...")
+        from .uretim.hatim import cuz_hatim_videosu_uret
+        mp4_path, bolum_path = cuz_hatim_videosu_uret(cuz_no=args.cuz, ayet_limiti=args.limit)
+        log.info(f"✅ Hatim videosu tamamlandı: {mp4_path}")
+        sys.exit(0)
+
     oto_varsayilan = True
     oto_yayin = True if args.otomatik else oto_varsayilan
 

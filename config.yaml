@@ -34,13 +34,14 @@ boyutlar:
 
 yayin:
   # Günde kaç post ve reels hedefleniyor
-  gunluk_post_sayisi: 2
-  gunluk_reels_sayisi: 1
+  gunluk_post_sayisi: 4
+  gunluk_reels_sayisi: 3
   # Saatler (Türkiye saati)
   saatler:
-    sabah: "08:30"             # Günün Ayeti / Hadisi
-    oglen: "13:00"             # Dini Bilgi / Takvim Yaprağı
-    aksam: "19:30"             # Dua / Reels / Carousel
+    sabah: "08:30"             # Kur'an Sözlüğü Kartı (4:5 + 9:16)
+    oglen: "13:00"             # Kur'an Tilaveti Reels (9:16)
+    ikindi: "17:00"            # Sahih Hadis-i Şerif (V20 Video)
+    aksam: "19:30"             # Günün Duası (V20 Video)
   # Otomatik onay yerine Telegram'dan onay zorunlu mu?
   telegram_onay_zorunlu: true
 
@@ -72,5 +73,5 @@ kategoriler:
     hafiz: "Mishary Rashid Alafasy"
 
 yapay_zeka:
-  model: "gemini-3.6-flash"
+  model: "gemini-3.8-flash"
   sicaklik: 0.7

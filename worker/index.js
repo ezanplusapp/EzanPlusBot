@@ -1,6 +1,6 @@
 /**
  * ezan-plus-tetikleyici — Cloudflare Worker Zamanlayıcı
- * Günde 6 kez (11:30, 13:45, 16:30, 18:45, 20:30, 22:00 TSİ) GitHub Actions'ı sıfır gecikmeyle tetikler.
+ * Günde 4 Altın Slot (08:30, 13:00, 17:00, 19:30 TSİ) GitHub Actions'ı sıfır gecikmeyle tetikler.
  */
 
 export default {
@@ -16,29 +16,23 @@ export default {
     const tsiHours = (utcHours + 3) % 24;
     const saatEtiket = `${String(tsiHours).padStart(2, '0')}:${String(utcMinutes).padStart(2, '0')} TSİ`;
 
-    // 6 Dağıtım Slotu Eşlemesi (Exact Cron & Saat Yedekli)
+    // 4 Dağıtım Slotu Eşlemesi (Exact Cron & Saat Yedekli)
     let tur = null;
     let slotAdi = null;
     const cron = event.cron;
 
-    if (cron === "30 8 * * *" || (utcHours === 8 && utcMinutes >= 25 && utcMinutes <= 35)) {
-      tur = "reels";
-      slotAdi = "1. Slot: Kur'an Tilaveti Reels 1 (11:30 TSİ)";
-    } else if (cron === "45 10 * * *" || (utcHours === 10 && utcMinutes >= 40 && utcMinutes <= 50)) {
-      tur = "hadis";
-      slotAdi = "2. Slot: Sahih Hadis-i Şerif Kartı (13:45 TSİ)";
-    } else if (cron === "30 13 * * *" || (utcHours === 13 && utcMinutes >= 25 && utcMinutes <= 35)) {
-      tur = "reels";
-      slotAdi = "3. Slot: Kur'an Tilaveti Reels 2 (16:30 TSİ)";
-    } else if (cron === "45 15 * * *" || (utcHours === 15 && utcMinutes >= 40 && utcMinutes <= 50)) {
-      tur = "dua";
-      slotAdi = "4. Slot: Günün Duası Kartı (18:45 TSİ)";
-    } else if (cron === "30 17 * * *" || (utcHours === 17 && utcMinutes >= 25 && utcMinutes <= 35)) {
-      tur = "reels";
-      slotAdi = "5. Slot: Kur'an Tilaveti Reels 3 (20:30 TSİ)";
-    } else if (cron === "0 19 * * *" || (utcHours === 19 && utcMinutes >= 0 && utcMinutes <= 10)) {
+    if (cron === "30 5 * * *" || (utcHours === 5 && utcMinutes >= 25 && utcMinutes <= 35)) {
       tur = "kelime";
-      slotAdi = "6. Slot: Kur'an Sözlüğü Kartı (22:00 TSİ)";
+      slotAdi = "1. Slot: Kur'an Sözlüğü Kartı (08:30 TSİ)";
+    } else if (cron === "0 10 * * *" || (utcHours === 10 && utcMinutes >= 0 && utcMinutes <= 10)) {
+      tur = "reels";
+      slotAdi = "2. Slot: Kur'an Tilaveti Reels (13:00 TSİ)";
+    } else if (cron === "0 14 * * *" || (utcHours === 14 && utcMinutes >= 0 && utcMinutes <= 10)) {
+      tur = "hadis";
+      slotAdi = "3. Slot: Sahih Hadis-i Şerif (17:00 TSİ)";
+    } else if (cron === "30 16 * * *" || (utcHours === 16 && utcMinutes >= 25 && utcMinutes <= 35)) {
+      tur = "dua";
+      slotAdi = "4. Slot: Günün Duası (19:30 TSİ)";
     } else {
       console.log(`[Zamanlayıcı] ${saatEtiket} (cron: ${cron}) - Aktif bir yayın slotu yok, atlanıyor.`);
       return;
@@ -110,14 +104,12 @@ export default {
     }
 
     return new Response(
-      "🕌 Ezan Plus 6 Dağıtım Slotu Zamanlayıcı Servisi Aktif.\n\n" +
-      "📅 Günlük Çizelge:\n" +
-      "1. 11:30 TSİ — Kur'an Tilaveti Reels 1\n" +
-      "2. 13:45 TSİ — Sahih Hadis Kartı (4:5 + 9:16)\n" +
-      "3. 16:30 TSİ — Kur'an Tilaveti Reels 2\n" +
-      "4. 18:45 TSİ — Günün Duası Kartı (4:5 + 9:16)\n" +
-      "5. 20:30 TSİ — Kur'an Tilaveti Reels 3\n" +
-      "6. 22:00 TSİ — Kur'an Sözlüğü Kartı (4:5 + 9:16)\n\n" +
+      "🕌 Ezan Plus 4 Dağıtım Slotu Zamanlayıcı Servisi Aktif.\n\n" +
+      "📅 Günlük Çizelge (TSİ):\n" +
+      "1. 08:30 TSİ — 📚 Kur'an Sözlüğü Kartı (4:5 + 9:16)\n" +
+      "2. 13:00 TSİ — 📖 Kur'an Tilaveti Reels (9:16)\n" +
+      "3. 17:00 TSİ — 📜 Sahih Hadis-i Şerif (V20 Video)\n" +
+      "4. 19:30 TSİ — 🤲 Günün Duası (V20 Video)\n\n" +
       "Manuel tetiklemek için: /tetikle?tur=reels (veya hadis, dua, kelime)"
     );
   },

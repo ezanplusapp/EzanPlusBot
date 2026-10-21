@@ -25,8 +25,33 @@ from .. import kelime_db
 log = logging.getLogger(__name__)
 
 GEMINI_API_KEY = get_env("GEMINI_API_KEY")
-MODEL_ADI = AYARLAR.get("yapay_zeka", {}).get("model", "gemini-3.6-flash")
+MODEL_ADI = AYARLAR.get("yapay_zeka", {}).get("model", "gemini-3.8-flash")
 UC_NOKTA = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_ADI}:generateContent"
+
+# Yasaklı Yapay / Bot İfadeleri (GEMINI.md Anayasa Kuralı)
+YASAKLI_IFADELER = [
+    "bot",
+    "otomasyon",
+    "yapay zeka",
+    "yapay zekâ",
+    "gemini",
+    "chatgpt",
+    "openai",
+    "ai üretimi",
+    "otomatik üretilmiştir",
+    "otomatik paylaşımdır",
+]
+
+
+def yasakli_ifadeleri_temizle(metin: str) -> str:
+    """GEMINI.md anayasası uyarınca bot/otomasyon/yapay zeka ifadelerini metinden temizler."""
+    if not metin:
+        return ""
+    temiz = metin
+    for yasakli in YASAKLI_IFADELER:
+        temiz = re.sub(rf"\b{re.escape(yasakli)}\b", "", temiz, flags=re.IGNORECASE)
+    temiz = re.sub(r"[ \t]+", " ", temiz)
+    return temiz.strip()
 
 # İlham Verici İslami Temalar (Her üretimde rastgele seçilir veya parametre olarak verilir)
 TEMALAR = [
@@ -83,13 +108,13 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
 
     # Çalışan güncel modeller öncelik sırasına göre dizilir
     modeller: List[str] = [MODEL_ADI]
-    for yedek in ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]:
+    for yedek in ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]:
         if yedek not in modeller:
             modeller.append(yedek)
 
     son_hata = None
     for model in modeller:
-        for deneme in range(1, 3):  # Her model için 2 defa retry/backoff
+        for deneme in range(1, 3):  # Her model için azami 2 deneme
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload: Dict[str, Any] = {
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -107,13 +132,25 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 }
 
             try:
-                res = requests.post(url, json=payload, timeout=45)
-                if res.status_code in (503, 429, 500, 502, 504):
-                    bekleme = 1.5 * deneme
-                    log.warning(f"Gemini {model} geçici yoğunluk ({res.status_code}), {bekleme}s bekleniyor (deneme {deneme}/2)...")
+                res = requests.post(url, json=payload, timeout=18)
+                if res.status_code == 503:
+                    # Google 503: "This model is currently experiencing high demand. Spikes in demand are usually temporary."
+                    log.warning(f"Gemini {model} geçici yoğunluk (HTTP 503), gecikmesiz alternatif modele geçiliyor...")
+                    son_hata = requests.exceptions.HTTPError(f"HTTP 503: {res.text[:150]}")
+                    break
+
+                if res.status_code == 429:
+                    log.warning(f"Gemini {model} kota/hız aşımı (HTTP 429), alternatif modele geçiliyor...")
+                    son_hata = requests.exceptions.HTTPError(f"HTTP 429: {res.text[:150]}")
+                    break
+
+                if res.status_code in (500, 502, 504):
+                    bekleme = 1.0 * deneme
+                    log.warning(f"Gemini {model} sunucu hatası ({res.status_code}), {bekleme}s bekleniyor...")
                     son_hata = requests.exceptions.HTTPError(f"HTTP {res.status_code}: {res.text[:150]}")
                     time.sleep(bekleme)
                     continue
+
                 res.raise_for_status()
 
                 data = res.json()
@@ -124,10 +161,14 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 parcalar = candidates[0].get("content", {}).get("parts", [])
                 cevap = "".join(p.get("text", "") for p in parcalar)
                 return cevap.strip()
+            except requests.exceptions.Timeout as e:
+                son_hata = e
+                log.warning(f"Gemini {model} yanıtı zaman aşımına uğradı (18s), bekletmeden sonraki modele geçiliyor...")
+                break
             except Exception as e:
                 son_hata = e
                 log.warning(f"Gemini {model} çağrısı hata verdi ({e}), deneme {deneme}/2...")
-                time.sleep(1.0)
+                time.sleep(0.5)
 
     raise son_hata or RuntimeError("Tüm Gemini modelleri denendi fakat yanıt alınamadı.")
 
@@ -287,10 +328,15 @@ def caption_hashtaglari_guncelle(
     zorunlu_ilk: str = "ezanplus",
 ) -> str:
     """
-    Caption içindeki hashtagleri ayıklar, normalize eder ve caption sonuna garantili
-    azami `maks` adet tekilleştirilmiş hashtag olarak ekler.
+    Caption içindeki hashtagleri ayıklar, yasaklı bot/AI kelimelerini temizler,
+    etiketleri normalize eder ve caption sonuna garantili azami `maks` adet tekilleştirilmiş
+    hashtag (#ezanplus zorunlu) olarak ekler.
     """
-    mevcut_etiketler = re.findall(r'#\w+', caption)
+    # 1. Yasaklı bot / AI ifadelerini temizle
+    caption_temiz = yasakli_ifadeleri_temizle(caption)
+
+    # 2. Mevcut hashtagleri tespit et
+    mevcut_etiketler = re.findall(r'#\w+', caption_temiz)
 
     tum_adaylar = list(mevcut_etiketler)
     if varsayilan_etiketler:
@@ -298,12 +344,12 @@ def caption_hashtaglari_guncelle(
 
     normallesmis = hashtaglari_normallestir(tum_adaylar, maks=maks, zorunlu_ilk=zorunlu_ilk)
 
-    # Caption gövdesindeki tüm etiketleri ve fazla satır başlarını ayıkla
-    metin_govdesi = re.sub(r'#\w+', '', caption).strip()
+    # 3. Caption gövdesindeki tüm etiketleri ve fazla satır başlarını ayıkla
+    metin_govdesi = re.sub(r'#\w+', '', caption_temiz).strip()
     metin_govdesi = re.sub(r'\n{3,}', '\n\n', metin_govdesi).strip()
 
     if not metin_govdesi:
-        return " ".join(normallesmis)
+        metin_govdesi = "Ezan Plus ile manevi derinliği kalbinizde hissedin."
 
     return f"{metin_govdesi}\n\n{' '.join(normallesmis)}"
 
@@ -431,9 +477,9 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
         veri["latin_kelimeler"] = turkce_okunus_hizala(tr_ham, ar_kelime_listesi)
         veri["arapca_okunus"] = " ".join(w for w in veri["latin_kelimeler"] if w)
 
-    # Başlık ve anons temizliği: Tırnaksız ve garantili fallbacks
-    s1 = str(veri.get("video_baslik_satir1") or "").strip().strip("“”\"'")
-    s2 = str(veri.get("video_baslik_satir2") or "").strip().strip("“”\"'")
+    # Başlık ve anons temizliği: Tırnaksız, yasaklı ifadesiz ve garantili fallbacks
+    s1 = yasakli_ifadeleri_temizle(str(veri.get("video_baslik_satir1") or "").strip().strip("“”\"'"))
+    s2 = yasakli_ifadeleri_temizle(str(veri.get("video_baslik_satir2") or "").strip().strip("“”\"'"))
     if not s1:
         s1 = "Günün manevi tefekkürü:"
     elif not s1.endswith(":"):
@@ -443,14 +489,14 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
     veri["video_baslik_satir1"] = s1
     veri["video_baslik_satir2"] = s2
 
-    tef = str(veri.get("tefekkur_notu") or "").strip()
+    tef = yasakli_ifadeleri_temizle(str(veri.get("tefekkur_notu") or "").strip())
     if not tef or len(tef) < 15:
         tef = "Kalpleri mutmain kılan yegâne hakikat Allah'ı zikretmek ve O'nun rızasına sığınmaktır."
     veri["tefekkur_notu"] = tef
 
     cap = str(veri.get("instagram_caption") or "").strip()
-    if not cap or len(cap) < 20:
-        cap = f"“{turkce_meal}”\n\n{sure_ayet_etiket}"
+    if not cap or len(cap) < 25:
+        cap = f"“{turkce_meal}”\n\n{sure_ayet_etiket}\n\n{tef}\n\nEzan Plus ile Kur'an'ın nurunu kalbinizde hissedin. 📲"
     varsayilan = ["ezanplus", "kuran", "ayet", "tilavet", "tefekkur"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
@@ -474,6 +520,13 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
     veri["kategori"] = "ayet"
     veri["format"] = "reels_9_16"
     veri["hafiz_adi"] = "Mişari Râşid el-Afâsî"
+
+    # Standart anahtar eşlemeleri
+    veri["caption"] = veri["instagram_caption"]
+    veri["turkce_metin"] = veri["turkce_meal"]
+    veri["baslik"] = sure_ayet_etiket
+    veri["kaynak"] = sure_ayet_etiket
+    veri["tefekkur"] = tef
 
     return veri
 
@@ -581,19 +634,26 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
     okunus_ham = okunus_ham.strip("“”\"'{}[] ")
     veri["arapca_okunus"] = okunus_ham
 
-    tef = str(veri.get("tefekkur_notu") or "").strip()
+    tef = yasakli_ifadeleri_temizle(str(veri.get("tefekkur_notu") or "").strip())
     if not tef or len(tef) < 15:
         tef = "Resûlullah'ın sünnetine tabi olmak, hem dünya hem de ahiret saadetinin anahtarıdır."
     veri["tefekkur_notu"] = tef
 
     cap = str(veri.get("instagram_caption") or "").strip()
-    if not cap or len(cap) < 20:
-        cap = f"“{hadis_metni}”\n\n{kaynak_ref}"
+    if not cap or len(cap) < 25:
+        cap = f"“{hadis_metni}”\n\n{kaynak_ref}\n\n{tef}\n\nSünnet-i Seniyye rehberliğinde bir hayat için Ezan Plus yanınızda. 📲"
     varsayilan = ["ezanplus", "hadis", "sunnet", "tefekkur", "dua"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     veri["kategori"] = "hadis"
     veri["format"] = "post_4_5"
+
+    # Standart anahtar eşlemeleri
+    veri["caption"] = veri["instagram_caption"]
+    veri["turkce_metin"] = hadis_metni
+    veri["baslik"] = kaynak_ref
+    veri["tefekkur"] = tef
+
     return veri
 
 
@@ -683,16 +743,24 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
     veri["arapca_metin"] = arapca_metin
     veri["arapca_okunus"] = arapca_okunus
     veri["turkce_anlam"] = turkce_anlam
+    veri["turkce_metin"] = turkce_anlam
+    veri["baslik"] = dua_basligi
+    veri["kaynak"] = kaynak_ref
     veri["kaynak_fazilet"] = f"{kaynak_ref} • {fazilet_notu}"
     veri["okunus_veya_fazilet"] = f"{kaynak_ref} • {fazilet_notu}"
     veri["ruh_hali"] = ruh_hali
     veri["kaynak_ref"] = kaynak_ref
+
+    tef = yasakli_ifadeleri_temizle(str(veri.get("tefekkur_notu") or "").strip())
+    if not tef or len(tef) < 15:
+        tef = yasakli_ifadeleri_temizle(fazilet_notu) if fazilet_notu and len(fazilet_notu) >= 15 else "Dua, kulun Rabbine olan teslimiyetinin ve yakarışının en samimi ifadesidir."
+    veri["tefekkur_notu"] = tef
     veri["fazilet_notu"] = fazilet_notu
     veri["format"] = f"post_{format_tipi.replace(':', '_')}"
 
     cap = str(veri.get("instagram_caption") or "").strip()
-    if not cap or len(cap) < 20:
-        cap = f"“{turkce_anlam}”\n\n{dua_basligi}"
+    if not cap or len(cap) < 25:
+        cap = f"“{turkce_anlam}”\n\n{dua_basligi}\n\n{tef}\n\nDualarınızın kabul olması niyazıyla. Ezan Plus 📲"
     varsayilan = ["ezanplus", "dua", "niyaz", "huzur", "tefekkur"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
@@ -835,6 +903,10 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
         log.warning(f"Kelime açıklaması üretilirken Gemini hatası ({e}), varsayılan editoryal şablon kullanılıyor.")
         veri = {}
 
+    hayat_dersi_temiz = yasakli_ifadeleri_temizle(hayat_dersi)
+    if not hayat_dersi_temiz or len(hayat_dersi_temiz) < 15:
+        hayat_dersi_temiz = "Kur'an kavramlarını anlamak ve hayatımıza rehber kılmak kalbimize inşirah verir."
+
     caption = str(veri.get("instagram_caption") or "").strip()
     if not caption or len(caption) < 80:
         caption = _varsayilan_kelime_caption(
@@ -844,7 +916,7 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
             kok=kok,
             lugat_anlami=lugat_anlami,
             kuran_boyutu=kuran_boyutu,
-            hayat_dersi=hayat_dersi,
+            hayat_dersi=hayat_dersi_temiz,
             ayet_ref=ayet_ref,
             ayet_ar=ayet_ar,
         )
@@ -853,11 +925,17 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
     veri["kelime_id"] = kelime_id
     veri["kelime_tr"] = k_tr
     veri["kelime_ar"] = k_ar
+    veri["arapca_metin"] = k_ar
+    veri["turkce_metin"] = lugat_anlami
+    veri["baslik"] = f"Kur'an Sözlüğü: {k_tr}"
+    veri["kaynak"] = ayet_ref or "Kur'an-ı Kerim"
     veri["okunus"] = okunus
     veri["kok"] = kok
     veri["lugat_anlami"] = lugat_anlami
     veri["kuran_boyutu"] = kuran_boyutu
-    veri["hayat_dersi"] = hayat_dersi
+    veri["hayat_dersi"] = hayat_dersi_temiz
+    veri["tefekkur_notu"] = hayat_dersi_temiz
+    veri["tefekkur"] = hayat_dersi_temiz
     veri["ayet_ref"] = ayet_ref
     veri["ayet_arapca"] = ayet_ar
     veri["kategori"] = "kelime"

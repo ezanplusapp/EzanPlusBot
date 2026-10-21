@@ -237,6 +237,8 @@ def arapca_kelimeleri_ayristir(metin: str) -> List[str]:
     olmayıp mushaf içi kıraat/durak sembolleridir. Video karaoke metninde ve kelime
     senkronunda bağımsız uçuşan garip harfler oluşturmaması için listeden elenir.
     """
+    if not metin:
+        return []
     secavendler = {"ۚ", "ۖ", "ۗ", "ۘ", "ۙ", "ۛ", "ۜ", "ؕ", "۞", "۩", "۝"}
     ham = [w.strip() for w in metin.split() if w.strip()]
     sonuc: List[str] = []
@@ -607,6 +609,9 @@ def _meal_parcala(
     asla **bold** vurgu bloklarının veya doğrudan duaların ortasından kesmeden
     parça sayısına böler. Arapça sayfa oranlarıyla (split_ratios) 1:1 uyumlu çalışır.
     """
+    if not meal_metin:
+        return [""] * max(1, parca_sayisi)
+
     if parca_sayisi <= 1:
         return [meal_metin.strip()]
 
@@ -1547,16 +1552,12 @@ def reels_videosu_uret(
         c_path = Path(cikti_adi)
         if c_path.is_absolute() or len(c_path.parts) > 1:
             final_video = c_path
-            gecici_sessiz_video = c_path.parent / f"temp_{c_path.name}"
         else:
             final_video = CIKTI_DIZINI / cikti_adi
-            gecici_sessiz_video = CIKTI_DIZINI / f"temp_{cikti_adi}"
     else:
         sure_kod = sure_ayet.replace(" ", "_").replace("•", "_").replace(".", "_").lower()
         cikti_adi = f"reels_{sure_kod}.mp4"
-        gecici_sessiz_video = CIKTI_DIZINI / f"temp_{cikti_adi}"
         final_video = CIKTI_DIZINI / cikti_adi
-
 
     bar_x1 = 64
     bar_x2 = GENISLIK_9_16 - 64
@@ -1567,14 +1568,29 @@ def reels_videosu_uret(
     eq_bar_x = eq_x - 34
     eq_base_y = 380 + 30 + 20
 
-    writer = imageio.get_writer(
-        str(gecici_sessiz_video),
-        fps=FPS,
-        codec="libx264",
-        quality=9,
-        pixelformat="yuv420p",
-        macro_block_size=None,
-    )
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    cmd = [
+        ffmpeg_exe,
+        "-y",
+        "-loglevel", "error",
+        "-f", "rawvideo",
+        "-vcodec", "rawvideo",
+        "-s", f"{GENISLIK_9_16}x{YUKSEKLIK_9_16}",
+        "-pix_fmt", "rgb24",
+        "-r", str(FPS),
+        "-i", "-",  # Video stdin
+        "-i", str(ses_yolu),  # Audio input
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "18",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-shortest",
+        str(final_video),
+    ]
+
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 
     try:
         for i in range(toplam_kare):
@@ -1660,37 +1676,29 @@ def reels_videosu_uret(
                 kapak_yolu = final_video.with_suffix(".png")
                 kare.save(kapak_yolu, quality=95)
 
-            frame_np = np.array(kare)
-            writer.append_data(frame_np)
+            if kare.mode != "RGB":
+                kare = kare.convert("RGB")
 
-    finally:
-        writer.close()
-
-    # 5. FFmpeg ile MP3 Sesi Sessiz Videoya Birleştir
-    exe = imageio_ffmpeg.get_ffmpeg_exe()
-    cmd = [
-        exe, "-y",
-        "-i", str(gecici_sessiz_video),
-        "-i", str(ses_yolu),
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-shortest",
-        str(final_video),
-    ]
-
-    try:
-        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except subprocess.CalledProcessError as cpe:
-        hata_detayi = cpe.stderr.decode("utf-8", errors="replace") if cpe.stderr else str(cpe)
-        log.error(f"FFmpeg render hatası: {hata_detayi[:400]}")
-        raise RuntimeError(f"FFmpeg video birleştirme hatası: {hata_detayi[:300]}")
-    finally:
-        if gecici_sessiz_video.exists():
             try:
-                gecici_sessiz_video.unlink()
+                proc.stdin.write(kare.tobytes())
+            except (BrokenPipeError, IOError):
+                break
+
+        if proc.stdin:
+            try:
+                proc.stdin.close()
             except Exception:
                 pass
+
+        _, stderr = proc.communicate(timeout=180)
+        if proc.returncode != 0:
+            hata_detayi = stderr.decode("utf-8", errors="replace") if stderr else f"kod {proc.returncode}"
+            log.error(f"FFmpeg render hatası: {hata_detayi[:400]}")
+            raise RuntimeError(f"FFmpeg video oluşturma hatası: {hata_detayi[:300]}")
+    except Exception as e:
+        if proc.poll() is None:
+            proc.kill()
+        raise RuntimeError(f"FFmpeg render hatası: {e}")
 
     log.info(f"Reels videosu başarıyla üretildi: {final_video}")
     return final_video

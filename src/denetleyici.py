@@ -101,11 +101,11 @@ def denetle_metin(veri: Dict[str, Any], kategori: str = "ayet") -> Tuple[List[st
     uyarilar: List[str] = []
     metrikler: Dict[str, Any] = {}
 
-    turkce = str(veri.get("turkce_metin") or veri.get("turkce_meal") or veri.get("hadis_metni") or "").strip()
-    arapca = str(veri.get("arapca_metin") or "").strip()
-    kaynak = str(veri.get("kaynak") or veri.get("baslik") or "").strip()
-    tefekkur = str(veri.get("tefekkur") or veri.get("tefekkur_notu") or "").strip()
-    caption = str(veri.get("caption") or "").strip()
+    turkce = str(veri.get("turkce_metin") or veri.get("turkce_meal") or veri.get("hadis_metni") or veri.get("turkce_anlam") or veri.get("lugat_anlami") or "").strip()
+    arapca = str(veri.get("arapca_metin") or veri.get("kelime_ar") or "").strip()
+    kaynak = str(veri.get("kaynak") or veri.get("baslik") or veri.get("sure_ayet_etiket") or veri.get("kaynak_ref") or veri.get("ayet_ref") or "").strip()
+    tefekkur = str(veri.get("tefekkur") or veri.get("tefekkur_notu") or veri.get("fazilet_notu") or veri.get("hayat_dersi") or "").strip()
+    caption = str(veri.get("caption") or veri.get("instagram_caption") or "").strip()
 
     # 1. Türkçe Metin Denetimi
     if not turkce or len(turkce) < 5:
@@ -274,6 +274,12 @@ def denetle_reels_mizanpaj(
     uyarilar: List[str] = []
     metrikler: Dict[str, Any] = {}
 
+    arapca_metin = str(arapca_metin or "").strip()
+    turkce_meal = str(turkce_meal or "").strip()
+    if not arapca_metin or not turkce_meal:
+        hatalar.append("Arapça metin veya Türkçe meal eksik olduğu için mizanpaj simülasyonu yapılamadı.")
+        return hatalar, uyarilar, metrikler
+
     try:
         from .uretim.video import (
             _SayfaVerisi, _meal_parcala, akilli_sayfa_araliklari,
@@ -435,13 +441,13 @@ def denetle_paylasim(paylasim_id: int) -> DenetimSonucu:
         # Reels Mizanpaj Çakışma Denetimi (Yalnızca Âyet tilavet şablonu için)
         if kategori in ("ayet", "reels"):
             r_hatalar, r_uyarilar, r_metrikler = denetle_reels_mizanpaj(
-                sure_ayet=kayit.get("baslik", "Günün Ayeti"),
-                turkce_meal=kayit.get("turkce_metin", ""),
-                arapca_metin=kayit.get("arapca_metin", ""),
+                sure_ayet=str(kayit.get("baslik") or "Günün Ayeti"),
+                turkce_meal=str(kayit.get("turkce_metin") or ""),
+                arapca_metin=str(kayit.get("arapca_metin") or ""),
                 arapca_okunus=kayit.get("arapca_okunus"),
-                tefekkur_notu=kayit.get("tefekkur", ""),
-                s1=kayit.get("video_baslik_satir1", ""),
-                s2=kayit.get("video_baslik_satir2", ""),
+                tefekkur_notu=str(kayit.get("tefekkur") or ""),
+                s1=str(kayit.get("video_baslik_satir1") or ""),
+                s2=str(kayit.get("video_baslik_satir2") or ""),
             )
             tum_hatalar.extend(r_hatalar)
             tum_uyarilar.extend(r_uyarilar)
@@ -568,7 +574,8 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
                 if not kayit.get("arapca_metin"):
                     guncellemeler["arapca_metin"] = db_ayet["arapca_metin"]
                     duzeltmeler.append("Eksik Arapça metin tescilli Kur'an veritabanından tamamlandı.")
-                if not kayit.get("tefekkur"):
+                tef_ayet = str(kayit.get("tefekkur") or "").strip()
+                if not tef_ayet or len(tef_ayet) < 15:
                     guncellemeler["tefekkur"] = "Kalpleri mutmain kılan yegâne hakikat Allah'ı anmaktır."
                     duzeltmeler.append("Eksik tefekkür notu tamamlandı.")
 
@@ -595,14 +602,103 @@ def otomatik_onar(paylasim_id: int) -> Tuple[bool, List[str]]:
             if db_hadis:
                 if not kayit.get("baslik"):
                     guncellemeler["baslik"] = f"Riyâzü's-Sâlihîn • {hadis_id}. Hadis"
-                if not kayit.get("tefekkur"):
+                tef_hadis = str(kayit.get("tefekkur") or "").strip()
+                if not tef_hadis or len(tef_hadis) < 15:
                     guncellemeler["tefekkur"] = "Peygamber Efendimiz (sallallahu aleyhi vesellem)'in sünnetine ittiba iki cihan saadetidir."
+                    duzeltmeler.append("Eksik hadis tefekkür notu tamamlandı.")
                 c_turkce = _metin_temizle(turkce_metin)
                 c_hadis = _metin_temizle(db_hadis.get("hadis_metni", ""))
                 if not turkce_metin or (c_turkce != c_hadis):
                     guncellemeler["turkce_metin"] = db_hadis["hadis_metni"]
                     turkce_metin = db_hadis["hadis_metni"]
                     duzeltmeler.append("Hadis metni tescilli Riyâzü's-Sâlihîn külliyatı ile eşitlendi.")
+
+    elif kategori == "dua":
+        from . import dua_db
+        dua_id = kayit.get("dua_id")
+        if not dua_id:
+            kaynak_str = str(kayit.get("kaynak") or "")
+            m_d = re.search(r'(\d+)', kaynak_str)
+            if m_d:
+                dua_id = int(m_d.group(1))
+
+        if dua_id:
+            db_dua = dua_db.dua_getir(int(dua_id))
+            if db_dua:
+                if not kayit.get("baslik"):
+                    guncellemeler["baslik"] = db_dua.get("dua_basligi") or "Günün Duası"
+                if not kayit.get("kaynak"):
+                    guncellemeler["kaynak"] = db_dua.get("kaynak_ref") or "Müsned / Tirmizî"
+                tef_dua = str(kayit.get("tefekkur") or "").strip()
+                if not tef_dua or len(tef_dua) < 15:
+                    guncellemeler["tefekkur"] = db_dua.get("fazilet_notu") or "Dua, kulun Rabbine olan teslimiyetinin ve yakarışının en samimi ifadesidir."
+                    duzeltmeler.append("Eksik dua tefekkür/fazilet notu tamamlandı.")
+                if not kayit.get("arapca_metin"):
+                    guncellemeler["arapca_metin"] = db_dua.get("arapca_metin")
+                    duzeltmeler.append("Eksik Arapça dua metni tamamlandı.")
+
+    elif kategori == "kelime":
+        from . import kelime_db
+        kelime_id = kayit.get("kelime_id")
+        if not kelime_id:
+            kaynak_str = str(kayit.get("kaynak") or "")
+            m_k = re.search(r'(\d+)', kaynak_str)
+            if m_k:
+                kelime_id = int(m_k.group(1))
+
+        if kelime_id:
+            db_k = kelime_db.kelime_getir(int(kelime_id))
+            if db_k:
+                if not kayit.get("baslik"):
+                    guncellemeler["baslik"] = f"Kur'an Sözlüğü: {db_k.get('kelime_tr')}"
+                if not kayit.get("kaynak"):
+                    guncellemeler["kaynak"] = db_k.get("ayet_ref") or "Kur'an-ı Kerim"
+                tef_kelime = str(kayit.get("tefekkur") or "").strip()
+                if not tef_kelime or len(tef_kelime) < 15:
+                    guncellemeler["tefekkur"] = db_k.get("hayat_dersi") or "Kur'an kavramlarını anlamak ve hayatımıza rehber kılmak kalbimize inşirah verir."
+                    duzeltmeler.append("Eksik kelime hayat dersi/tefekkür notu tamamlandı.")
+                if not kayit.get("arapca_metin"):
+                    guncellemeler["arapca_metin"] = db_k.get("kelime_ar")
+                    duzeltmeler.append("Eksik Arapça kavram metni tamamlandı.")
+
+    # 2.1 Evrensel Künye, Başlık ve Tefekkür Güvencesi
+    if not (guncellemeler.get("baslik") or kayit.get("baslik")):
+        varsayilan_baslik = {
+            "ayet": "Kur'an-ı Kerim Tilaveti",
+            "hadis": "Sahih Hadis-i Şerif",
+            "dua": "Günün Duası",
+            "kelime": "Kur'an Sözlüğü",
+        }.get(kategori, "Ezan Plus")
+        guncellemeler["baslik"] = varsayilan_baslik
+        duzeltmeler.append(f"Eksik başlık tamamlandı: {varsayilan_baslik}")
+
+    if not (guncellemeler.get("kaynak") or kayit.get("kaynak")):
+        guncellemeler["kaynak"] = str(guncellemeler.get("baslik") or kayit.get("baslik") or "Ezan Plus Külliyatı")
+        duzeltmeler.append("Eksik kaynak künyesi tamamlandı.")
+
+    tef_kontrol = str(guncellemeler.get("tefekkur") or kayit.get("tefekkur") or "").strip()
+    if not tef_kontrol or len(tef_kontrol) < 15:
+        varsayilan_tefekkur = {
+            "ayet": "Kalpleri mutmain kılan yegâne hakikat Allah'ı zikretmek ve O'nun rızasına sığınmaktır.",
+            "hadis": "Resûlullah'ın sünnetine tabi olmak, hem dünya hem de ahiret saadetinin anahtarıdır.",
+            "dua": "Dua, kulun Rabbine olan teslimiyetinin ve yakarışının en samimi ifadesidir.",
+            "kelime": "Kur'an kavramlarını anlamak ve hayatımıza rehber kılmak kalbimize inşirah verir.",
+        }.get(kategori, "Manevi tefekkür ve ibadet kalbin huzurudur.")
+        guncellemeler["tefekkur"] = varsayilan_tefekkur
+        duzeltmeler.append("Eksik/yetersiz tefekkür notu editoryal standartla tamamlandı.")
+
+    # 2.2 Tüm Alanlardan Yasaklı Bot/AI Kelimelerinin Ayıklanması
+    for alan in ["turkce_metin", "tefekkur", "baslik", "kaynak"]:
+        mevcut_deger = str(guncellemeler.get(alan) or kayit.get(alan) or "")
+        temiz_deger = mevcut_deger
+        for yasakli in YASAKLI_IFADELER:
+            if re.search(rf"\b{re.escape(yasakli)}\b", temiz_deger, flags=re.IGNORECASE):
+                temiz_deger = re.sub(rf"\b{re.escape(yasakli)}\b", "", temiz_deger, flags=re.IGNORECASE).strip()
+        if temiz_deger != mevcut_deger:
+            guncellemeler[alan] = temiz_deger
+            if alan == "turkce_metin":
+                turkce_metin = temiz_deger
+            duzeltmeler.append(f"'{alan}' alanından yasaklı yapay zeka/bot ifadesi temizlendi.")
 
     # 3. Reels Dikey Mizanpaj Çakışması Telafisi
     if format_tipi == "reels_9_16" and kategori in ("ayet", "reels"):

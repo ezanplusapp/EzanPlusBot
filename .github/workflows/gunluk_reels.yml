@@ -1,16 +1,14 @@
-name: Günlük Yayın Otomasyonu (6 Dağıtım Slotu)
+name: Günlük Yayın Otomasyonu (4 Dağıtım Slotu)
 
 on:
   # 1. Cloudflare Edge Cron (Birincil ve Yetkili Zamanlayıcı: repository_dispatch)
   # GitHub Actions'ın dahili 'schedule' mekanizması gecikmeli (15-30 dk) tetiklenip mükerrer içerik
   # üretimine yol açtığı için devre dışı bırakılmıştır. Zamanlamayı 0 ms gecikmeyle Cloudflare Worker yönetir.
   # schedule:
-  #   - cron: '30 8 * * *'   # 11:30 TSİ — Kur'an Tilaveti Reels 1
-  #   - cron: '45 10 * * *'  # 13:45 TSİ — Sahih Hadis Kartı (4:5 + 9:16)
-  #   - cron: '30 13 * * *'  # 16:30 TSİ — Kur'an Tilaveti Reels 2
-  #   - cron: '45 15 * * *'  # 18:45 TSİ — Günün Duası Kartı (4:5 + 9:16)
-  #   - cron: '30 17 * * *'  # 20:30 TSİ — Kur'an Tilaveti Reels 3
-  #   - cron: '0 19 * * *'   # 22:00 TSİ — Kur'an Sözlüğü Kartı (4:5 + 9:16)
+  #   - cron: '30 5 * * *'   # 08:30 TSİ — Kur'an Sözlüğü Kartı (4:5 + 9:16)
+  #   - cron: '0 10 * * *'   # 13:00 TSİ — Kur'an Tilaveti Reels (9:16)
+  #   - cron: '0 14 * * *'   # 17:00 TSİ — Sahih Hadis-i Şerif (V20 Video)
+  #   - cron: '30 16 * * *'  # 19:30 TSİ — Günün Duası (V20 Video)
 
   # 2. Manuel Web Arayüzü Tetiklemesi
   workflow_dispatch:
@@ -124,12 +122,14 @@ jobs:
           # Eğer zamanlanmış cron ise ve tur belirtilmemişse saate göre slot tespiti yap
           if [ -z "$TUR" ]; then
             UTC_HOUR=$(date -u +%H)
-            if [ "$UTC_HOUR" -eq 10 ] || [ "$UTC_HOUR" -eq 11 ]; then
-              TUR="hadis"
-            elif [ "$UTC_HOUR" -eq 15 ] || [ "$UTC_HOUR" -eq 16 ]; then
-              TUR="dua"
-            elif [ "$UTC_HOUR" -eq 19 ] || [ "$UTC_HOUR" -eq 20 ]; then
+            if [ "$UTC_HOUR" -eq 5 ] || [ "$UTC_HOUR" -eq 6 ]; then
               TUR="kelime"
+            elif [ "$UTC_HOUR" -eq 9 ] || [ "$UTC_HOUR" -eq 10 ]; then
+              TUR="reels"
+            elif [ "$UTC_HOUR" -eq 13 ] || [ "$UTC_HOUR" -eq 14 ]; then
+              TUR="hadis"
+            elif [ "$UTC_HOUR" -eq 16 ] || [ "$UTC_HOUR" -eq 17 ]; then
+              TUR="dua"
             else
               TUR="reels"
             fi
@@ -163,14 +163,10 @@ jobs:
           git add -f data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json data/kuran/kuran.db data/hadisler/hadisler.db data/bot.db data/arsiv 2>/dev/null || git add data/yayin_gecmisi.json data/dualar/dualar.json data/kelimeler/kelimeler.json data/kuran/kuran.db data/hadisler/hadisler.db data/arsiv || true
           if ! git diff --staged --quiet; then
             git commit -m "chore: Günlük yayın geçmişi, külliyat ve repo arşivi güncellendi [skip ci]"
-            git fetch origin main || true
-            git stash --include-untracked || true
-            if ! git rebase origin/main; then
-              git checkout --theirs -- data/kuran/kuran.db data/hadisler/hadisler.db data/bot.db 2>/dev/null || true
-              git add data/kuran/kuran.db data/hadisler/hadisler.db data/bot.db 2>/dev/null || true
-              git -c core.editor=true rebase --continue 2>/dev/null || git rebase --abort || true
-            fi
-            git stash pop 2>/dev/null || true
+            git pull --rebase --autostash -X ours origin main 2>/dev/null || {
+              git rebase --abort 2>/dev/null || true
+              git pull --no-rebase -X ours origin main -m "merge: sync with origin [skip ci]" 2>/dev/null || true
+            }
             git push origin HEAD:main
           fi
 

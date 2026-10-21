@@ -605,34 +605,6 @@ class V20MultiPageVideoEngine:
 
         log.info(f"Video Render Başlıyor: {cikti_mp4.name} | Sayfa: {self.sayfa_sayisi} | Süre: {video_sec:.2f}s ({total_frames} kare)")
 
-        temp_video = cikti_mp4.with_name(f"temp_silent_{cikti_mp4.name}")
-        writer = imageio.get_writer(
-            str(temp_video),
-            fps=FPS,
-            codec="libx264",
-            quality=9,
-            pixelformat="yuv420p",
-            macro_block_size=None,
-        )
-
-        try:
-            for i in range(total_frames):
-                t_sec = i / FPS
-                frame_im = self.render_frame(t_sec, total_sec)
-
-                if i == 0:
-                    cover_p = cikti_mp4.with_suffix(".png")
-                    frame_im.save(cover_p, quality=95)
-
-                frame_np = np.array(frame_im)
-                writer.append_data(frame_np)
-
-                if (i + 1) % 90 == 0 or i == total_frames - 1:
-                    log.debug(f"Render İlerleme: %{int((i+1)/total_frames*100)} ({i+1}/{total_frames} kare)")
-        finally:
-            writer.close()
-
-        # FFmpeg ile Spiker Sesi + Telifsiz Ney Fon Müziği Miksajı
         exe = imageio_ffmpeg.get_ffmpeg_exe()
         if fon_ney_path and fon_ney_path.exists():
             fon_name = fon_ney_path.name.lower()
@@ -646,14 +618,23 @@ class V20MultiPageVideoEngine:
             log.info(f"Ney fon müziği miksleniyor: {fon_ney_path.name} (volume={ney_volume}, offset={fon_offset}s, attack=0.15s)")
             cmd = [
                 exe, "-y",
-                "-i", str(temp_video),
-                "-i", str(mp3_path),
-                "-i", str(fon_ney_path),
+                "-loglevel", "error",
+                "-f", "rawvideo",
+                "-vcodec", "rawvideo",
+                "-s", "1080x1920",
+                "-pix_fmt", "rgb24",
+                "-r", str(FPS),
+                "-i", "-",  # 0:v (stdin)
+                "-i", str(mp3_path),  # 1:a (spiker)
+                "-i", str(fon_ney_path),  # 2:a (fon)
                 "-filter_complex",
                 f"[1:a]volume=1.0[v];[2:a]atrim=start={fon_offset},asetpts=PTS-STARTPTS,volume={ney_volume},afade=t=in:st=0:d=0.15,afade=t=out:st={total_sec-1.0}:d=1.2[m];[v][m]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[aout]",
                 "-map", "0:v",
                 "-map", "[aout]",
-                "-c:v", "copy",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
                 "-b:a", "192k",
                 "-shortest",
@@ -662,19 +643,61 @@ class V20MultiPageVideoEngine:
         else:
             cmd = [
                 exe, "-y",
-                "-i", str(temp_video),
-                "-i", str(mp3_path),
-                "-c:v", "copy",
+                "-loglevel", "error",
+                "-f", "rawvideo",
+                "-vcodec", "rawvideo",
+                "-s", "1080x1920",
+                "-pix_fmt", "rgb24",
+                "-r", str(FPS),
+                "-i", "-",  # 0:v (stdin)
+                "-i", str(mp3_path),  # 1:a
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
                 "-b:a", "192k",
                 "-shortest",
                 str(cikti_mp4)
             ]
 
-        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        if temp_video.exists():
-            temp_video.unlink()
+        try:
+            for i in range(total_frames):
+                t_sec = i / FPS
+                frame_im = self.render_frame(t_sec, total_sec)
+
+                if i == 0:
+                    cover_p = cikti_mp4.with_suffix(".png")
+                    frame_im.save(cover_p, quality=95)
+
+                if frame_im.mode != "RGB":
+                    frame_im = frame_im.convert("RGB")
+
+                try:
+                    proc.stdin.write(frame_im.tobytes())
+                except (BrokenPipeError, IOError):
+                    break
+
+                if (i + 1) % 90 == 0 or i == total_frames - 1:
+                    log.debug(f"Render İlerleme: %{int((i+1)/total_frames*100)} ({i+1}/{total_frames} kare)")
+
+            if proc.stdin:
+                try:
+                    proc.stdin.close()
+                except Exception:
+                    pass
+
+            _, stderr = proc.communicate(timeout=180)
+            if proc.returncode != 0:
+                hata_detayi = stderr.decode("utf-8", errors="replace") if stderr else f"kod {proc.returncode}"
+                log.error(f"FFmpeg render hatası: {hata_detayi[:400]}")
+                raise RuntimeError(f"FFmpeg video oluşturma hatası: {hata_detayi[:300]}")
+        except Exception as e:
+            if proc.poll() is None:
+                proc.kill()
+            raise RuntimeError(f"FFmpeg render hatası: {e}")
 
         log.info(f"Çok Sayfalı Dinamik Video Başarıyla Üretildi: {cikti_mp4} ({cikti_mp4.stat().st_size} bayt)")
         return cikti_mp4

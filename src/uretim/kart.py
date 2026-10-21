@@ -862,7 +862,7 @@ def _kelime_cta_butonu_ciz(im: Image.Image, format_tipi: str = "9:16") -> int:
     nav_h = 72 if is_916 else 62
     nav_x1 = (w - nav_w) // 2
     nav_x2 = nav_x1 + nav_w
-    nav_y1 = (h - 150) if is_916 else (h - 96)
+    nav_y1 = (h - 260) if is_916 else (h - 96)
     nav_y2 = nav_y1 + nav_h
     btn_y = nav_y1 + nav_h // 2
 
@@ -2086,7 +2086,7 @@ def kelime_karti_ciz(
     gap_tr_ar = 68 if is_916 else (42 if len(lines_tr) >= 2 else 46)
     gap_ar_origin = 56 if is_916 else (38 if len(lines_tr) >= 2 else 42)
 
-    top_y = 150 if is_916 else 95
+    top_y = 220 if is_916 else 95
     # CTA butonu üst sınırından kesin nefes payı ile referans satırının azami tavanı
     ref_y_max = cta_ust_y - (44 if is_916 else 34) - rh
     usable_h = ref_y_max - top_y

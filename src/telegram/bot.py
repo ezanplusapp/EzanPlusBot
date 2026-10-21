@@ -247,13 +247,11 @@ def grup_aciklamasi_guncelle(aciklama: Optional[str] = None, chat_id: Optional[s
 
     varsayilan_aciklama = (
         "📅 Günlük Yayın Takvimi (TSİ):\n"
-        "• 11:30 — Kur'an Tilaveti Reels\n"
-        "• 13:45 — Sahih Hadis Kartı\n"
-        "• 16:30 — Kur'an Tilaveti Reels\n"
-        "• 18:45 — Günün Duası Kartı\n"
-        "• 20:30 — Kur'an Tilaveti Reels\n"
-        "• 22:00 — Kur'an Sözlüğü Kartı\n"
-        "⚡ Cloudflare Edge Cron (6 Slot)"
+        "• 08:30 — Kur'an Sözlüğü Kartı\n"
+        "• 13:00 — Kur'an Tilaveti Reels\n"
+        "• 17:00 — Sahih Hadis Videosu\n"
+        "• 19:30 — Günün Duası Videosu\n"
+        "⚡ Cloudflare Edge Cron (4 Slot)"
     )
     yeni_desc = (aciklama or varsayilan_aciklama)[:255]
     try:
@@ -398,13 +396,24 @@ def metin_yenileme_menusu_kur(paylasim_id: int) -> List[List[Dict[str, str]]]:
     ]
 
 
-def manuel_paylasim_menusu_kur(paylasim_id: int) -> List[List[Dict[str, str]]]:
+def manuel_paylasim_menusu_kur(paylasim_id: int) -> List[List[Dict[str, Any]]]:
     """Manuel paylaşım paketi butonları."""
-    return [
+    kayit = db.paylasim_getir(paylasim_id) or {}
+    caption = str(kayit.get("caption") or "")
+
+    satirlar: List[List[Dict[str, Any]]] = [
         [
             {"text": "📸 Instagram'ı Aç", "url": "https://www.instagram.com"},
             {"text": "🎵 TikTok'u Aç", "url": "https://www.tiktok.com/@ezanplusapp"},
-        ],
+        ]
+    ]
+
+    if caption:
+        satirlar.append([
+            {"text": "📋 Açıklamayı / Başlığı Kopyala", "copy_text": {"text": caption}}
+        ])
+
+    satirlar.extend([
         [
             {"text": "🚀 Diğer Kanallarda Otomatik Yayınla", "callback_data": f"manuel_diger_{paylasim_id}"},
         ],
@@ -414,7 +423,8 @@ def manuel_paylasim_menusu_kur(paylasim_id: int) -> List[List[Dict[str, str]]]:
         [
             {"text": "← Geri (Ana Menü)", "callback_data": f"onay_menu_{paylasim_id}"},
         ],
-    ]
+    ])
+    return satirlar
 
 
 def duraklatildi_mi() -> tuple[bool, str]:
@@ -485,7 +495,10 @@ def kontrol_merkezi_menusu() -> List[List[Dict[str, str]]]:
             {"text": "📖 Kur'an Sözlüğü", "callback_data": "menu_kelime"},
         ],
         [
+            {"text": "🎥 16:9 Hatim (Mukabele)", "callback_data": "menu_hatim"},
             {"text": "📈 Detaylı Kota Raporu", "callback_data": "cmd_kota"},
+        ],
+        [
             {"text": "📊 Sistem Durumu", "callback_data": "cmd_durum"},
         ],
         [
@@ -992,7 +1005,15 @@ def telafi_butonlari_kur(paylasim_id: int, sonuclar: Dict[str, Any], format_tipi
     # Yayından kaldır ve TikTok manuel link butonları
     satirlar.append([{"text": "🗑️ Yayından Kaldır", "callback_data": f"kaldir_{paylasim_id}"}])
     if format_tipi == "reels_9_16" and not _kanal_ok(sonuclar, "tiktok"):
-        satirlar.append([{"text": "🎵 TikTok'u Aç (@ezanplusapp)", "url": "https://www.tiktok.com/@ezanplusapp"}])
+        tiktok_row: List[Dict[str, Any]] = [{"text": "🎵 TikTok'u Aç (@ezanplusapp)", "url": "https://www.tiktok.com/@ezanplusapp"}]
+        try:
+            kayit_veri = db.paylasim_getir(paylasim_id) or {}
+            caption_metni = str(kayit_veri.get("caption") or "")
+            if caption_metni:
+                tiktok_row.append({"text": "📋 Başlığı Kopyala", "copy_text": {"text": caption_metni}})
+        except Exception:
+            pass
+        satirlar.append(tiktok_row)
 
     return satirlar
 
@@ -1595,7 +1616,8 @@ def yardim_metni_olustur() -> str:
         f"🎬 <b>/ayet</b> [sure:ayet veya tema] — 9:16 Kur'an Tilaveti Reels videosu üretir (onayınıza sunar).\n"
         f"📜 <b>/hadis</b> [konu veya hadis no] — V20 Dinamik Hadis Videosu üretir (onayınıza sunar).\n"
         f"🤲 <b>/dua</b> [ruh hali veya dua adı] — V20 Dinamik Dua Videosu üretir (onayınıza sunar).\n"
-        f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (onayınıza sunar).\n\n"
+        f"📖 <b>/kelime</b> [kavram adı] — Kur'an Sözlüğü kavram kartı üretir (onayınıza sunar).\n"
+        f"🎥 <b>/hatim</b> [cüz no] [limit] — 16:9 YouTube Hatim / Mukabele videosu ve bölüm zamanları üretir.\n\n"
         f"🛠️ <b>HATA ÇÖZÜM & ONARIM KOMUTLARI:</b>\n"
         f"• <b>/sesyenile &lt;ID&gt;</b> — Hadis veya Dua videosunun sesini alternatif manevi tonla yeniden üretir.\n"
         f"• <b>/onar &lt;ID&gt;</b> — Kalite veya mizanpaj hatası alan içeriği otonom onarır.\n"
@@ -1699,13 +1721,11 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
     elif ana_komut in ("/takvim", "/saatler", "/plan"):
         mesaj_gonder(
             "📅 <b>EZAN PLUS GÜNLÜK YAYIN TAKVİMİ (TSİ)</b>\n\n"
-            "Türkiye sosyal medya etkileşim zirveleri ve manevi vakitler uyarınca Cloudflare Edge Cron üzerinden çalışan 6 yayın slotumuz:\n\n"
-            "• <b>11:30 TSİ</b> — 📖 Kur'an Tilaveti Reels 1 (Mişari Râşid el-Afâsî)\n"
-            "• <b>13:45 TSİ</b> — 📜 Sahih Hadis-i Şerif Kartı (Riyâzü's-Sâlihîn)\n"
-            "• <b>16:30 TSİ</b> — 📖 Kur'an Tilaveti Reels 2 (Mişari Râşid el-Afâsî)\n"
-            "• <b>18:45 TSİ</b> — 🌿 Günün Duası Kartı (Kur'an & Sünnet Duaları)\n"
-            "• <b>20:30 TSİ</b> — 📖 Kur'an Tilaveti Reels 3 (Mişari Râşid el-Afâsî)\n"
-            "• <b>22:00 TSİ</b> — 📖 Kur'an Sözlüğü Kartı (İslamî Kavramlar)\n\n"
+            "Instagram etkileşim zirveleri ve manevi vakitler uyarınca optimize edilmiş 4 yayın slotumuz:\n\n"
+            "• <b>08:30 TSİ</b> — 📚 Kur'an Sözlüğü Kartı (İslamî Kavramlar & Kök Anlam)\n"
+            "• <b>13:00 TSİ</b> — 📖 Kur'an Tilaveti Reels (Mişari Râşid el-Afâsî)\n"
+            "• <b>17:00 TSİ</b> — 📜 Sahih Hadis-i Şerif Videosu (Riyâzü's-Sâlihîn & Segâh Ney)\n"
+            "• <b>19:30 TSİ</b> — 🤲 Günün Duası Videosu (Ferahfezâ Ney • Prime Time)\n\n"
             "⚡ <i>Tüm tetiklemeler Cloudflare Edge Cron (0 ms gecikme) tarafından tam vaktinde yönetilir.</i>",
             chat_id=str(chat_id),
         )
@@ -1780,6 +1800,55 @@ def komut_isle(chat_id: str | int, msg_id: int, metin: str):
                 log.error(f"{ana_komut} komutu hatası: {e}")
                 caption_ve_buton_guncelle(str(c_id), d_mid, f"❌ <b>Kelime kartı üretilemedi:</b>\n<code>{html.escape(str(e))}</code>")
         _arkaplanda_calistir(_gorev_kelime)
+
+    elif ana_komut in ("/hatim", "/mukabele"):
+        if not _coklu_komut_engeli(ana_komut, chat_id):
+            mesaj_gonder("⚠️ <b>Komutunuz zaten işleniyor:</b> Hatim videosu hazırlanıyor, lütfen bekleyin...", chat_id=str(chat_id))
+            return
+        cuz_no = 1
+        limit = 3
+        if parametre:
+            parts = parametre.strip().split()
+            if len(parts) >= 1 and parts[0].isdigit():
+                cuz_no = max(1, min(30, int(parts[0])))
+            if len(parts) >= 2 and parts[1].isdigit():
+                limit = int(parts[1])
+            elif any(w in parametre.lower() for w in ("tam", "hepsi", "full")):
+                limit = None
+
+        limit_str = f"{limit} Âyet" if limit else "Tüm Cüz"
+        durum_mid = mesaj_gonder(
+            f"⏳ <b>YouTube 16:9 Hatim-i Şerif Videosu Hazırlanıyor...</b>\n\n"
+            f"• <b>Cüz:</b> {cuz_no}. Cüz\n"
+            f"• <b>Kapsam:</b> {limit_str}\n"
+            f"• <b>Format:</b> 1920x1080 (16:9 Yatay) 30 FPS\n"
+            f"• <b>Özellikler:</b> Mişari Râşid tilaveti, senkron karaoke, Elmalılı meali, YouTube Chapters\n\n"
+            f"Render işlemi devam ediyor, lütfen bekleyin...",
+            chat_id=str(chat_id)
+        )
+        def _gorev_hatim(d_mid=durum_mid, c_id=chat_id, c_no=cuz_no, a_limit=limit):
+            try:
+                from ..uretim.hatim import cuz_hatim_videosu_uret
+                mp4_yolu, bolum_yolu = cuz_hatim_videosu_uret(cuz_no=c_no, ayet_limiti=a_limit)
+                bolum_metni = ""
+                if bolum_yolu.exists():
+                    bolum_metni = bolum_yolu.read_text(encoding="utf-8")[:800]
+
+                dosya_boyutu_mb = mp4_yolu.stat().st_size / (1024 * 1024)
+                caption = (
+                    f"✨ <b>{c_no}. CÜZ HATİM-İ ŞERİF (16:9 MUKABELE) HAZIR!</b>\n\n"
+                    f"📁 <code>{mp4_yolu.name}</code> ({dosya_boyutu_mb:.1f} MB)\n\n"
+                    f"📑 <b>YouTube Bölümleri (Chapters):</b>\n<code>{bolum_metni}</code>"
+                )
+                if dosya_boyutu_mb < 49.0:
+                    video_gonder(mp4_yolu, caption=caption, chat_id=str(c_id))
+                    mesaj_sil(str(c_id), d_mid)
+                else:
+                    caption_ve_buton_guncelle(str(c_id), d_mid, caption)
+            except Exception as e:
+                log.error(f"{ana_komut} komutu hatası: {e}")
+                caption_ve_buton_guncelle(str(c_id), d_mid, f"❌ <b>Hatim videosu üretilemedi:</b>\n<code>{html.escape(str(e))}</code>")
+        _arkaplanda_calistir(_gorev_hatim)
 
     elif ana_komut == "/yayinla":
         if not parametre or not parametre.isdigit():
@@ -2848,16 +2917,17 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                     else:
                         callback_cevapla(cq_id, "Ayar bulunamadı.", alert=False)
 
-                elif data in ("menu_ayet", "menu_hadis", "menu_dua", "menu_kelime"):
+                elif data in ("menu_ayet", "menu_hadis", "menu_dua", "menu_kelime", "menu_hatim"):
                     tur_harita = {
                         "menu_ayet": ("ayet", "Kur'an Tilaveti Reels"),
                         "menu_hadis": ("hadis", "Sahih Hadis Videosu"),
                         "menu_dua": ("dua", "Günün Duası Videosu"),
                         "menu_kelime": ("kelime", "Kur'an Sözlüğü Kartı"),
+                        "menu_hatim": ("hatim", "16:9 YouTube Hatim (Mukabele)"),
                     }
                     tur_kod, tur_ad = tur_harita[data]
                     callback_cevapla(cq_id, f"🚀 {tur_ad} üretimi başlatıldı...", alert=False)
-                    durum_mid = mesaj_gonder(f"⏳ <b>{tur_ad} üretimi başlatılıyor...</b>\n\nİçerik render edilip onayınıza sunulacak, lütfen bekleyin...", chat_id=str(chat_id))
+                    durum_mid = mesaj_gonder(f"⏳ <b>{tur_ad} üretimi başlatılıyor...</b>\n\nİçerik render edilip iletilecek, lütfen bekleyin...", chat_id=str(chat_id))
 
                     def _gorev_menu_uret(t_kod=tur_kod, c_id=chat_id, d_mid=durum_mid):
                         try:
@@ -2870,6 +2940,17 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                                 otomasyon.dua_videosu_olustur_ve_gonder(auto_publish=False, durum_mesaj_id=d_mid)
                             elif t_kod == "kelime":
                                 otomasyon.kelime_postu_olustur_ve_gonder(auto_publish=False, durum_mesaj_id=d_mid)
+                            elif t_kod == "hatim":
+                                from ..uretim.hatim import cuz_hatim_videosu_uret
+                                mp4_yolu, bolum_yolu = cuz_hatim_videosu_uret(cuz_no=1, ayet_limiti=3)
+                                bolum_metni = bolum_yolu.read_text(encoding="utf-8")[:800] if bolum_yolu.exists() else ""
+                                mb = mp4_yolu.stat().st_size / (1024 * 1024)
+                                cap = f"✨ <b>1. CÜZ HATİM-İ ŞERİF (16:9 MUKABELE) ÖNİZLEME</b>\n\n📁 <code>{mp4_yolu.name}</code> ({mb:.1f} MB)\n\n📑 <b>Chapters:</b>\n<code>{bolum_metni}</code>"
+                                if mb < 49.0:
+                                    video_gonder(mp4_yolu, caption=cap, chat_id=str(c_id))
+                                    mesaj_sil(str(c_id), d_mid)
+                                else:
+                                    caption_ve_buton_guncelle(str(c_id), d_mid, cap)
                         except Exception as e:
                             log.error(f"Menüden üretim hatası ({t_kod}): {e}")
                             hata_metni = f"❌ <b>{tur_ad} Üretim Hatası:</b> <code>{html.escape(str(e))}</code>"

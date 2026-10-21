@@ -9,18 +9,14 @@ preview_urls = false
 GITHUB_REPO = "ezanplusapp/EzanPlusBot"
 
 [triggers]
-# Günde 6 Dağıtım Slotu (TSİ = UTC+3) — Cloudflare Workers Paid Plan (250 Cron Desteği & Sıfır Jitter)
-# 1. Slot: 11:30 TSİ (08:30 UTC) — Kur'an Tilaveti Reels 1
-# 2. Slot: 13:45 TSİ (10:45 UTC) — Sahih Hadis-i Şerif Kartı (4:5 + 9:16)
-# 3. Slot: 16:30 TSİ (13:30 UTC) — Kur'an Tilaveti Reels 2
-# 4. Slot: 18:45 TSİ (15:45 UTC) — Günün Duası Kartı (4:5 + 9:16)
-# 5. Slot: 20:30 TSİ (17:30 UTC) — Kur'an Tilaveti Reels 3 (Prime Time)
-# 6. Slot: 22:00 TSİ (19:00 UTC) — Kur'an Sözlüğü Kartı (4:5 + 9:16)
+# Günde 4 Dağıtım Slotu (TSİ = UTC+3) — Cloudflare Workers (Sıfır Jitter)
+# 1. Slot: 08:30 TSİ (05:30 UTC) — Kur'an Sözlüğü Kartı (4:5 + 9:16)
+# 2. Slot: 13:00 TSİ (10:00 UTC) — Kur'an Tilaveti Reels (9:16)
+# 3. Slot: 17:00 TSİ (14:00 UTC) — Sahih Hadis-i Şerif (V20 Video)
+# 4. Slot: 19:30 TSİ (16:30 UTC) — Günün Duası (V20 Video)
 crons = [
-  "30 8 * * *",
-  "45 10 * * *",
-  "30 13 * * *",
-  "45 15 * * *",
-  "30 17 * * *",
-  "0 19 * * *"
+  "30 5 * * *",
+  "0 10 * * *",
+  "0 14 * * *",
+  "30 16 * * *"
 ]
