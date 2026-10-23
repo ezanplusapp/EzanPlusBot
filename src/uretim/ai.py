@@ -43,6 +43,11 @@ YASAKLI_IFADELER = [
 ]
 
 
+class GeminiBillingError(RuntimeError):
+    """Google Gemini API ön ödemeli kredi/bakiye tükendiğinde (HTTP 402) derhal fırlatılır."""
+    pass
+
+
 def yasakli_ifadeleri_temizle(metin: str) -> str:
     """GEMINI.md anayasası uyarınca bot/otomasyon/yapay zeka ifadelerini metinden temizler."""
     if not metin:
@@ -133,6 +138,10 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
 
             try:
                 res = requests.post(url, json=payload, timeout=18)
+                if res.status_code == 402:
+                    log.error(f"Gemini API bakiye/kredi yetersiz (HTTP 402: Payment Required). Lütfen Google AI Studio hesabınızı kontrol edin: {res.text[:150]}")
+                    raise GeminiBillingError(f"HTTP 402 Payment Required: Krediler tükendi ({res.text[:120]})")
+
                 if res.status_code == 503:
                     # Google 503: "This model is currently experiencing high demand. Spikes in demand are usually temporary."
                     log.warning(f"Gemini {model} geçici yoğunluk (HTTP 503), gecikmesiz alternatif modele geçiliyor...")
@@ -161,6 +170,8 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 parcalar = candidates[0].get("content", {}).get("parts", [])
                 cevap = "".join(p.get("text", "") for p in parcalar)
                 return cevap.strip()
+            except GeminiBillingError:
+                raise
             except requests.exceptions.Timeout as e:
                 son_hata = e
                 log.warning(f"Gemini {model} yanıtı zaman aşımına uğradı (18s), bekletmeden sonraki modele geçiliyor...")
@@ -266,6 +277,8 @@ def _gemini_cagir_json(prompt: str, sistem_talimati: str = "", maks_deneme: int 
             cevap = _gemini_cagir(guncel_prompt, sistem_talimati)
             son_deneme_mi = (deneme == maks_deneme)
             return _json_ayikla(cevap, toleransli=son_deneme_mi)
+        except GeminiBillingError:
+            raise
         except Exception as e:
             son_hata = e
             log.warning(f"Gemini yanıtı JSON ayrıştırma hatası (deneme {deneme}/{maks_deneme}): {e}")
@@ -462,9 +475,12 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
 }}
 """
 
-    veri = _gemini_cagir_json(prompt, sistem_talimati)
-
     # Latin kelimeler kontrolü: Eğer tam dizi geldiyse kullan, eksikse/fazlaysa hizala
+    try:
+        veri = _gemini_cagir_json(prompt, sistem_talimati)
+    except Exception as e:
+        log.warning(f"Âyet açıklaması üretilirken Gemini hatası ({e}), tescilli editoryal şablon devreye alınıyor.")
+        veri = {}
     from .video import turkce_okunus_hizala, latin_okunus_temizle
     lk = veri.get("latin_kelimeler")
     if isinstance(lk, list) and len(lk) == toplam_ar_kelime:
@@ -598,7 +614,11 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
 }}
 """
 
-    veri = _gemini_cagir_json(prompt, sistem_talimati)
+    try:
+        veri = _gemini_cagir_json(prompt, sistem_talimati)
+    except Exception as e:
+        log.warning(f"Hadis açıklaması üretilirken Gemini hatası ({e}), tescilli editoryal şablon devreye alınıyor.")
+        veri = {}
 
     # Tescilli doğrulanmış alanları veriye yerleştir (AI halüsinasyonu imkansız!)
     veri["hadis_id"] = hadis_id
@@ -733,7 +753,11 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
 }}
 """
 
-    veri = _gemini_cagir_json(prompt, sistem_talimati)
+    try:
+        veri = _gemini_cagir_json(prompt, sistem_talimati)
+    except Exception as e:
+        log.warning(f"Dua açıklaması üretilirken Gemini hatası ({e}), tescilli editoryal şablon devreye alınıyor.")
+        veri = {}
 
     # Tescilli doğrulanmış alanları yerleştir
     veri["dua_id"] = dua_id
@@ -763,6 +787,7 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
         cap = f"“{turkce_anlam}”\n\n{dua_basligi}\n\n{tef}\n\nDualarınızın kabul olması niyazıyla. Ezan Plus 📲"
     varsayilan = ["ezanplus", "dua", "niyaz", "huzur", "tefekkur"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
+    veri["caption"] = veri["instagram_caption"]
 
     return veri
 
@@ -922,6 +947,7 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
         )
     varsayilan = ["ezanplus", "kuran", "kavram", "kelime", "tefekkur"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(caption, varsayilan_etiketler=varsayilan)
+    veri["caption"] = veri["instagram_caption"]
     veri["kelime_id"] = kelime_id
     veri["kelime_tr"] = k_tr
     veri["kelime_ar"] = k_ar
