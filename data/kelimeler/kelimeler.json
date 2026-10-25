@@ -1680,9 +1680,9 @@
     "kuran_boyutu": "Kur'an'da kulun muhtaca yaptığı yardım, bizzat Allah Teâlâ'ya verilmiş ve kat kat fazlasıyla geri ödenecek bir borç olarak tasvir edilir.",
     "hayat_dersi": "Varlığı kendinden bilmeyip elindeki imkanla bir kardeşinin zor anında elinden tutmaktır.",
     "ayet_ref": "Hadîd Sûresi, 11. Âyet",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-25 05:32:42"
   },
   {
     "id": 114,
