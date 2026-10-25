@@ -726,7 +726,7 @@ def akilli_v20_sayfalari_olustur(
     """
     from .ses import turkce_kisaltmalari_genislet, turkce_metin_harf_duzelt
     ar_metin = arapca_glif_temizle(ar_metin) if ar_metin else ""
-    meal_metin = turkce_metin_harf_duzelt(turkce_kisaltmalari_genislet(meal_metin)) if meal_metin else ""
+    meal_metin = turkce_metin_harf_duzelt(turkce_kisaltmalari_genislet(meal_metin.replace("**", "").replace("*", ""))) if meal_metin else ""
     total_words = len(words_data)
 
     # 1. Tek Sayfa Durumu

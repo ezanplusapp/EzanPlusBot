@@ -84,20 +84,45 @@ def code_ile_token_al(auth_code: str, redirect_uri: str = "https://ozbornstudio.
     return user_id, long_token
 
 
+def _threads_metin_temizle(metin: str) -> str:
+    """
+    Threads metinlerinde ham markdown (**bold**, *italic*) ve yetim yıldızları temizler.
+    Threads platformu markdown etiketlerini desteklemediği için ekranda ham yıldız çıkmasını önler.
+    """
+    if not metin:
+        return ""
+    import re
+    # 1. Triple bold/italic (***metin***)
+    t = re.sub(r"\*\*\*([^*]+)\*\*\*", r"\1", str(metin))
+    # 2. Double bold (**metin**)
+    t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
+    # 3. Single italic (*metin*)
+    t = re.sub(r"(?<!\w)\*([^*\n]+)\*(?!\w)", r"\1", t)
+    # 4. Kalan yetim ** veya * işaretleri
+    t = t.replace("**", "").replace("*", "")
+    # 5. Çift boşlukları ve satır boşluklarını toparla
+    t = re.sub(r"[ \t]+", " ", t)
+    satirlar = [s.strip() for s in t.split("\n")]
+    return "\n".join(satirlar).strip()
+
+
 def _threads_metin_kirp(metin: str, limit: int = 500) -> str:
-    """Threads 500 karakter sınırına göre metni güvenle kırpar."""
-    if not metin or len(metin) <= limit:
-        return metin
-    return metin[:limit - 3].rstrip() + "..."
+    """Threads 500 karakter sınırına göre metni temizler ve güvenle kırpar."""
+    temiz = _threads_metin_temizle(metin)
+    if not temiz or len(temiz) <= limit:
+        return temiz
+    return temiz[:limit - 3].rstrip() + "..."
 
 
 def metni_parcala(metin: str, max_karakter: int = 460) -> list[str]:
     """
     Uzun metinleri Threads'in 500 karakter sınırına uygun şekilde
     paragraf ve cümle bütünlüğünü bozmadan mantıklı parçalara böler.
+    Metin öncesinde markdown yıldızlarından tamamen arındırılır.
     """
     import re
-    paragraflar = [p.strip() for p in metin.split("\n\n") if p.strip()]
+    temiz_metin = _threads_metin_temizle(metin)
+    paragraflar = [p.strip() for p in temiz_metin.split("\n\n") if p.strip()]
     parcalar = []
     mevcut_parca = ""
 

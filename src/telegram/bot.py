@@ -399,7 +399,8 @@ def metin_yenileme_menusu_kur(paylasim_id: int) -> List[List[Dict[str, str]]]:
 def manuel_paylasim_menusu_kur(paylasim_id: int) -> List[List[Dict[str, Any]]]:
     """Manuel paylaşım paketi butonları."""
     kayit = db.paylasim_getir(paylasim_id) or {}
-    caption = str(kayit.get("caption") or "")
+    from ..uretim.ai import markdown_temizle
+    caption = markdown_temizle(str(kayit.get("caption") or ""))
 
     satirlar: List[List[Dict[str, Any]]] = [
         [
@@ -726,7 +727,8 @@ def onay_istegi_gonder(paylasim_id: int) -> int:
 
     kategori = kayit["kategori"].upper()
     format_tipi = kayit["format"]
-    caption = kayit.get("caption") or ""
+    from ..uretim.ai import markdown_temizle
+    caption = markdown_temizle(kayit.get("caption") or "")
     baslik = kayit.get("baslik") or ""
     kaynak = kayit.get("kaynak") or baslik
 
@@ -1152,7 +1154,8 @@ def yayin_detay_karti_gonder(
         raise ValueError(f"Paylaşım bulunamadı: ID {paylasim_id}")
 
     format_tipi = kayit["format"]
-    caption = kayit.get("caption") or ""
+    from ..uretim.ai import markdown_temizle
+    caption = markdown_temizle(kayit.get("caption") or "")
     
     tam_rapor = yayin_raporu_metni_kur(kayit, sonuclar, dagitim_suresi=dagitim_suresi, aciklama_dahil=True)
     kisa_rapor = yayin_raporu_metni_kur(kayit, sonuclar, dagitim_suresi=dagitim_suresi, aciklama_dahil=False)
@@ -2737,7 +2740,8 @@ def tek_sefer_dinle(offset: int = 0) -> int:
                         continue
 
                     callback_cevapla(cq_id, "📲 Manuel paylaşım paketi hazırlandı.", alert=False)
-                    caption_metni = kayit.get("caption") or kayit.get("turkce_metin") or ""
+                    from ..uretim.ai import markdown_temizle
+                    caption_metni = markdown_temizle(kayit.get("caption") or kayit.get("turkce_metin") or "")
                     etiketler = kayit.get("etiketler") or ""
                     if etiketler and etiketler not in caption_metni:
                         caption_metni = f"{caption_metni}\n\n{etiketler}"

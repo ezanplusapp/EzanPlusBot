@@ -109,7 +109,8 @@ def yayinla_hepsi(
                 return {"hata": "Kalite kontrolünden geçemedi ve onarılamadı", "hatalar": denetim.hatalar}
 
     format_tipi = kayit["format"]
-    caption = kayit.get("caption") or ""
+    from ..uretim.ai import markdown_temizle
+    caption = markdown_temizle(kayit.get("caption") or "")
     video_yolu = kayit.get("video_yolu")
     gorsel_yollari = kayit.get("gorsel_yollari") or []
     gorsel_yolu = gorsel_yollari[0] if gorsel_yollari else None
@@ -367,7 +368,8 @@ def yayinla_telafi(
         raise ValueError(f"Paylaşım ID bulunamadı: {paylasim_id}")
 
     format_tipi = kayit["format"]
-    caption = kayit.get("caption") or ""
+    from ..uretim.ai import markdown_temizle
+    caption = markdown_temizle(kayit.get("caption") or "")
     video_yolu = kayit.get("video_yolu")
     gorsel_yollari = kayit.get("gorsel_yollari") or []
     gorsel_yolu = gorsel_yollari[0] if gorsel_yollari else None

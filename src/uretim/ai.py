@@ -334,6 +334,28 @@ def hashtaglari_normallestir(
     return sonuc
 
 
+def markdown_temizle(metin: str) -> str:
+    """
+    Metindeki markdown bold (**bold**) ve italik (*italic*) etiketlerini ayıklar,
+    sosyal medya açıklamaları ve Threads metinleri için temiz düz metin (plain text) üretir.
+    Ekranda çıplak '**' veya '*' karakterlerinin kalmasını kesinlikle engeller.
+    """
+    if not metin:
+        return ""
+    # 1. Triple bold/italic (***metin***)
+    t = re.sub(r"\*\*\*([^*]+)\*\*\*", r"\1", str(metin))
+    # 2. Double bold (**metin**)
+    t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
+    # 3. Single italic (*metin*)
+    t = re.sub(r"(?<!\w)\*([^*\n]+)\*(?!\w)", r"\1", t)
+    # 4. Kalan yetim ** veya * işaretleri
+    t = t.replace("**", "").replace("*", "")
+    # 5. Çift boşlukları ve satır boşluklarını toparla
+    t = re.sub(r"[ \t]+", " ", t)
+    satirlar = [s.strip() for s in t.split("\n")]
+    return "\n".join(satirlar).strip()
+
+
 def caption_hashtaglari_guncelle(
     caption: str,
     varsayilan_etiketler: Optional[List[str]] = None,
@@ -342,13 +364,16 @@ def caption_hashtaglari_guncelle(
 ) -> str:
     """
     Caption içindeki hashtagleri ayıklar, yasaklı bot/AI kelimelerini temizler,
-    etiketleri normalize eder ve caption sonuna garantili azami `maks` adet tekilleştirilmiş
-    hashtag (#ezanplus zorunlu) olarak ekler.
+    markdown bold/italic işaretlerini ayıklar, etiketleri normalize eder ve caption sonuna
+    garantili azami `maks` adet tekilleştirilmiş hashtag (#ezanplus zorunlu) olarak ekler.
     """
     # 1. Yasaklı bot / AI ifadelerini temizle
     caption_temiz = yasakli_ifadeleri_temizle(caption)
 
-    # 2. Mevcut hashtagleri tespit et
+    # 2. Sosyal medya için markdown yıldızlarını (**...**, *...*) temizle
+    caption_temiz = markdown_temizle(caption_temiz)
+
+    # 3. Mevcut hashtagleri tespit et
     mevcut_etiketler = re.findall(r'#\w+', caption_temiz)
 
     tum_adaylar = list(mevcut_etiketler)
@@ -446,6 +471,7 @@ Görevin:
    - Kaydet 📌 & Paylaş 🕊️ çağrısı
    - Ezan Plus yönlendirmesi 📲
    - KESİNLİKLE VE TAM 5 ADET HASHTAG (#ezanplus ve 4 adet ayet/konu odaklı etiket). Asla 5'ten fazla yazma!
+   - KESİNLİKLE markdown bold (**...**) veya yıldız işareti kullanma; sosyal medya açıklaması tamamen temiz düz metin olmalıdır.
 Çıktıyı YALNIZCA geçerli bir JSON objesi olarak ver.
 """
 
@@ -471,7 +497,7 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
   "video_baslik_satir1": "Çağrı/anons cümlesi (sonunda : olsun, maks 30 karakter)",
   "video_baslik_satir2": "Vurucu hakikat cümlesi (maks 32 karakter)",
   "tefekkur_notu": "2-3 cümlelik samimi hayat dersi ve tefekkür",
-  "instagram_caption": "Yukarıda belirtilen 6 aşamalı Instagram açıklama metni"
+  "instagram_caption": "Yukarıda belirtilen 6 aşamalı Instagram açıklama metni (ASLA ** veya * kullanma, temiz düz metin yaz)"
 }}
 """
 
@@ -594,6 +620,7 @@ Açıklama yapısı:
 - Kaydet 📌 & Paylaş 🕊️ çağrısı
 - Ezan Plus yönlendirmesi 📲
 - KESİNLİKLE VE TAM 5 ADET HASHTAG (#ezanplus ve 4 adet odaklı etiket). Asla 5'ten fazla yazma!
+- KESİNLİKLE markdown bold (**...**) veya yıldız işareti kullanma; sosyal medya açıklaması tamamen temiz düz metin olmalıdır.
 Çıktıyı YALNIZCA geçerli bir JSON objesi olarak ver.
 """
 
@@ -610,7 +637,7 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
   "arapca_okunus": "Arapça metnin Türkçe Latin harfleriyle edebi okunuşu (Örn: Lâ yüldeğu’l-mü’minü min cuhrin vâhıdin merrateyn)",
   "hadis_vurgulu": "Yukarıdaki Türkçe mealin hiçbir kelimesini değiştirmeden veya eksiltmeden, hadisin en can alıcı ve vurucu 2-5 kelimelik kısmını markdown **bold** içine alarak aynen yaz (Örn: 'Mü’min bir delikten **iki defa sokulmaz.**')",
   "tefekkur_notu": "Bu nebevi öğüdün modern hayattaki karşılığı ve bize verdiği ahlaki ders (Maksimum 2 cümle).",
-  "instagram_caption": "Yukarıda belirtilen 6 aşamalı Instagram açıklama metni."
+  "instagram_caption": "Yukarıda belirtilen 6 aşamalı Instagram açıklama metni (ASLA ** veya * kullanma, temiz düz metin yaz)."
 }}
 """
 
@@ -732,6 +759,7 @@ Açıklama yapısı:
 - 'Yoruma bir Âmin bırakarak dualara ortak olun 🤲' ve sevdiklerine gönderme çağrısı
 - Ezan Plus yönlendirmesi 📲
 - KESİNLİKLE VE TAM 5 ADET HASHTAG (#ezanplus ve 4 adet duaya odaklı etiket). Asla 5'ten fazla yazma!
+- KESİNLİKLE markdown bold (**...**) veya yıldız işareti kullanma; sosyal medya açıklaması tamamen temiz düz metin olmalıdır.
 Çıktıyı YALNIZCA geçerli bir JSON objesi olarak ver.
 """
 
@@ -749,7 +777,7 @@ Ruh Hâli / Durum: {ruh_hali}
 Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
 {{
   "tefekkur_notu": "Bu duanın insanın kalbine dokunan 1-2 cümlelik hikmeti ve manevi şifası",
-  "instagram_caption": "Yukarıda belirtilen 5 aşamalı Instagram açıklama metni"
+  "instagram_caption": "Yukarıda belirtilen 5 aşamalı Instagram açıklama metni (ASLA ** veya * kullanma, temiz düz metin yaz)"
 }}
 """
 
@@ -901,6 +929,8 @@ Açıklama şablonu TAM OLARAK şu 6 bloktan oluşmalıdır (bloklar arasında b
 📲 Günlük Kur'an tilavetleri, sahih hadisler ve manevi rehberlik için Ezan Plus uygulamasını biyografideki bağlantıdan ücretsiz indirebilirsin.
 6) HASHTAGLER:
 KESİNLİKLE VE TAM 5 ADET HASHTAG (#ezanplus #kuransözlüğü #kavramadı #tefekkür #ayetler). Asla 5'ten fazla veya eksik yazma!
+7) DÜZ METİN ZORUNLULUĞU:
+Sosyal medya açıklamasında ("instagram_caption") KESİNLİKLE markdown bold (**...**) veya yıldız işareti KULLANMA; tamamen temiz düz metin yaz.
 
 Çıktıyı YALNIZCA geçerli bir JSON objesi olarak ver.
 """
@@ -918,7 +948,7 @@ Hayat Dersi: {hayat_dersi}
 
 Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
 {{
-  "instagram_caption": "Yukarıda belirtilen 6 aşamalı Instagram açıklama metni"
+  "instagram_caption": "Yukarıda belirtilen 6 aşamalı Instagram açıklama metni (ASLA ** veya * kullanma, temiz düz metin yaz)"
 }}
 """
 
@@ -1008,24 +1038,25 @@ GÖREV:
 KURALLAR:
 1. Türkçe meal metnini asla değiştirme veya yapay zekayla yeniden çevirme!
 2. Asla "bot", "otomasyon", "yapay zeka", "algoritma" gibi kelimeler KULLANMA.
-3. Çıktıyı kesinlikle geçerli bir JSON olarak ver:
+3. Açıklama metninde ("caption") KESİNLİKLE markdown bold (**...**) veya yıldız işareti KULLANMA; temiz düz metin yaz.
+4. Çıktıyı kesinlikle geçerli bir JSON olarak ver:
 {{
   "tefekkur_notu": "Revize edilmiş tefekkür notu",
-  "caption": "Instagram/TikTok için kopyalanabilir tam açıklama metni (#ezanplus etiketiyle)"
+  "caption": "Instagram/Threads için kopyalanabilir tam açıklama metni (#ezanplus etiketiyle, yıldızsız düz metin)"
 }}
 """
     try:
         veri = _gemini_cagir_json(prompt)
-        tef = str(veri.get("tefekkur_notu") or "").strip()
-        cap = str(veri.get("caption") or "").strip()
+        tef = markdown_temizle(str(veri.get("tefekkur_notu") or "").strip())
+        cap = markdown_temizle(str(veri.get("caption") or "").strip())
         if not tef:
-            tef = mevcut_tefekkur
+            tef = markdown_temizle(mevcut_tefekkur)
         if not cap:
-            cap = mevcut_caption
+            cap = markdown_temizle(mevcut_caption)
         if "#ezanplus" not in cap:
             cap += "\n\n#ezanplus #tefekkur"
         return tef, cap
     except Exception as e:
         log.warning(f"Metin revizyonu hatası ({e}), mevcut metin korundu.")
-        return mevcut_tefekkur, mevcut_caption
+        return markdown_temizle(mevcut_tefekkur), markdown_temizle(mevcut_caption)
 

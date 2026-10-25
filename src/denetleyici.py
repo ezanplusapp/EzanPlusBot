@@ -149,6 +149,8 @@ def denetle_metin(veri: Dict[str, Any], kategori: str = "ayet") -> Tuple[List[st
             uyarilar.append(f"Hashtag sayısı az ({len(hashtags)} adet, asgari 5 önerilir).")
         elif len(hashtags) > 10:
             uyarilar.append(f"Hashtag sayısı fazla ({len(hashtags)} adet, azami 5 önerilir).")
+        if "**" in caption:
+            hatalar.append("Açıklama metninde (caption) ham markdown '**' yıldız işaretleri bulundu.")
 
     # 6. Yasaklı Bot / AI İfadeleri Kontrolü (Marka Standartı)
     butun_metinler = f"{turkce} {caption} {tefekkur} {kaynak}".lower()

@@ -204,6 +204,43 @@ class TestTroubleshootingVeOnarimlar(unittest.TestCase):
         self.assertTrue(p.exists())
         p.unlink()
 
+    # -------------------------------------------------------------
+    # Senaryo 6: Sosyal Medya ve Threads Markdown (**) Temizliği Güvencesi
+    # -------------------------------------------------------------
+    def test_markdown_temizle_tum_varyasyonlar(self):
+        """Metinlerdeki **bold**, ***triple***, *italic* ve yetim yıldızların temizlendiğini doğrular."""
+        from src.uretim.ai import markdown_temizle
+        test_metin = "Gecenin derinliğinde **Rabbine seccadesinde vuslat bulmak** ve *samimiyetle* dua etmek."
+        sonuc = markdown_temizle(test_metin)
+        self.assertNotIn("**", sonuc)
+        self.assertNotIn("*", sonuc)
+        self.assertEqual(sonuc, "Gecenin derinliğinde Rabbine seccadesinde vuslat bulmak ve samimiyetle dua etmek.")
+
+    def test_threads_metin_temizle_ve_parcala(self):
+        """Threads zincir ve kırpma fonksiyonlarının metinden yıldızları tamamen arındırdığını doğrular."""
+        from src.platformlar.threads import _threads_metin_temizle, metni_parcala, _threads_metin_kirp
+        metin = "“İman edip **hayırlı ameller işleyenler** var ya, işte onlar **yaratılmışların en hayırlısıdır.**”"
+        temiz = _threads_metin_temizle(metin)
+        self.assertNotIn("**", temiz)
+        self.assertIn("hayırlı ameller işleyenler", temiz)
+        self.assertIn("yaratılmışların en hayırlısıdır.", temiz)
+
+        parcalar = metni_parcala(metin)
+        for p in parcalar:
+            self.assertNotIn("**", p)
+
+        kirpilmis = _threads_metin_kirp(metin, limit=100)
+        self.assertNotIn("**", kirpilmis)
+
+    def test_caption_hashtaglari_guncelle_markdown_arindirir(self):
+        """caption_hashtaglari_guncelle fonksiyonunun caption içindeki ** işaretlerini yok ettiğini doğrular."""
+        from src.uretim.ai import caption_hashtaglari_guncelle
+        ham_caption = "Rabbimiz! Bizi **doğru yola ilet** ve başarılı kıl. #ezanplus"
+        temiz_caption = caption_hashtaglari_guncelle(ham_caption, varsayilan_etiketler=["dua", "ayet"])
+        self.assertNotIn("**", temiz_caption)
+        self.assertIn("doğru yola ilet", temiz_caption)
+        self.assertIn("#ezanplus", temiz_caption)
+
 
 if __name__ == "__main__":
     unittest.main()
