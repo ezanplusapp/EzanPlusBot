@@ -606,9 +606,9 @@
     "turkce_anlam": "Rabbim! **Beni bereketli bir konakta indir;** zira Sen konaklatanların en hayırlısısın.",
     "kaynak_ref": "Mü'minûn Sûresi, 29. Âyet",
     "fazilet_notu": "Yeni bir eve taşınırken, yeni bir şehre yerleşirken veya işe girerken mekanın bereketi için okunur.",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-10-28 16:33:12"
   },
   {
     "id": 43,
