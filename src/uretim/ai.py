@@ -392,6 +392,139 @@ def caption_hashtaglari_guncelle(
     return f"{metin_govdesi}\n\n{' '.join(normallesmis)}"
 
 
+def _varsayilan_ayet_caption(
+    sure_adi: str,
+    sure_no: int,
+    ayet_no: int,
+    turkce_meal: str,
+    arapca_metin: Optional[str] = None,
+    arapca_okunus: Optional[str] = None,
+    tefekkur_notu: Optional[str] = None,
+    cuz_no: Optional[int] = None,
+    hafiz_adi: str = "Mişari Râşid el-Afâsî",
+) -> str:
+    """Gemini AI yanıt vermediğinde veya kota bittiğinde devreye giren tescilli editoryal Kur'an caption şablonu."""
+    temiz_meal = markdown_temizle(turkce_meal).strip('“”" ')
+    tr_map = str.maketrans("ıîâûşğüöçİÎÂÛŞĞÜÖÇ", "iiaasguocIIAASGUOC")
+    sure_slug = re.sub(r'[^a-zA-Z0-9]', '', sure_adi.translate(tr_map).lower())
+
+    ref_str = f"{sure_adi} Sûresi, {ayet_no}. Âyet"
+    if cuz_no:
+        ref_str += f" ({cuz_no}. Cüz)"
+
+    ar_blok = f"{arapca_metin}\n\n" if arapca_metin else ""
+    okunus_blok = f"🔊 Okunuş: {arapca_okunus}\n\n" if arapca_okunus else ""
+
+    if not tefekkur_notu or len(tefekkur_notu.strip()) < 15 or "mutmain kılan yegâne hakikat" in tefekkur_notu:
+        tef_metni = (
+            "Bu ilahi kelam, insanın dünya telaşında kalbine bir pusula ve istikamet rehberidir. "
+            "Âyetin manasını tefekkür ederek hayatımıza taşımak, ruhumuza daimi bir sükûnet ve basiret bahşeder."
+        )
+    else:
+        tef_metni = markdown_temizle(tefekkur_notu).strip()
+
+    return (
+        f"“Yüce Allah'ın kalplere şifa, akıllara rehber olan ilahi kelamına kulak verin...”\n\n"
+        f"📖 {ref_str}\n"
+        f"🎙️ Tilavet: {hafiz_adi}\n\n"
+        f"{ar_blok}"
+        f"“{temiz_meal}”\n\n"
+        f"{okunus_blok}"
+        f"💡 Tefekkür & Hikmet Notu:\n"
+        f"{tef_metni}\n\n"
+        f"📌 Kalbine rehber olması için kaydet, gün içinde tefekkür et.\n"
+        f"🕊️ Bu ilahi mesaja vesile olmak için sevdiklerinle paylaş.\n"
+        f"📲 114 sûre, kelime kelime senkron tilavetler ve namaz vakitleri için Ezan Plus uygulamasını biyografideki bağlantıdan ücretsiz indirebilirsin.\n\n"
+        f"#ezanplus #kuran #{sure_slug}suresi #tilavet #tefekkur"
+    )
+
+
+def _varsayilan_hadis_caption(
+    hadis_metni: str,
+    kaynak_ref: str,
+    ravi: Optional[str] = None,
+    arapca_metin: Optional[str] = None,
+    arapca_okunus: Optional[str] = None,
+    tefekkur_notu: Optional[str] = None,
+) -> str:
+    """Gemini AI yanıt vermediğinde veya kota bittiğinde devreye giren tescilli editoryal Sahih Hadis caption şablonu."""
+    temiz_hadis = markdown_temizle(hadis_metni).strip('“”" ')
+    ravi_str = f" • Râvi: {ravi}" if ravi else ""
+    kaynak_bloku = f"📜 Kaynak: {kaynak_ref}{ravi_str}"
+
+    ar_blok = f"{arapca_metin}\n\n" if arapca_metin else ""
+    okunus_blok = f"🔊 Okunuş: {arapca_okunus}\n\n" if arapca_okunus else ""
+
+    if not tefekkur_notu or len(tefekkur_notu.strip()) < 15 or "dünya hem de ahiret saadetinin" in tefekkur_notu:
+        tef_metni = (
+            "Resûlullah'ın (s.a.v.) mübarek sünneti, her anımızda ahlakımızı güzelleştiren "
+            "ve adımlarımızı istikamette tutan Nebevî bir nurdur."
+        )
+    else:
+        tef_metni = markdown_temizle(tefekkur_notu).strip()
+
+    return (
+        f"“Resûlullah (sallallahu aleyhi vesellem) buyurdu:”\n\n"
+        f"{kaynak_bloku}\n\n"
+        f"{ar_blok}"
+        f"“{temiz_hadis}”\n\n"
+        f"{okunus_blok}"
+        f"💡 Nebevî Öğüt & Hikmet:\n"
+        f"{tef_metni}\n\n"
+        f"📌 Sünnet-i Seniyye'yi hayatına tatbik etmek için kaydet.\n"
+        f"🕊️ Hayra vesile olmak ve bu Nebevî öğüdü yaymak için sevdiklerinle paylaş.\n"
+        f"📲 Sahih hadis külliyatı, günlük zikirler ve ibadet rehberi için Ezan Plus uygulamasını biyografideki bağlantıdan ücretsiz indirebilirsin.\n\n"
+        f"#ezanplus #hadis #hadisişerif #sünnet #tefekkür"
+    )
+
+
+def _varsayilan_dua_caption(
+    dua_basligi: str,
+    turkce_anlam: str,
+    kaynak_ref: str,
+    kimin_duasi: Optional[str] = None,
+    arapca_metin: Optional[str] = None,
+    arapca_okunus: Optional[str] = None,
+    fazilet_notu: Optional[str] = None,
+    tefekkur_notu: Optional[str] = None,
+    ruh_hali: Optional[str] = None,
+) -> str:
+    """Gemini AI yanıt vermediğinde veya kota bittiğinde devreye giren tescilli editoryal Dua caption şablonu."""
+    temiz_anlam = markdown_temizle(turkce_anlam).strip('“”" ')
+    kimin_str = f" • {kimin_duasi}" if kimin_duasi else ""
+    baslik_bloku = f"🤲 {dua_basligi}\n📍 {kaynak_ref}{kimin_str}"
+
+    ar_blok = f"{arapca_metin}\n\n" if arapca_metin else ""
+    okunus_blok = f"🔊 Okunuş: {arapca_okunus}\n\n" if arapca_okunus else ""
+
+    fazilet_metni = ""
+    if fazilet_notu and len(fazilet_notu.strip()) >= 10:
+        fazilet_metni = f"✨ Fazilet & Hikmet: {markdown_temizle(fazilet_notu).strip()}\n\n"
+
+    if not tefekkur_notu or len(tefekkur_notu.strip()) < 15 or "teslimiyetinin ve yakarışının" in tefekkur_notu:
+        tef_metni = (
+            "Dua, kulun aczini itiraf edip sonsuz rahmet sahibi Yüce Yaratıcı'ya sığınmasıdır. "
+            "İhlas ve samimiyetle edilen dualar geri çevrilmez."
+        )
+    else:
+        tef_metni = markdown_temizle(tefekkur_notu).strip()
+
+    return (
+        f"“Kalpten dökülen en samimi yakarış, kul ile Rabbi arasındaki en güçlü bağdır...”\n\n"
+        f"{baslik_bloku}\n\n"
+        f"{ar_blok}"
+        f"“{temiz_anlam}”\n\n"
+        f"{okunus_blok}"
+        f"{fazilet_metni}"
+        f"💡 Tefekkür Notu:\n"
+        f"{tef_metni}\n\n"
+        f"📌 İhtiyaç duyduğun her an okumak ve ezberlemek için kaydet.\n"
+        f"🕊️ Bir kardeşinin duasına vesile olmak için sevdiklerinle paylaş.\n"
+        f"📲 Günün duaları, tesbihat ve manevi tefekkürler için Ezan Plus uygulamasını biyografideki bağlantıdan ücretsiz indirebilirsin.\n\n"
+        f"#ezanplus #dua #gününduası #huzur #münacat"
+    )
+
+
 def ayet_icerigi_uret(
     tema: Optional[str] = None,
     meal_tercihi: str = "elmalili",
@@ -538,7 +671,17 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
 
     cap = str(veri.get("instagram_caption") or "").strip()
     if not cap or len(cap) < 25:
-        cap = f"“{turkce_meal}”\n\n{sure_ayet_etiket}\n\n{tef}\n\nEzan Plus ile Kur'an'ın nurunu kalbinizde hissedin. 📲"
+        cap = _varsayilan_ayet_caption(
+            sure_adi=sure_adi,
+            sure_no=sure_no,
+            ayet_no=ayet_no,
+            turkce_meal=turkce_meal,
+            arapca_metin=arapca_metin,
+            arapca_okunus=veri.get("arapca_okunus"),
+            tefekkur_notu=tef,
+            cuz_no=cuz_no,
+            hafiz_adi="Mişari Râşid el-Afâsî",
+        )
     varsayilan = ["ezanplus", "kuran", "ayet", "tilavet", "tefekkur"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
@@ -688,8 +831,15 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
 
     cap = str(veri.get("instagram_caption") or "").strip()
     if not cap or len(cap) < 25:
-        cap = f"“{hadis_metni}”\n\n{kaynak_ref}\n\n{tef}\n\nSünnet-i Seniyye rehberliğinde bir hayat için Ezan Plus yanınızda. 📲"
-    varsayilan = ["ezanplus", "hadis", "sunnet", "tefekkur", "dua"]
+        cap = _varsayilan_hadis_caption(
+            hadis_metni=hadis_metni,
+            kaynak_ref=kaynak_ref,
+            ravi=ravi,
+            arapca_metin=arapca_metin,
+            arapca_okunus=veri.get("arapca_okunus"),
+            tefekkur_notu=tef,
+        )
+    varsayilan = ["ezanplus", "hadis", "hadisişerif", "sünnet", "tefekkür"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     veri["kategori"] = "hadis"
@@ -812,8 +962,18 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
 
     cap = str(veri.get("instagram_caption") or "").strip()
     if not cap or len(cap) < 25:
-        cap = f"“{turkce_anlam}”\n\n{dua_basligi}\n\n{tef}\n\nDualarınızın kabul olması niyazıyla. Ezan Plus 📲"
-    varsayilan = ["ezanplus", "dua", "niyaz", "huzur", "tefekkur"]
+        cap = _varsayilan_dua_caption(
+            dua_basligi=dua_basligi,
+            turkce_anlam=turkce_anlam,
+            kaynak_ref=kaynak_ref,
+            kimin_duasi=kimin_duasi,
+            arapca_metin=arapca_metin,
+            arapca_okunus=arapca_okunus,
+            fazilet_notu=fazilet_notu,
+            tefekkur_notu=tef,
+            ruh_hali=ruh_hali,
+        )
+    varsayilan = ["ezanplus", "dua", "gününduası", "huzur", "münacat"]
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
     veri["caption"] = veri["instagram_caption"]
 

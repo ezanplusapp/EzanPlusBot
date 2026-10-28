@@ -231,10 +231,10 @@ def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> 
 
             container_id = c_data["id"]
 
-            # Container hazır olana kadar bekle (azami 30 saniye)
+            # Container hazır olana kadar bekle (azami 75 saniye)
             gecerli = False
-            for poll_no in range(1, 16):
-                time.sleep(2)
+            for poll_no in range(1, 26):
+                time.sleep(3)
                 try:
                     status_res = requests.get(
                         f"{GRAPH_API_URL}/{container_id}",
@@ -243,7 +243,7 @@ def instagram_gorsel_paylas(gorsel_url_veya_yolu: str | Path, aciklama: str) -> 
                     )
                     s_data = status_res.json()
                     status_code = s_data.get("status_code")
-                    log.info(f"Container durum kontrolü ({poll_no}/15): status_code={status_code}, status={s_data.get('status')}")
+                    log.info(f"Container durum kontrolü ({poll_no}/25): status_code={status_code}, status={s_data.get('status')}")
 
                     if status_code == "FINISHED" or (status_code is None and status_res.status_code == 200 and "error" not in s_data):
                         gecerli = True
@@ -337,7 +337,7 @@ def instagram_reels_paylas(video_dosya_yolu: str | Path, aciklama: str) -> Dict[
 
     # 3. Adım: Video İşleme Durumunu Bekle (Polling)
     log.info("Videonun Meta tarafında işlenmesi bekleniyor...")
-    for _ in range(30):  # Maksimum 2.5 dakika bekle
+    for _ in range(45):  # Maksimum 3.75 dakika bekle
         time.sleep(5)
         status_res = requests.get(
             f"{GRAPH_API_URL}/{container_id}",
@@ -534,7 +534,7 @@ def instagram_story_paylas(
 
         # 3. Adım: İşlenme Durumunu Bekle
         log.info("Story videosunun Meta tarafında işlenmesi bekleniyor...")
-        for _ in range(30):
+        for _ in range(45):  # Maksimum 3.75 dakika bekle
             time.sleep(5)
             status_res = requests.get(
                 f"{GRAPH_API_URL}/{container_id}",
@@ -589,10 +589,10 @@ def instagram_story_paylas(
 
                 container_id = c_data["id"]
 
-                # Container hazır olana kadar bekle (azami 30 saniye)
+                # Container hazır olana kadar bekle (azami 75 saniye)
                 gecerli = False
-                for poll_no in range(1, 16):
-                    time.sleep(2)
+                for poll_no in range(1, 26):
+                    time.sleep(3)
                     try:
                         status_res = requests.get(
                             f"{GRAPH_API_URL}/{container_id}",
@@ -601,7 +601,7 @@ def instagram_story_paylas(
                         )
                         s_data = status_res.json()
                         status_code = s_data.get("status_code")
-                        log.info(f"Story container durum kontrolü ({poll_no}/15): status_code={status_code}, status={s_data.get('status')}")
+                        log.info(f"Story container durum kontrolü ({poll_no}/25): status_code={status_code}, status={s_data.get('status')}")
 
                         if status_code == "FINISHED" or (status_code is None and status_res.status_code == 200 and "error" not in s_data):
                             gecerli = True

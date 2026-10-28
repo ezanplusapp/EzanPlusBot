@@ -224,8 +224,8 @@ def denetle_video_dosyasi(video_yolu: str, min_sure: float = 3.0) -> Tuple[List[
 
     boyut_kb = p.stat().st_size // 1024
     metrikler["dosya_boyutu_kb"] = boyut_kb
-    if boyut_kb < 300:
-        hatalar.append(f"Video dosya boyutu çok küçük ({boyut_kb} KB, asgari 300 KB).")
+    if boyut_kb < 100:
+        hatalar.append(f"Video dosya boyutu çok küçük ({boyut_kb} KB, asgari 100 KB).")
 
     try:
         import imageio
