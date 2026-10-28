@@ -105,6 +105,39 @@ def dini_gun_bilgisi(tarih_str: Optional[str] = None) -> Optional[tuple[str, str
     return DINI_GUNLER.get(bugun)
 
 
+def _groq_cagir(prompt: str, sistem_talimati: str = "") -> Optional[str]:
+    """Groq Cloud API (Llama 3.3 70B) üzerinden yedek yapay zeka metin yanıtı üretir."""
+    groq_key = get_env("GROQ_API_KEY")
+    if not groq_key:
+        return None
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_key}",
+        "Content-Type": "application/json",
+    }
+    messages = []
+    if sistem_talimati:
+        messages.append({"role": "system", "content": sistem_talimati})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": messages,
+        "temperature": 0.5,
+        "response_format": {"type": "json_object"},
+    }
+    try:
+        log.info("Groq Cloud (Llama 3.3 70B) yedek yapay zeka motoru devreye alınıyor...")
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        if res.status_code == 200:
+            content = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            return content.strip()
+        log.warning(f"Groq API hatası ({res.status_code}): {res.text[:150]}")
+    except Exception as e_groq:
+        log.warning(f"Groq çağrısı başarısız: {e_groq}")
+    return None
+
+
 def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
     """Gemini API'ye istek atar ve metin cevabını döner. 503 veya geçici arızalarda alternatif modellere otonom geçer."""
     api_key = get_env("GEMINI_API_KEY")
@@ -170,8 +203,11 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 parcalar = candidates[0].get("content", {}).get("parts", [])
                 cevap = "".join(p.get("text", "") for p in parcalar)
                 return cevap.strip()
-            except GeminiBillingError:
-                raise
+            except GeminiBillingError as e_bill:
+                groq_cevap = _groq_cagir(prompt, sistem_talimati)
+                if groq_cevap:
+                    return groq_cevap
+                raise e_bill
             except requests.exceptions.Timeout as e:
                 son_hata = e
                 log.warning(f"Gemini {model} yanıtı zaman aşımına uğradı (18s), bekletmeden sonraki modele geçiliyor...")
@@ -180,6 +216,10 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 son_hata = e
                 log.warning(f"Gemini {model} çağrısı hata verdi ({e}), deneme {deneme}/2...")
                 time.sleep(0.5)
+
+    groq_cevap = _groq_cagir(prompt, sistem_talimati)
+    if groq_cevap:
+        return groq_cevap
 
     raise son_hata or RuntimeError("Tüm Gemini modelleri denendi fakat yanıt alınamadı.")
 
