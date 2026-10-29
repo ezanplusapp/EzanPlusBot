@@ -25,7 +25,7 @@ from .. import kelime_db
 log = logging.getLogger(__name__)
 
 GEMINI_API_KEY = get_env("GEMINI_API_KEY")
-MODEL_ADI = AYARLAR.get("yapay_zeka", {}).get("model", "gemini-3.8-flash")
+MODEL_ADI = AYARLAR.get("yapay_zeka", {}).get("model", "gemini-flash-lite-latest")
 UC_NOKTA = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_ADI}:generateContent"
 
 # Yasaklı Yapay / Bot İfadeleri (GEMINI.md Anayasa Kuralı)
@@ -146,7 +146,7 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
 
     # Çalışan güncel modeller öncelik sırasına göre dizilir
     modeller: List[str] = [MODEL_ADI]
-    for yedek in ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]:
+    for yedek in ["gemini-flash-lite-latest", "gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-3.8-flash"]:
         if yedek not in modeller:
             modeller.append(yedek)
 
@@ -170,7 +170,7 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 }
 
             try:
-                res = requests.post(url, json=payload, timeout=18)
+                res = requests.post(url, json=payload, timeout=25)
                 if res.status_code == 402:
                     log.error(f"Gemini API bakiye/kredi yetersiz (HTTP 402: Payment Required). Lütfen Google AI Studio hesabınızı kontrol edin: {res.text[:150]}")
                     raise GeminiBillingError(f"HTTP 402 Payment Required: Krediler tükendi ({res.text[:120]})")
@@ -210,7 +210,7 @@ def _gemini_cagir(prompt: str, sistem_talimati: str = "") -> str:
                 raise e_bill
             except requests.exceptions.Timeout as e:
                 son_hata = e
-                log.warning(f"Gemini {model} yanıtı zaman aşımına uğradı (18s), bekletmeden sonraki modele geçiliyor...")
+                log.warning(f"Gemini {model} yanıtı zaman aşımına uğradı (25s), bekletmeden sonraki modele geçiliyor...")
                 break
             except Exception as e:
                 son_hata = e
