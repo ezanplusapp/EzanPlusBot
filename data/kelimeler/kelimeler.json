@@ -1792,9 +1792,9 @@
     "kuran_boyutu": "Kur'an'da asıl körlüğün gözlerde değil, göğüslerin içindeki kalplerde olduğu uyarısı yapılır.",
     "hayat_dersi": "Baktığı her varlıkta sanatkârın imzasını görebilen uyanık ve diri bir bakış açısı kazanmaktır.",
     "ayet_ref": "Hac Sûresi, 46. Âyet",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-11-02 05:32:31"
   },
   {
     "id": 122,
