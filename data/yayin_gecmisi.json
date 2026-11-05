@@ -157,10 +157,18 @@
   },
   {
     "id": 222,
-    "kategori": "hadis",
-    "kaynak": "Müslim, Zikr 8",
-    "baslik": "Müslim, Zikr 8",
-    "yayin_zamani": "2026-09-15 15:14:03"
+    "kategori": "dua",
+    "kaynak": "Âl-i İmrân Sûresi, 194. Âyet",
+    "baslik": "Kıyamet Günü Mahcubiyetten Korunma Duası",
+    "yayin_zamani": "2026-11-05 16:32:55",
+    "unique_id": "dua_29",
+    "tasarim_versiyonu": "v1",
+    "instagram_post_id": "17971190616196097",
+    "instagram_story_post_id": "17871017952658421",
+    "threads_post_id": "18121258066993187",
+    "youtube_post_id": "FgFbakVyO_4",
+    "facebook_post_id": "1663362271924852",
+    "tiktok_post_id": "v_inbox_file~v2.7704725908405471233"
   },
   {
     "id": 223,
