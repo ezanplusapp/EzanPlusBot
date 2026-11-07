@@ -591,9 +591,9 @@
     "turkce_anlam": "Rabbimiz! Katından bize bir rahmet ver ve **işimizde bizim için bir kurtuluş ve başarı yolu hazırla.**",
     "kaynak_ref": "Kehf Sûresi, 10. Âyet",
     "fazilet_notu": "Çaresiz kalındığında, yol görünmediğinde ve karanlıklar içinde çıkış arandığında okunacak en tesirli ayettir.",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-11-07 16:32:43"
   },
   {
     "id": 42,
