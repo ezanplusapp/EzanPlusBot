@@ -3392,10 +3392,10 @@
     "kuran_boyutu": "“Yalnız Sana ibadet eder ve yalnız Senden yardım dileriz.” (Fâtiha, 5)",
     "hayat_dersi": "Kula minnet eyleme; rızkın da devanın da sahibi yalnız O'dur. Dilenen el ancak Rabbe açılmalıdır.",
     "ayet_ref": "Fâtiha Sûresi, 5. Âyet",
-    "paylasildi_mi": false,
+    "paylasildi_mi": true,
     "ayet_arapca": "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-11-08 05:32:23"
   },
   {
     "id": 234,
