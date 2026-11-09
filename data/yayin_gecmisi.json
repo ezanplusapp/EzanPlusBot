@@ -301,10 +301,18 @@
   },
   {
     "id": 235,
-    "kategori": "kelime",
-    "kaynak": "Kur'an Sözlüğü • Hikmet",
-    "baslik": "Kur'an Sözlüğü • Hikmet",
-    "yayin_zamani": "2026-09-16 16:25:01"
+    "kategori": "ayet",
+    "kaynak": "Bakara Sûresi • 16. Âyet",
+    "baslik": "Bakara Sûresi • 16. Âyet",
+    "yayin_zamani": "2026-11-09 10:02:31",
+    "unique_id": "ayet_2_16",
+    "tasarim_versiyonu": "v1",
+    "instagram_post_id": "18122828227941690",
+    "instagram_story_post_id": "18134113837801744",
+    "threads_post_id": "18491098960129457",
+    "youtube_post_id": "dKJ_AKjZXPk",
+    "facebook_post_id": "1764148638029424",
+    "tiktok_post_id": "v_inbox_file~v2.7706109723325859860"
   },
   {
     "id": 239,
