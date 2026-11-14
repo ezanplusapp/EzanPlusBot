@@ -1582,9 +1582,9 @@
     "kuran_boyutu": "Kur'an'da cennet nimetlerinin bile fevkinde, müminin ulaşabileceği en yüce gaye ve en büyük manevi mükâfat olarak müjdelenir.",
     "hayat_dersi": "İnsanların geçici takdirlerine değil, yalnızca Âlemlerin Rabbinin ebedi rızasına talip olmaktır.",
     "ayet_ref": "Tevbe Sûresi, 72. Âyet",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-11-14 05:32:28"
   },
   {
     "id": 107,
