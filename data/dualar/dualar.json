@@ -564,9 +564,9 @@
     "turkce_anlam": "Rabbimiz! Hesabın görüleceği günde; **beni, anamı-babamı ve bütün inananları bağışla.**",
     "kaynak_ref": "İbrâhîm Sûresi, 41. Âyet",
     "fazilet_notu": "Namazların son oturuşunda (Salli-Bârik'ten sonra) okunması sünnet olan en kapsamlı af niyazıdır.",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-11-18 16:35:58"
   },
   {
     "id": 40,
