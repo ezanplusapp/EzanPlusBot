@@ -1764,9 +1764,9 @@
     "kuran_boyutu": "Kur'an'da onlarca âyette 'hâlâ akletmez misiniz?' hitabıyla insanın düşünme ve anlama melekeleri harekete geçirilir.",
     "hayat_dersi": "Aklı heva ve heveslerin esiri etmeyip hakikatin ve adaletin emrinde rehber kılmaktır.",
     "ayet_ref": "Bakara Sûresi, 44. Âyet",
-    "paylasildi_mi": false,
-    "paylasim_sayisi": 0,
-    "son_paylasim": null
+    "paylasildi_mi": true,
+    "paylasim_sayisi": 2,
+    "son_paylasim": "2026-11-19 05:32:15"
   },
   {
     "id": 120,
