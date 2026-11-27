@@ -244,6 +244,67 @@ def ayet_anahtari_cozumle(metin: str) -> Optional[Tuple[int, int]]:
     return None
 
 
+# Kıssa ortasından kopuk diyalog başlangıçları veya müstakil sosyal medya kartında bağlam kopukluğu yaratan ifadeler
+_AYET_BAGLAM_KOPUK_BASLANGICLAR = (
+    "dediler ki",
+    "dedi ki",
+    "sonra ",
+    "bunun üzerine",
+    "yoksa onlar",
+    "onlara âyetlerimizi",
+    "onlara ayetlerimizi",
+    "fakat onlar",
+    "derken ",
+    "senden izin isteyenler",
+    "ey ehl-i kitap",
+)
+
+_AYET_HASSAS_KALIPLAR = (
+    "öldürün",
+    "boynunu vur",
+    "boyunlarını vur",
+    "cizye",
+    "üçte bir",
+    "altıda bir",
+    "sekizde bir",
+    "boşadığınız",
+    "hayız",
+)
+
+_AYET_YUKSEK_ETKILESIM_KELIMELERI = (
+    "sabır", "sabr", "sabreden", "rahmet", "merhamet", "bağışla", "mağfiret",
+    "tevbe", "tövbe", "huzur", "mutmain", "kalp", "kalb", "kolaylık", "şifa",
+    "nur", "dua", "kullarım", "yakın", "vekil", "tevekkül", "şükür", "şükr",
+    "rızık", "rızk", "iyilik", "ihsan", "cennet", "müjde", "sev", "koru", "yardım",
+)
+
+
+def _ayet_sosyal_medya_uygun_mu(kayit: Dict[str, Any]) -> bool:
+    """Âyetin tek başına müstakil anlam bütünlüğüne ve sosyal medya uygunluğuna sahip olup olmadığını denetler."""
+    meal = (kayit.get("meal_elmalili") or kayit.get("meal_diyanet") or "").strip().strip('“”"\' ').lower()
+    if not meal:
+        return False
+    if any(meal.startswith(b) for b in _AYET_BAGLAM_KOPUK_BASLANGICLAR):
+        return False
+    if any(h in meal for h in _AYET_HASSAS_KALIPLAR):
+        return False
+    return True
+
+
+def _ayet_etkilesim_puani(kayit: Dict[str, Any]) -> int:
+    """Müstakil, veciz ve kalbe dokunan âyetlere öncelik puanı verir."""
+    meal = (kayit.get("meal_elmalili") or "").lower()
+    ks = int(kayit.get("kelime_sayisi") or len(meal.split()) or 0)
+    puan = 0
+    if 5 <= ks <= 18:
+        puan += 30
+    elif 19 <= ks <= 25:
+        puan += 15
+    eslesme = sum(1 for k in _AYET_YUKSEK_ETKILESIM_KELIMELERI if k in meal)
+    puan += min(60, eslesme * 15)
+    return puan
+
+
 def gunun_ayetini_sec(
     tema: Optional[str] = None,
     sadece_video_uygun: bool = True,
@@ -253,10 +314,11 @@ def gunun_ayetini_sec(
     Paylaşılmamış veya en az paylaşılmış tescilli bir âyet seçer.
     
     1. Tema verilmişse FTS üzerinden o temaya (sabır, huzur, şükür, tevbe vb.) uyan âyetleri tarar.
-    2. Video/Reels formatı için ideal uzunluktaki (4-25 kelime, <= 200 karakter meal) âyetlere öncelik verir.
+    2. Video/Reels formatı için ideal uzunluktaki ve müstakil anlam bütünlüğü taşıyan âyetlere öncelik verir.
     3. Geçmişte paylaşılan âyetleri (haric_tutulanlar) kesinlikle eler (etiket, key ve (sure, ayet) bazında).
-    4. En az paylaşılmış olanlar arasından rastgele birini seçerek mükerrerliği %100 engeller.
+    4. En az paylaşılmış olanlar arasından yüksek etkileşim potansiyelli birini seçerek mükerrerliği %100 engeller.
     """
+    import random
     with baglanti_al() as con:
         # Hariç tutulanları normalize et:
         # Hem ham stringler, hem çözümlenmiş sure_ayet_key ("9:53") hem de (sure_no, ayet_no) çiftleri
@@ -286,7 +348,9 @@ def gunun_ayetini_sec(
             tema_kelimeleri = [k.strip() for k in tema.replace("(", " ").replace(")", " ").replace(",", " ").split() if len(k.strip()) >= 3]
             uygun_adaylar = []
             for kelime in tema_kelimeleri:
-                adaylar = ayet_ara(kelime, limit=50)
+                adaylar = ayet_ara(kelime, limit=60)
+                if not adaylar and len(kelime) >= 5:
+                    adaylar = ayet_ara(kelime[:4], limit=40)
                 if sadece_video_uygun:
                     adaylar = [a for a in adaylar if a.get("video_icin_uygun") == 1]
                 if haric_keys or haric_etiketler or haric_ciftler:
@@ -302,17 +366,17 @@ def gunun_ayetini_sec(
                 uygun_adaylar.extend(sifir_paylasimlilar)
 
             if uygun_adaylar:
-                # Tekilleştir ve rastgele seç
                 tekil_adaylar = list({a["sure_ayet_key"]: a for a in uygun_adaylar}.values())
-                import random
-                return random.choice(tekil_adaylar)
+                suzulen = [a for a in tekil_adaylar if _ayet_sosyal_medya_uygun_mu(a)] or tekil_adaylar
+                suzulen.sort(key=_ayet_etkilesim_puani, reverse=True)
+                return random.choice(suzulen[: min(12, len(suzulen))])
             else:
                 log.info(
                     f"'{tema}' temasında henüz paylaşılmamış (paylaşım <= {global_min}) âyet bulunamadı. "
-                    f"Mükerrer paylaşımı önlemek için genel sıfır paylaşımlı havuza geçiliyor."
+                    f"Mükerrer paylaşımı önlemek için genel sıfır paylaşımlı kürasyon havuzuna geçiliyor."
                 )
 
-        # 2. Genel Havuzdan Seçim (Tema bulunamadıysa, tema verilmediyse veya temadaki âyetler önceden paylaşılmışsa)
+        # 2. Genel Havuzdan Seçim (Müstakil anlamlı ve yüksek etkileşimli âyet öncelikli)
         filtreler = []
         params: List[Any] = []
 
@@ -345,11 +409,17 @@ def gunun_ayetini_sec(
             JOIN sureler s ON a.sure_no = s.sure_no
             WHERE {where_str}
             ORDER BY RANDOM()
-            LIMIT 1
+            LIMIT 100
         """
-        cur = con.execute(sorgu, params)
-        row = cur.fetchone()
+        aday_rows = [dict(r) for r in con.execute(sorgu, params).fetchall()]
+        uygun_genel = [a for a in aday_rows if _ayet_sosyal_medya_uygun_mu(a)]
+        if uygun_genel:
+            uygun_genel.sort(key=_ayet_etkilesim_puani, reverse=True)
+            return random.choice(uygun_genel[: min(15, len(uygun_genel))])
+        if aday_rows:
+            return aday_rows[0]
 
+        row = None
         if not row and global_min == 0:
             # Eğer hariç tutulanlar nedeniyle 0 paylaşımlı kalmadıysa genel minimum kuralını gevşet
             sorgu_gevsek = f"""
@@ -358,17 +428,20 @@ def gunun_ayetini_sec(
                 JOIN sureler s ON a.sure_no = s.sure_no
                 WHERE {' AND '.join([f for f in filtreler if 'paylasim_sayisi' not in f]) or '1=1'}
                 ORDER BY a.paylasim_sayisi ASC, a.son_paylasim ASC, RANDOM()
-                LIMIT 1
+                LIMIT 30
             """
             gevsek_params = [p for i, p in enumerate(params) if not (isinstance(p, int) and p == global_min)]
-            cur = con.execute(sorgu_gevsek, gevsek_params)
-            row = cur.fetchone()
+            gevsek_rows = [dict(r) for r in con.execute(sorgu_gevsek, gevsek_params).fetchall()]
+            gevsek_uygun = [a for a in gevsek_rows if _ayet_sosyal_medya_uygun_mu(a)] or gevsek_rows
+            if gevsek_uygun:
+                gevsek_uygun.sort(key=_ayet_etkilesim_puani, reverse=True)
+                return random.choice(gevsek_uygun[: min(8, len(gevsek_uygun))])
 
-        if not row and sadece_video_uygun:
+        if sadece_video_uygun:
             # Video filtresini gevşetip tekrar dene
             return gunun_ayetini_sec(tema=None, sadece_video_uygun=False, haric_tutulanlar=haric_tutulanlar)
 
-        return dict(row) if row else None
+        return None
 
 
 def ayeti_paylasildi_isaretle(sure_no: int, ayet_no: int):

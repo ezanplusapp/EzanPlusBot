@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -99,12 +100,86 @@ def yetki_al() -> Optional[Credentials]:
     return creds
 
 
+def _metin_kelime_sinirinda_kirp(metin: str, maks_uzunluk: int) -> str:
+    """Metni kelime ortasından bölmeden maks_uzunluk sınırında zarifçe kırpar."""
+    temiz = re.sub(r"\s+", " ", (metin or "")).strip()
+    if len(temiz) <= maks_uzunluk:
+        return temiz
+    kesik = temiz[: max(1, maks_uzunluk - 1)].rsplit(" ", 1)[0].rstrip(" ,;:-•")
+    if len(kesik) < maks_uzunluk // 2:
+        kesik = temiz[: max(1, maks_uzunluk - 1)].rstrip(" ,;:-•")
+    return f"{kesik}…"
+
+
+def youtube_baslik_olustur(kayit: Dict[str, Any]) -> str:
+    """
+    Paylaşım kaydından YouTube Shorts algoritması için yüksek tıklama (CTR) ve
+    izlenme üreten duygusal Türkçe kanca + kaynak başlığı üretir (<= 90 karakter).
+    Akademik kaynak kodlarının ('Müslim, Fiten 126...' vb.) çıplak başlık olmasını engeller.
+    """
+    kategori = (kayit.get("kategori") or "ayet").lower().strip()
+    ham_baslik = re.sub(r"\s+", " ", (kayit.get("baslik") or "")).strip()
+    caption = (kayit.get("caption") or "").strip()
+    turkce_metin = re.sub(r"\*+", "", (kayit.get("turkce_metin") or "")).strip().strip('“”"\' ')
+
+    # Caption'ın ilk paragrafındaki duygusal kancayı (hook) çıkar
+    ilk_satir = ""
+    for satir in caption.splitlines():
+        s = satir.strip().strip('“”"\' ')
+        if not s or s.startswith("#") or s.startswith("📖") or s.startswith("📜") or s.startswith("🎙️"):
+            continue
+        ilk_satir = s
+        break
+
+    jenerik_kaliplar = (
+        "yüce allah'ın kalplere şifa",
+        "resûlullah (sallallahu aleyhi vesellem) buyurdu",
+        "kalpten dökülen en samimi yakarış",
+    )
+    kanca_gecerli = bool(ilk_satir) and len(ilk_satir) >= 14 and not any(
+        ilk_satir.lower().startswith(jk) for jk in jenerik_kaliplar
+    )
+
+    if kategori == "dua":
+        temiz_dua = ham_baslik or "Günün Duası"
+        if not any(k in temiz_dua.lower() for k in ("dua", "niyaz", "münacat", "istiğfar", "şifa", "korunma")):
+            if len(temiz_dua) <= 78:
+                temiz_dua = f"{temiz_dua} Duası"
+        return _metin_kelime_sinirinda_kirp(temiz_dua, 88)
+
+    if kategori == "hadis":
+        aday_kanca = ilk_satir if kanca_gecerli else turkce_metin
+        ek = " | Hadis-i Şerif"
+        if aday_kanca:
+            kisa_kanca = _metin_kelime_sinirinda_kirp(aday_kanca, 88 - len(ek))
+            return f"{kisa_kanca}{ek}"
+        return "Kalbe Dokunan Nebevî Öğüt | Hadis-i Şerif"
+
+    # kategori == "ayet" (veya genel)
+    # Kısa sûre referansı çıkar: "Rahmân Sûresi • 76. Âyet" -> "Rahmân 76"
+    kisa_ref = ham_baslik
+    m_ref = re.match(r"^(.+?)\s+S[ûu]resi\s*[•\-:,]?\s*(\d+)\.\s*[ÂA]yet", ham_baslik, flags=re.IGNORECASE)
+    if m_ref:
+        kisa_ref = f"{m_ref.group(1).strip()} {m_ref.group(2)}"
+
+    aday_kanca = ilk_satir if kanca_gecerli else turkce_metin
+    if aday_kanca and kisa_ref:
+        ek = f" | {kisa_ref}"
+        if len(ek) <= 32:
+            kisa_kanca = _metin_kelime_sinirinda_kirp(aday_kanca, 88 - len(ek))
+            return f"{kisa_kanca}{ek}"
+    if aday_kanca:
+        return _metin_kelime_sinirinda_kirp(aday_kanca, 88)
+    return _metin_kelime_sinirinda_kirp(ham_baslik or "Kur'an-ı Kerim Tilaveti • Ezan Plus", 88)
+
+
 def youtube_shorts_yukle(
     video_yolu: str | Path,
     baslik: str,
     aciklama: str,
     etiketler: Optional[List[str]] = None,
     gizlilik: str = "public",
+    kategori: str = "ayet",
 ) -> Dict[str, Any]:
     """
     Verilen dikey 9:16 videoyu YouTube Shorts olarak yükler.
@@ -115,6 +190,7 @@ def youtube_shorts_yukle(
         aciklama: Video açıklaması (Caption + hashtagler).
         etiketler: Video etiketleri listesi.
         gizlilik: 'public', 'unlisted' veya 'private' (Varsayılan: 'public').
+        kategori: İçerik kategorisi ('ayet', 'hadis', 'dua').
     """
     video_path = Path(video_yolu)
     if not video_path.exists():
@@ -130,27 +206,41 @@ def youtube_shorts_yukle(
     if "#Shorts" not in baslik and "#shorts" not in baslik:
         # YouTube başlık sınırı 100 karakterdir
         if len(baslik) > 90:
-            baslik = baslik[:89] + "…"
+            baslik = _metin_kelime_sinirinda_kirp(baslik, 90)
         baslik_fmt = f"{baslik} #Shorts"
     else:
         baslik_fmt = baslik[:100]
 
-    varsayilan_etiketler = ["ezanplus", "kuran", "ayet", "tefekkur", "Shorts", "islam"]
-    if etiketler:
-        for tag in etiketler:
-            t = tag.replace("#", "").strip()
-            if t and t not in varsayilan_etiketler:
-                varsayilan_etiketler.append(t)
+    kat_norm = (kategori or "ayet").lower().strip()
+    if kat_norm == "hadis":
+        varsayilan_etiketler = ["ezanplus", "hadis", "hadisişerif", "sünnet", "hzmuhammed", "tefekkür", "huzur", "islam", "Shorts"]
+    elif kat_norm == "dua":
+        varsayilan_etiketler = ["ezanplus", "dua", "gününduası", "amin", "şifa", "huzur", "zikir", "tefekkür", "islam", "Shorts"]
+    else:
+        varsayilan_etiketler = ["ezanplus", "kuran", "kuranıkerim", "ayet", "tilavet", "meal", "tefekkur", "huzur", "Shorts", "islam"]
+
+    # Açıklama sonundaki hashtag'leri de YouTube video etiketlerine (tags) dahil et
+    aciklama_etiketleri = re.findall(r"#([0-9A-Za-zÇĞİÖŞÜçğıöşüâîûÂÎÛ_]+)", aciklama or "")
+    tum_aday_etiketler = list(etiketler or []) + aciklama_etiketleri
+    for tag in tum_aday_etiketler:
+        t = tag.replace("#", "").strip()
+        if t and t.lower() not in {x.lower() for x in varsayilan_etiketler}:
+            varsayilan_etiketler.append(t)
+
+    snippet_dict: Dict[str, Any] = {
+        "title": baslik_fmt,
+        "description": aciklama,
+        "tags": varsayilan_etiketler[:15],
+        "categoryId": "22",  # People & Blogs / İnsanlar ve Bloglar
+        "defaultLanguage": "tr",
+    }
+    # Türkçe spiker seslendirmeli videolarda (Hadis / Dua) ses dilini açıkça 'tr' bildir;
+    # Arapça tilavetli Türkçe yazılı Ayet videolarında 'ar' zorlaması kitleyi böldüğü için yalnızca defaultLanguage='tr' bırak.
+    if kat_norm in ("hadis", "dua", "kelime"):
+        snippet_dict["defaultAudioLanguage"] = "tr"
 
     govde = {
-        "snippet": {
-            "title": baslik_fmt,
-            "description": aciklama,
-            "tags": varsayilan_etiketler[:15],
-            "categoryId": "22",  # People & Blogs / İnsanlar ve Bloglar
-            "defaultLanguage": "tr",
-            "defaultAudioLanguage": "ar",
-        },
+        "snippet": snippet_dict,
         "status": {
             "privacyStatus": gizlilik,
             "selfDeclaredMadeForKids": False,

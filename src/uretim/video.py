@@ -211,21 +211,28 @@ def _statik_taban_ciz(
     font_cta = font_al(FONT_UI, 24, agirlik=700)
     draw.text((nav_x1 + 20 + logo_btn_size + 16, btn_y - 14), "Ezan Plus • Ücretsiz İndirin", font=font_cta, fill=METIN_ANA)
 
-    # Store İkonları
+    # Store İkonları (Google Play + Linux/macOS Tam Uyumlu Vektörel/PNG Apple İkonu)
     ps_size = 28
     ps_x = nav_x2 - 58
     ps_y = btn_y - ps_size // 2
     _play_store_vektor_ciz(draw, ps_x, ps_y, ps_size)
 
-    try:
-        font_apple = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 30)
-        bbox_ap = draw.textbbox((0, 0), "", font=font_apple)
-        ap_w, ap_h = bbox_ap[2] - bbox_ap[0], bbox_ap[3] - bbox_ap[1]
-        ap_y = btn_y - ap_h // 2 - bbox_ap[1]
-        ap_x = ps_x - ap_w - 24
-        draw.text((ap_x, ap_y), "", font=font_apple, fill="#000000")
-    except Exception:
-        pass
+    apple_path = IKONLAR / "apple.png"
+    ap_size = 26
+    if apple_path.exists():
+        ap_img = Image.open(apple_path).convert("RGBA").resize((ap_size, ap_size), Image.Resampling.LANCZOS)
+        ap_x = int(ps_x - ap_size - 20)
+        im.paste(ap_img, (ap_x, btn_y - ap_size // 2), ap_img)
+    else:
+        try:
+            font_apple = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 30)
+            bbox_ap = draw.textbbox((0, 0), "", font=font_apple)
+            ap_w, ap_h = bbox_ap[2] - bbox_ap[0], bbox_ap[3] - bbox_ap[1]
+            ap_y = btn_y - ap_h // 2 - bbox_ap[1]
+            ap_x = ps_x - ap_w - 24
+            draw.text((ap_x, ap_y), "", font=font_apple, fill="#000000")
+        except Exception:
+            pass
 
     return im, arapca_y_baslangic, 0, kart_ic_genislik
 

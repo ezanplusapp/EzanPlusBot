@@ -446,3 +446,60 @@ def jetonu_yenile() -> tuple[str, int]:
     return yeni, kalan_gun
 
 
+def auth_url_uret(redirect_uri: str = "https://ozbornstudio.com/") -> str:
+    """Threads OAuth 2.0 yetkilendirme bağlantısını üretir."""
+    import urllib.parse
+    app_id = get_env("THREADS_APP_ID", "").strip()
+    if not app_id:
+        raise ValueError("THREADS_APP_ID .env içinde tanımlı değil!")
+    params = {
+        "client_id": app_id,
+        "redirect_uri": redirect_uri,
+        "scope": "threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies",
+        "response_type": "code",
+    }
+    return f"https://threads.net/oauth/authorize?{urllib.parse.urlencode(params)}"
+
+
+if __name__ == "__main__":
+    import argparse
+    import re
+    import urllib.parse
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    parser = argparse.ArgumentParser(description="Ezan Plus Threads OAuth & Jeton Yenileme Aracı")
+    parser.add_argument("--yenile", action="store_true", help="Mevcut geçerli 60 günlük jetonu uzatır")
+    parser.add_argument("--kod", type=str, default=None, help="Tarayıcıdan alınan OAuth kodu veya yönlendirme URL'si")
+    parser.add_argument("--redirect-uri", type=str, default="https://ozbornstudio.com/", help="Kayıtlı Redirect URI")
+    args = parser.parse_args()
+
+    if args.yenile:
+        yeni_tok, kalan = jetonu_yenile()
+        print(f"✅ Threads jetonu başarıyla yenilendi (~{kalan} gün geçerli).")
+    elif args.kod:
+        ham = args.kod.strip()
+        if "code=" in ham:
+            parsed = urllib.parse.urlparse(ham)
+            qs = urllib.parse.parse_qs(parsed.query)
+            kod = qs.get("code", [ham])[0]
+        else:
+            kod = ham
+        uid, yeni_tok = code_ile_token_al(kod, redirect_uri=args.redirect_uri)
+        env_dosyasi = KOK_DIZIN / ".env"
+        if env_dosyasi.exists():
+            metin = env_dosyasi.read_text(encoding="utf-8")
+            if "THREADS_ACCESS_TOKEN=" in metin:
+                metin = re.sub(r"THREADS_ACCESS_TOKEN=.*", f"THREADS_ACCESS_TOKEN={yeni_tok}", metin)
+            else:
+                metin = metin.rstrip() + f"\nTHREADS_ACCESS_TOKEN={yeni_tok}\n"
+            if uid and "THREADS_USER_ID=" in metin:
+                metin = re.sub(r"THREADS_USER_ID=.*", f"THREADS_USER_ID={uid}", metin)
+            env_dosyasi.write_text(metin, encoding="utf-8")
+        print(f"✅ Yeni 60 günlük Threads jetonu alındı ve .env güncellendi! User ID: {uid}")
+    else:
+        print("\n🔗 THREADS OAUTH YETKİLENDİRME BAĞLANTISI:")
+        print(auth_url_uret(redirect_uri=args.redirect_uri))
+        print("\nİzin verdikten sonra adres çubuğundaki URL'yi şu komutla verin:")
+        print("  python -m src.platformlar.threads --kod '<YONLENDIRME_URL>'\n")
+
+

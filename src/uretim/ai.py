@@ -105,6 +105,50 @@ def dini_gun_bilgisi(tarih_str: Optional[str] = None) -> Optional[tuple[str, str
     return DINI_GUNLER.get(bugun)
 
 
+def cuma_ozel_bilgisi(simdi_dt: Optional[Any] = None) -> Optional[tuple[str, str]]:
+    """
+    Türkiye saatiyle Perşembe akşamı (>= 16:00, Cuma Gecesi) veya Cuma günü boyunca
+    haftalık yüksek paylaşım (DM/Story) potansiyelli 'Cuma Özel' modunu tetikler.
+    """
+    from datetime import datetime, timezone, timedelta
+    tz_tr = timezone(timedelta(hours=3))
+    dt = simdi_dt or datetime.now(tz_tr)
+    hafta_gunu = dt.weekday()  # 3 = Perşembe, 4 = Cuma
+    if hafta_gunu == 4:
+        return (
+            "Mübarek Cuma Günü",
+            "Cuma bereketi, rahmet, mağfiret, dua, salavat, kalp huzuru ve kardeşlik",
+        )
+    if hafta_gunu == 3 and dt.hour >= 16:
+        return (
+            "Mübarek Cuma Gecesi",
+            "Cuma gecesi rahmeti, tevbe, bağışlanma, dua icabeti ve huzur",
+        )
+    return None
+
+
+def _cuma_caption_zenginlestir(caption: str, varsayilan_etiketler: List[str]) -> tuple[str, List[str]]:
+    """Cuma gecesi ve Cuma gününde paylaşım (DM/WhatsApp) oranını artıran zarif tebrik notunu ve #hayırlıcumalar etiketini ekler."""
+    cuma_durum = cuma_ozel_bilgisi()
+    if not cuma_durum:
+        return caption, varsayilan_etiketler
+    unvan, _ = cuma_durum
+    tebrik = (
+        "🌹 Cumamız mübarek, dualarımız kabul olsun. Sevdiklerinizin Cumasına bereket katmak için bu paylaşımı onlara gönderebilirsiniz."
+        if "Günü" in unvan
+        else "🌹 Cuma gecemiz mübarek, gönlümüz ferah olsun. Sevdiklerinize hayırla gönderebilirsiniz."
+    )
+    if "cumamız mübarek" not in caption.lower() and "cuma gecemiz mübarek" not in caption.lower():
+        # Hashtag satırından hemen önceye zarifçe yerleştir
+        parcalar = caption.rstrip().split("\n\n")
+        if parcalar and any(w.startswith("#") for w in parcalar[-1].split()):
+            caption = "\n\n".join(parcalar[:-1] + [tebrik, parcalar[-1]])
+        else:
+            caption = f"{caption.rstrip()}\n\n{tebrik}"
+    yeni_varsayilan = ["ezanplus", "hayırlıcumalar"] + [e for e in varsayilan_etiketler if e not in ("ezanplus", "hayırlıcumalar")]
+    return caption, yeni_varsayilan[:5]
+
+
 def _groq_cagir(prompt: str, sistem_talimati: str = "") -> Optional[str]:
     """Groq Cloud API (Llama 3.3 70B) üzerinden yedek yapay zeka metin yanıtı üretir."""
     groq_key = get_env("GROQ_API_KEY")
@@ -578,10 +622,10 @@ def ayet_icerigi_uret(
     Sıfır yapay zeka halüsinasyonu garantisi sunar.
     """
     if not tema:
-        dini_gun = dini_gun_bilgisi()
+        dini_gun = dini_gun_bilgisi() or cuma_ozel_bilgisi()
         if dini_gun:
             gun_adi, gun_tema = dini_gun
-            log.info(f"Bugün özel dini gün tespit edildi: {gun_adi} -> {gun_tema}")
+            log.info(f"Özel gün/Cuma modu tespit edildi: {gun_adi} -> {gun_tema}")
             tema = gun_tema
         else:
             tema = random.choice(TEMALAR)
@@ -723,6 +767,7 @@ Yukarıdaki tescilli âyete %100 sadık kalarak aşağıdaki JSON formatında ya
             hafiz_adi="Mişari Râşid el-Afâsî",
         )
     varsayilan = ["ezanplus", "kuran", "ayet", "tilavet", "tefekkur"]
+    cap, varsayilan = _cuma_caption_zenginlestir(cap, varsayilan)
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     # Tescilli doğrulanmış alanları veriye yerleştir (AI halüsinasyonu kesinlikle İMKANSIZDIR)
@@ -763,7 +808,13 @@ def hadis_icerigi_uret(tema: Optional[str] = None) -> Dict[str, Any]:
     Hadis metni, Arapçası ve kaynağı %100 orijinal ve tescillidir; halüsinasyon riski sıfırdır.
     """
     if not tema:
-        tema = random.choice(TEMALAR)
+        dini_gun = dini_gun_bilgisi() or cuma_ozel_bilgisi()
+        if dini_gun:
+            gun_adi, gun_tema = dini_gun
+            log.info(f"Hadis için özel gün/Cuma modu tespit edildi: {gun_adi} -> {gun_tema}")
+            tema = gun_tema
+        else:
+            tema = random.choice(TEMALAR)
 
     # 1. Doğrulanmış tescilli veritabanından hadis seç
     gecmis_hadisler = db.son_paylasilan_kaynaklar(limit=90, kategori="hadis")
@@ -880,6 +931,7 @@ Yukarıdaki sahih hadise sadık kalarak aşağıdaki JSON formatında yanıt ver
             tefekkur_notu=tef,
         )
     varsayilan = ["ezanplus", "hadis", "hadisişerif", "sünnet", "tefekkür"]
+    cap, varsayilan = _cuma_caption_zenginlestir(cap, varsayilan)
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
 
     veri["kategori"] = "hadis"
@@ -914,7 +966,11 @@ def dua_icerigi_uret(
         "Tevbe ve Günahlardan Arınma Niyazı",
     ]
     if not ruh_hali:
-        ruh_hali = random.choice(haller)
+        dini_gun = dini_gun_bilgisi() or cuma_ozel_bilgisi()
+        if dini_gun:
+            ruh_hali = dini_gun[1]
+        else:
+            ruh_hali = random.choice(haller)
 
     # Mükerrer kontrolü
     gecmis_kaynaklar = db.son_paylasilan_kaynaklar(limit=90, kategori="dua")
@@ -1014,6 +1070,7 @@ Yukarıdaki duaya sadık kalarak aşağıdaki JSON formatında yanıt ver:
             ruh_hali=ruh_hali,
         )
     varsayilan = ["ezanplus", "dua", "gününduası", "huzur", "münacat"]
+    cap, varsayilan = _cuma_caption_zenginlestir(cap, varsayilan)
     veri["instagram_caption"] = caption_hashtaglari_guncelle(cap, varsayilan_etiketler=varsayilan)
     veri["caption"] = veri["instagram_caption"]
 
@@ -1176,6 +1233,7 @@ Yukarıdaki kavrama sadık kalarak aşağıdaki JSON formatında yanıt ver:
             ayet_ar=ayet_ar,
         )
     varsayilan = ["ezanplus", "kuran", "kavram", "kelime", "tefekkur"]
+    caption, varsayilan = _cuma_caption_zenginlestir(caption, varsayilan)
     veri["instagram_caption"] = caption_hashtaglari_guncelle(caption, varsayilan_etiketler=varsayilan)
     veri["caption"] = veri["instagram_caption"]
     veri["kelime_id"] = kelime_id

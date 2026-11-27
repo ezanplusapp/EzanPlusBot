@@ -269,6 +269,61 @@ def veritabanini_hazirla():
         log.info(f"Riyâzü's-Sâlihîn külliyatı başarıyla aktarıldı: {eklenen} hadis.")
 
 
+# Sosyal medya algoritmalarında topluluk kuralları yanlış pozitif (shadowban) riski doğuran,
+# bağlam dışı cezai/fıkhi/bedensel detay içeren veya Türkçe meal kutusunda ham Arapça okunuş bırakan ifadeler
+_HADIS_HASSAS_FILTRE_KALIPLARI = (
+    "yahudi ve hıristiyan",
+    "yolun kenarından yürümeye zorla",
+    "abdest bozar",
+    "sümkürür",
+    "tükürür",
+    "recm",
+    "taşlayarak öldür",
+    "boyunlarını vur",
+    "elini kesin",
+    "cüzâm",
+    "cüzam",
+    "alaca hastalığ",
+    "allâhumme innî",
+    "allâhümme innî",
+    "sübhâneke ve bi-hamdik",
+    "hayız",
+    "nifas",
+    "istinca",
+    "cenabet",
+    "cima",
+    "avret",
+)
+
+_HADIS_YUKSEK_ETKILESIM_KELIMELERI = (
+    "merhamet", "şefkat", "sadaka", "yoksul", "yetim", "dul", "yardım",
+    "tebessüm", "güzel ahlâk", "güzel ahlak", "ahlâk", "ahlak", "dua",
+    "bağışla", "mağfiret", "tövbe", "tevbe", "sabır", "sabr", "şükür",
+    "cennet", "müjde", "huzur", "kalp", "kalb", "sevgi", "anne", "baba",
+    "kardeş", "kolaylaştır", "hayır", "bereket", "rızık", "şifa", "affet",
+)
+
+
+def _hadis_sosyal_medya_uygun_mu(kayit: Dict[str, Any]) -> bool:
+    """Hadisin genel sosyal medya kitlesi ve platform topluluk kuralları için uygunluğunu denetler."""
+    metin = f"{kayit.get('hadis_metni') or ''} {kayit.get('turkce_tam') or ''}".lower()
+    return not any(kalip in metin for kalip in _HADIS_HASSAS_FILTRE_KALIPLARI)
+
+
+def _hadis_etkilesim_puani(kayit: Dict[str, Any]) -> int:
+    """Veriye dayalı olarak kısa, vurucu ve kalbe dokunan hadislere öncelik puanı verir."""
+    metin = (kayit.get("hadis_metni") or "").lower()
+    ks = int(kayit.get("kelime_sayisi") or len(metin.split()) or 0)
+    puan = 0
+    if 10 <= ks <= 34:
+        puan += 35  # 8-18 sn ideal viral Reels/Shorts süresi
+    elif 35 <= ks <= 46:
+        puan += 15
+    eslesme = sum(1 for k in _HADIS_YUKSEK_ETKILESIM_KELIMELERI if k in metin)
+    puan += min(60, eslesme * 15)
+    return puan
+
+
 def gunun_hadisini_sec(
     tema: Optional[str] = None,
     sadece_kart_uygun: bool = True,
@@ -277,10 +332,11 @@ def gunun_hadisini_sec(
 ) -> Optional[Dict[str, Any]]:
     """
     Paylaşılmamış veya en az paylaşılmış sahih bir hadis seçer.
-    Kart mizanpajına tam oturan uzunluktaki hadislere öncelik verir.
+    Kart mizanpajına tam oturan, kalbe dokunan ve yüksek etkileşim potansiyelli hadislere öncelik verir.
     Geçmişte paylaşılanları (haric_tutulanlar) kesinlikle eler.
     İsteğe bağlı olarak belirli bir külliyatı (örn: 'Sahîh-i Buhârî') filtreleyebilir.
     """
+    import random
     veritabanini_hazirla()
     with baglanti_al() as con:
         filtreler = []
@@ -309,8 +365,19 @@ def gunun_hadisini_sec(
         parametreler.append(global_min)
 
         if tema:
-            filtreler.append("(turkce_tam LIKE ? OR hadis_metni LIKE ?)")
-            parametreler.extend([f"%{tema}%", f"%{tema}%"])
+            tema_kelimeleri = [
+                k.strip() for k in tema.replace("(", " ").replace(")", " ").replace(",", " ").split()
+                if len(k.strip()) >= 4 and k.strip().lower() not in {"veya", "için", "olan", "günü", "gecesi"}
+            ]
+            if tema_kelimeleri:
+                parcalar_sql = []
+                for tk in tema_kelimeleri[:5]:
+                    parcalar_sql.append("(turkce_tam LIKE ? OR hadis_metni LIKE ?)")
+                    parametreler.extend([f"%{tk}%", f"%{tk}%"])
+                filtreler.append("(" + " OR ".join(parcalar_sql) + ")")
+            else:
+                filtreler.append("(turkce_tam LIKE ? OR hadis_metni LIKE ?)")
+                parametreler.extend([f"%{tema}%", f"%{tema}%"])
 
         if haric_tutulanlar:
             haric_temiz = [h.strip() for h in haric_tutulanlar if h and isinstance(h, str)]
@@ -325,16 +392,25 @@ def gunun_hadisini_sec(
             SELECT * FROM hadisler
             WHERE {where_clause}
             ORDER BY RANDOM()
-            LIMIT 1
+            LIMIT 80
         """
-        cur = con.execute(sorgu, parametreler)
-        row = cur.fetchone()
+        aday_rows = [dict(r) for r in con.execute(sorgu, parametreler).fetchall()]
+        uygun_adaylar = [a for a in aday_rows if _hadis_sosyal_medya_uygun_mu(a)]
 
-        if not row and tema:
+        if uygun_adaylar:
+            uygun_adaylar.sort(key=_hadis_etkilesim_puani, reverse=True)
+            ust_havuz = uygun_adaylar[: min(12, len(uygun_adaylar))]
+            return random.choice(ust_havuz)
+
+        if not aday_rows and tema:
             log.info(f"'{tema}' temasında henüz paylaşılmamış hadis kalmadı. Genel sıfır paylaşımlı havuza geçiliyor.")
-            return gunun_hadisini_sec(tema=None, sadece_kart_uygun=sadece_kart_uygun, haric_tutulanlar=haric_tutulanlar)
+            return gunun_hadisini_sec(tema=None, sadece_kart_uygun=sadece_kart_uygun, haric_tutulanlar=haric_tutulanlar, kulliyat=kulliyat)
 
-        if not row and global_min == 0:
+        if aday_rows and tema:
+            # Temadaki adaylar filtreye takıldıysa genel sıfır paylaşımlı kürasyon havuzuna geç
+            return gunun_hadisini_sec(tema=None, sadece_kart_uygun=sadece_kart_uygun, haric_tutulanlar=haric_tutulanlar, kulliyat=kulliyat)
+
+        if global_min == 0:
             # Hariç tutulanlar nedeniyle 0 paylaşımlı kalmadıysa genel minimum kısıtını esnet
             filtreler_gevsek = [f for f in filtreler if "paylasim_sayisi" not in f]
             params_gevsek = [p for p in parametreler if not (isinstance(p, int) and p == global_min)]
@@ -343,13 +419,16 @@ def gunun_hadisini_sec(
                 SELECT * FROM hadisler
                 WHERE {where_gevsek}
                 ORDER BY paylasim_sayisi ASC, son_paylasim ASC, RANDOM()
-                LIMIT 1
+                LIMIT 40
             """
-            cur = con.execute(sorgu_gevsek, params_gevsek)
-            row = cur.fetchone()
+            gevsek_adaylar = [dict(r) for r in con.execute(sorgu_gevsek, params_gevsek).fetchall()]
+            gevsek_uygun = [a for a in gevsek_adaylar if _hadis_sosyal_medya_uygun_mu(a)] or gevsek_adaylar
+            if gevsek_uygun:
+                gevsek_uygun.sort(key=_hadis_etkilesim_puani, reverse=True)
+                return random.choice(gevsek_uygun[: min(8, len(gevsek_uygun))])
 
-        if row:
-            return dict(row)
+        if aday_rows:
+            return aday_rows[0]
         return None
 
 

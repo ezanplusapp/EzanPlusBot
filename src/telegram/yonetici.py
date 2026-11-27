@@ -302,11 +302,12 @@ def yayinla_hepsi(
         try:
             if youtube.CLIENT_SECRET_DOSYASI.exists() or youtube.TOKEN_DOSYASI.exists():
                 log.info(f"YouTube Shorts'a yükleniyor (Paralel Dağıtım): {video_yolu}")
-                baslik = kayit.get("baslik") or "Günün Ayeti • Ezan Plus"
+                baslik = youtube.youtube_baslik_olustur(kayit)
                 yt_res = youtube.youtube_shorts_yukle(
                     video_yolu=video_yolu,
                     baslik=baslik,
                     aciklama=caption,
+                    kategori=kayit.get("kategori") or "ayet",
                 )
                 with _lock:
                     sonuclar["youtube"] = yt_res.get("video_id")
@@ -572,8 +573,13 @@ def yayinla_telafi(
         try:
             if youtube.CLIENT_SECRET_DOSYASI.exists() or youtube.TOKEN_DOSYASI.exists():
                 log.info(f"Telafi: YouTube Shorts yükleniyor (#{paylasim_id})...")
-                baslik = kayit.get("baslik") or "Günün Ayeti • Ezan Plus"
-                yt_res = youtube.youtube_shorts_yukle(video_yolu=video_yolu, baslik=baslik, aciklama=caption)
+                baslik = youtube.youtube_baslik_olustur(kayit)
+                yt_res = youtube.youtube_shorts_yukle(
+                    video_yolu=video_yolu,
+                    baslik=baslik,
+                    aciklama=caption,
+                    kategori=kayit.get("kategori") or "ayet",
+                )
                 with _lock:
                     sonuclar["youtube"] = yt_res.get("video_id")
                     sonuclar["youtube_url"] = yt_res.get("url")

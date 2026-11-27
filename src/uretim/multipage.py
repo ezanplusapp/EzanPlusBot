@@ -183,18 +183,25 @@ def build_v20_base_layout(
     top_text_bottom += gap_ar_ok + len(ok_lines) * ok_line_step
 
     # 5. Dinamik Flex Keten Bandı (Sıfır Çakışma Garantisi)
+    clean_tef_pre = tef_txt.strip().strip('“”" ').replace("ölüümüz", "ölümüz")
+    if not is_hadis and "•" in clean_tef_pre:
+        _p_pre = clean_tef_pre.split("•", 1)
+        if len(_p_pre[0].strip()) < 45:
+            clean_tef_pre = _p_pre[1].strip()
+
     if is_916:
         fade_len = 70
         fade_1_start = max(740, min(860, int(top_text_bottom + 28)))
         fade_1_end = fade_1_start + fade_len
-        fade_2_start = 1430
+        # Uzun tefekkür metinlerinde alt CTA butonuna (Y=1660) asla binmemesi için keten bandı alt sınırını dinamik esnet
+        fade_2_start = 1390 if len(clean_tef_pre) > 130 else 1430
         fade_2_end = fade_2_start + fade_len
         tefekkur_start_y = fade_2_end + 25
     else:
         fade_len = 55
         fade_1_start = max(490, min(630, int(top_text_bottom + 20)))
         fade_1_end = fade_1_start + fade_len
-        fade_2_start = 1040
+        fade_2_start = 1010 if len(clean_tef_pre) > 120 else 1040
         fade_2_end = fade_2_start + fade_len
         tefekkur_start_y = fade_2_end + 20
 
@@ -269,34 +276,49 @@ def build_v20_base_layout(
         draw.text(((w - (ob[2] - ob[0])) / 2 - ob[0], cur_y - ob[1]), ol, font=f_ok, fill="#EADBC8")
         cur_y += ok_line_step
 
-    # 11. Alt Bölüm: Tefekkür & Tescilli Kaynak
-    clean_tef = tef_txt.strip().strip('“”" ')
-    if not is_hadis and "•" in clean_tef:
-        parcalar = clean_tef.split("•", 1)
-        if len(parcalar[0].strip()) < 45:
-            clean_tef = parcalar[1].strip()
-
-    pt_tef = 30 if is_916 else 25
-    f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
-    tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_w - 40, draw)
-    step_tef = int(pt_tef * 1.34)
-    tef_block_h = len(tef_lines) * step_tef
-    gap_tef_kaynak = 16 if is_916 else 10
+    # 11. Alt Bölüm: Tefekkür & Tescilli Kaynak (Sıfır CTA Çarpışması Garantili Auto-Fit)
+    clean_tef = clean_tef_pre
 
     f_kaynak = font_al(FONT_UI, 17 if is_916 else 15, agirlik=700)
     kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
     kaynak_w = kb[2] - kb[0]
     pt_k = 17 if is_916 else 15
-    while kaynak_w > (max_w - 40) and pt_k > 13:
+    while kaynak_w > (max_w - 40) and pt_k > 12:
         pt_k -= 1
         f_kaynak = font_al(FONT_UI, pt_k, agirlik=700)
         kb = draw.textbbox((0, 0), kaynak_txt, font=f_kaynak)
         kaynak_w = kb[2] - kb[0]
 
-    total_bot_h = tef_block_h + gap_tef_kaynak + (kb[3] - kb[1])
-    usable_top = fade_2_end + (30 if is_916 else 22)
-    usable_bot = cta_ust_y - (18 if is_916 else 12)
-    bot_y = usable_top + max(0, (usable_bot - usable_top - total_bot_h) // 2)
+    usable_top = fade_2_end + (26 if is_916 else 18)
+    usable_bot = cta_ust_y - (16 if is_916 else 10)
+    avail_bot_h = max(60, usable_bot - usable_top)
+    kaynak_h = kb[3] - kb[1]
+
+    pt_tef = 30 if is_916 else 25
+    min_pt_tef = 19 if is_916 else 16
+    gap_tef_kaynak = 14 if is_916 else 10
+    while pt_tef >= min_pt_tef:
+        f_tef = font_al(FONT_GOVDE, pt_tef, agirlik=400)
+        tef_lines = metin_satirla(f"“{clean_tef}”", f_tef, max_w - 20, draw)
+        step_tef = int(pt_tef * 1.30)
+        tef_block_h = len(tef_lines) * step_tef
+        total_bot_h = tef_block_h + gap_tef_kaynak + kaynak_h
+        if total_bot_h <= avail_bot_h:
+            break
+        pt_tef -= 1
+        if pt_tef < 24:
+            gap_tef_kaynak = 10 if is_916 else 8
+
+    # Aşırı uzun tefekkür istisnalarında dahi CTA butonuna taşmayı kesin olarak engelle
+    max_lines = max(1, (avail_bot_h - gap_tef_kaynak - kaynak_h) // max(1, step_tef))
+    if len(tef_lines) > max_lines:
+        tef_lines = tef_lines[:max_lines]
+        if not tef_lines[-1].endswith("”"):
+            tef_lines[-1] = tef_lines[-1].rstrip(" .,;:") + "…”"
+        tef_block_h = len(tef_lines) * step_tef
+        total_bot_h = tef_block_h + gap_tef_kaynak + kaynak_h
+
+    bot_y = usable_top + max(0, (avail_bot_h - total_bot_h) // 2)
 
     for tl in tef_lines:
         tlb = draw.textbbox((0, 0), tl, font=f_tef)
@@ -306,9 +328,10 @@ def build_v20_base_layout(
 
     draw.text(((w - (kb[2] - kb[0])) / 2, bot_y), kaynak_txt, font=f_kaynak, fill="#EADBC8")
 
-    # 12. Orta Bölüm: 100% Bold Ibarra Real Nova Türkçe Meal
+    # 12. Orta Bölüm: 100% Bold Ibarra Real Nova Türkçe Meal (Yatay & Dikey Auto-Fit Korumalı)
     solid_meal_h = fade_2_start - fade_1_end
-    temiz_meal = turkce_kisaltmalari_genislet(meal_txt.strip("“”\"' "))
+    temiz_meal = re.sub(r',\s*([.,;:!?])', r'\1', meal_txt.strip("“”\"' "))
+    temiz_meal = re.sub(r'\s+([.,;:!?])', r'\1', temiz_meal)
     raw_tokens = re.sub(r'\*\*', '', temiz_meal)
     tr_len = len(temiz_meal)
     tr_words = raw_tokens.split()
@@ -326,13 +349,15 @@ def build_v20_base_layout(
     else:
         pt_hero = 54 if is_916 else 44
 
-    while pt_hero >= 34:
+    max_hero_line_w = max_w - 30
+    while pt_hero >= 26:
         f_hero_b = font_al(FONT_BASLIK, pt_hero, agirlik=700)
         tokens = [(tok_str, True) for tok_str in tr_words]
         hero_wrapped, hero_space_w = wrap_mixed_tokens(tokens, f_hero_b, f_hero_b, max_w - 40, draw)
         step_hero = int(pt_hero * 1.32)
         hero_h = len(hero_wrapped) * step_hero
-        if hero_h <= solid_meal_h - (24 if is_916 else 14):
+        en_genis_satir = max((lw for _, lw in hero_wrapped), default=0)
+        if hero_h <= solid_meal_h - (24 if is_916 else 14) and en_genis_satir <= max_hero_line_w:
             break
         pt_hero -= 2
 

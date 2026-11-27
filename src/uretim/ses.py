@@ -329,10 +329,14 @@ def turkce_kisaltmalari_genislet(metin: str) -> str:
     metin = re.sub(r'\(\s*[kK]\.?[sS]\.?\s*\)', 'kaddesallahu sırrah', metin, flags=re.IGNORECASE)
     metin = re.sub(r'\(\s*[rR]h?\.[aA]\.?\s*\)', 'rahmetullahi aleyh', metin, flags=re.IGNORECASE)
 
-    # 6. Genel Türkçe Kısaltmalar
+    # 6. Genel Türkçe Kısaltmalar ve Eğik Çizgi (/) Ayrıştırma
     metin = re.sub(r'\bvb\.(?=\s|[,\.;:!?\'’\"]|$)', 've benzeri', metin, flags=re.IGNORECASE)
     metin = re.sub(r'\bvs\.(?=\s|[,\.;:!?\'’\"]|$)', 've saire', metin, flags=re.IGNORECASE)
     metin = re.sub(r'\bbkz\.(?=\s|[,\.;:!?\'’\"]|$)', 'bakınız', metin, flags=re.IGNORECASE)
+    # Uzun birleşik eğik çizgili ifadeleri (örn. kışkırtmalarından/vesveselerinden) hem satır sarımı hem doğal seslendirme için ayır
+    metin = re.sub(r'([A-Za-zÇĞİÖŞÜçğıöşüâîûÂÎÛ]{3,})\s*/\s*([A-Za-zÇĞİÖŞÜçğıöşüâîûÂÎÛ]{3,})', r'\1 ve \2', metin)
+    # Yaygın dizgi/harf tekrar pürüzlerini onar
+    metin = re.sub(r'\bölüümüz\b', 'ölümüz', metin, flags=re.IGNORECASE)
 
     # Fazla boşlukları toparla
     metin = re.sub(r'\s+', ' ', metin).strip()
@@ -387,25 +391,30 @@ def dua_fonetik_ve_es_hazirla(metin: str) -> str:
         return ""
     metin = metin.strip()
 
-    # Yaygın nida ve münacat terkiplerinden sonra virgül ekle (eğer yoksa)
+    # Yaygın nida ve münacat terkiplerinden sonra YALNIZCA devamında kelime geliyorsa virgül ekle
+    # (Cümle sonlarında 'Rabbim.' -> 'Rabbim, .' hatasını %100 engeller)
+    devaminda_kelime = r'(?=\s+[A-Za-zÇĞİÖŞÜçğıöşüâîûÂÎÛ“"\'])'
     nida_kaliplari = [
-        (r'\b(Ey\s+Rabbimiz)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Ey\s+Rabbim)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Ey\s+Allah\'ım)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Allah\'ım)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Rabbimiz)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Rabbim)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Yâ\s+Rabbi|Ya\s+Rabbi)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Yâ\s+Rab|Ya\s+Rab)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Ey\s+merhametlilerin\s+en\s+merhametlisi)(?![,;:!?])\b', r'\1,'),
-        (r'\b(Ey\s+kalpleri\s+çekip\s+çeviren\s+Rabbim)(?![,;:!?])\b', r'\1,'),
+        (r'\b(Ey\s+Rabbimiz)' + devaminda_kelime, r'\1,'),
+        (r'\b(Ey\s+Rabbim)' + devaminda_kelime, r'\1,'),
+        (r'\b(Ey\s+Allah[\'’]ım)' + devaminda_kelime, r'\1,'),
+        (r'\b(Allah[\'’]ım)' + devaminda_kelime, r'\1,'),
+        (r'\b(Rabbimiz)' + devaminda_kelime, r'\1,'),
+        (r'\b(Rabbim)' + devaminda_kelime, r'\1,'),
+        (r'\b(Yâ\s+Rabbi|Ya\s+Rabbi)' + devaminda_kelime, r'\1,'),
+        (r'\b(Yâ\s+Rab|Ya\s+Rab)' + devaminda_kelime, r'\1,'),
+        (r'\b(Ey\s+merhametlilerin\s+en\s+merhametlisi)' + devaminda_kelime, r'\1,'),
+        (r'\b(Ey\s+kalpleri\s+çekip\s+çeviren\s+Rabbim)' + devaminda_kelime, r'\1,'),
     ]
     for pattern, repl in nida_kaliplari:
         metin = re.sub(pattern, repl, metin, flags=re.IGNORECASE)
 
-    # Noktalamadan önceki gereksiz boşlukları ve mükerrer virgülleri temizle
+    # Noktalamadan önceki gereksiz boşlukları, ', .' çakışmalarını ve mükerrer virgülleri temizle
+    metin = re.sub(r',\s*([.,;:!?])', r'\1', metin)
+    metin = re.sub(r'\s+([.,;:!?])', r'\1', metin)
     metin = re.sub(r'\s*,\s*', ', ', metin)
     metin = re.sub(r',+', ',', metin)
+    metin = re.sub(r',\s*([.;:!?])', r'\1', metin)
     metin = re.sub(r'\s+', ' ', metin).strip()
     return metin
 

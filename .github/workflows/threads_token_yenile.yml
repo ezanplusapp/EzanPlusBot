@@ -1,0 +1,80 @@
+name: Threads 60 Günlük Jeton Otomatik Yenileme
+
+on:
+  schedule:
+    # Her ayın 1. ve 15. günü sabah 06:00 UTC (09:00 TSİ) çalışarak 60 günlük Threads jetonunun süresinin dolmasını engeller
+    - cron: '0 6 1,15 * *'
+  workflow_dispatch:
+
+jobs:
+  threads_jeton_yenile:
+    name: Threads Jetonunu Uzat ve Bildir
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Kodu Çek
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Bağımlılıkları Yükle
+        run: pip install requests python-dotenv pyyaml
+
+      - name: Threads Jetonunu Yenile ve GitHub Secret Güncelle
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.REPO_PAT || '' }}
+        run: |
+          python - <<'PY'
+          import os, subprocess, requests
+          from src.platformlar import threads
+
+          chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+          bot_tok = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+
+          def tg_bildir(mesaj: str):
+              if bot_tok and chat_id:
+                  try:
+                      requests.post(
+                          f"https://api.telegram.org/bot{bot_tok}/sendMessage",
+                          data={"chat_id": chat_id, "text": mesaj, "parse_mode": "HTML"},
+                          timeout=15,
+                      )
+                  except Exception:
+                      pass
+
+          try:
+              yeni_jeton, kalan_gun = threads.jetonu_yenile()
+              gh_tok = os.getenv("GH_TOKEN", "").strip()
+              secret_guncellendi = False
+              if gh_tok:
+                  res = subprocess.run(
+                      ["gh", "secret", "set", "THREADS_ACCESS_TOKEN", "--repo", os.environ["GITHUB_REPOSITORY"], "--body", yeni_jeton],
+                      capture_output=True,
+                      text=True,
+                  )
+                  secret_guncellendi = (res.returncode == 0)
+
+              if secret_guncellendi:
+                  tg_bildir(f"🔄 <b>Threads Jetonu Otomatik Uzatıldı</b>\nYeni geçerlilik süresi: <b>~{kalan_gun} gün</b> (GitHub Secrets güncellendi).")
+              else:
+                  tg_bildir(
+                      f"🔄 <b>Threads Jetonu Yenilendi (~{kalan_gun} gün)</b>\n"
+                      "Not: Otomatik GitHub Secret yazımı için <code>REPO_PAT</code> tanımlı değilse yerel ortamda "
+                      "<code>python -m src.platformlar.threads --yenile</code> çalıştırıp secret'ı güncelleyebilirsiniz."
+                  )
+          except Exception as e:
+              tg_bildir(
+                  f"⚠️ <b>Threads Jetonu Yenilenemedi!</b>\nHata: <code>{str(e)[:220]}</code>\n\n"
+                  "Jeton süresi dolmuş olabilir. Lütfen yerel terminalde <code>python -m src.platformlar.threads</code> ile yeni 60 günlük jeton alın."
+              )
+              raise
+          PY
